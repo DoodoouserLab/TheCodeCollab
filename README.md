@@ -35,7 +35,7 @@ Ready to **become a collaborator**? Follow these steps:
 ## 📢 Stay Updated
 Keep up with announcements, updates, and new features by following our work and engaging in discussions.
 
-🔔 **Join the conversation** in [GitHub Discussions](#)!
+🔔 **Join the conversation** in **Discussions**!
 
 ---
 
