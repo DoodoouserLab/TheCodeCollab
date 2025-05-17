@@ -37,19 +37,6 @@
         const paddleHeight = 10;
         const paddleSpeed = 6;
 
-        function updatePaddle() {
-            document.addEventListener('keydown', function(e) {
-  
-                // left arrow key
-                if (e.which === 37 && paddleX >= 0) {
-                    paddleX = paddleX - 3;
-                }
-                // right arrow key
-                else if (e.which === 39 && paddleX <= 600) {
-                    paddleX = paddleX + 3;
-                }
-            }
-         }            
 
         function updateGame() {
             ballX += ballSpeedX;
@@ -80,6 +67,21 @@
 
         }
 
+         function updatePaddle() {
+            document.addEventListener('keydown', function(e) {
+  
+                // left arrow key
+                if (e.which === 37 && paddleX >= 0) {
+                    paddleX = paddleX - 3;
+                }
+                // right arrow key
+                else if (e.which === 39 && paddleX <= 600) {
+                    paddleX = paddleX + 3;
+                }
+            }
+         }            
+
+
         function drawGame() {
             ctx.clearRect(0, 0, canvas.width, canvas.height);
 
@@ -109,7 +111,7 @@
 
  
   
-                                      );
+        });
 
         gameLoop();
     </script>
