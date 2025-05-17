@@ -99,11 +99,11 @@
 
   // left arrow key
   if (e.which === 37 && paddleX >= 0) {
-    paddleX = paddleX - 1
+    paddleX = paddleX - paddleSpeed
   }
  // right arrow key
   else if (e.which === 39 && paddleX <= 600) {
-    paddleX = paddleX + 1
+    paddleX = paddleX + paddleSpeed
   }
         }
  
