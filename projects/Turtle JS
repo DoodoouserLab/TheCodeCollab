@@ -1,0 +1,141 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Turtle Graphics in JavaScript</title>
+  <style>
+    /* Center the canvas on the page */
+    body {
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      height: 100vh;
+      background-color: #f0f0f0;
+      margin: 0;
+    }
+    canvas {
+      background-color: #ffffff;
+      border: 1px solid #ccc;
+    }
+  </style>
+</head>
+<body>
+  <canvas id="turtleCanvas" width="600" height="600"></canvas>
+  <script>
+    // Define a pen class to mimic turtle functionality.
+    function Pen(ctx) {
+      this.ctx = ctx;
+      this.x = 0;
+      this.y = 0;
+      this.angle = 0; // In degrees – 0 points to the right.
+      this.penDown = true;
+    }
+
+    // Moves forward by "dist" pixels drawing a line if the pen is down.
+    Pen.prototype.forward = function(dist) {
+      var rad = this.angle * Math.PI / 180;
+      var newX = this.x + Math.cos(rad) * dist;
+      var newY = this.y + Math.sin(rad) * dist;
+      if (this.penDown) {
+        this.ctx.beginPath();
+        this.ctx.moveTo(this.x, this.y);
+        this.ctx.lineTo(newX, newY);
+        this.ctx.stroke();
+      }
+      this.x = newX;
+      this.y = newY;
+    };
+
+    // Turns the pen to the right (clockwise) by the given angle in degrees.
+    Pen.prototype.right = function(angle) {
+      this.angle -= angle;
+    };
+
+    // Optional: turn left for convenience.
+    Pen.prototype.left = function(angle) {
+      this.angle += angle;
+    };
+
+    // Lifts the pen, so no drawing occurs during movement.
+    Pen.prototype.penup = function() {
+      this.penDown = false;
+    };
+
+    // Puts the pen down so that movement draws lines.
+    Pen.prototype.pendown = function() {
+      this.penDown = true;
+    };
+
+    // Moves the pen to a new (x, y) position.
+    Pen.prototype.goto = function(x, y) {
+      if (this.penDown) {
+        this.ctx.beginPath();
+        this.ctx.moveTo(this.x, this.y);
+        this.ctx.lineTo(x, y);
+        this.ctx.stroke();
+      }
+      this.x = x;
+      this.y = y;
+    };
+
+    // Draws a circle with the given radius.
+    // This function mimics turtle.circle by computing the circle center to the
+    // left of the pen (relative to its current heading). The circle is drawn in full.
+    Pen.prototype.circle = function(radius) {
+      // Convert current heading to radians.
+      var radAngle = this.angle * Math.PI / 180;
+      // Compute the circle's center offset: turtle centers the circle to its left.
+      var centerX = this.x + Math.cos(radAngle + Math.PI/2) * radius;
+      var centerY = this.y + Math.sin(radAngle + Math.PI/2) * radius;
+      // The starting angle is from the center to the current position.
+      var startAngle = Math.atan2(this.y - centerY, this.x - centerX);
+      // Draw a complete circle.
+      this.ctx.beginPath();
+      // For positive radius, draw counterclockwise (like turtle's behavior).
+      this.ctx.arc(centerX, centerY, Math.abs(radius), startAngle, startAngle + 2 * Math.PI, radius > 0);
+      this.ctx.stroke();
+    };
+
+    // Run our drawing commands once the page loads.
+    window.onload = function() {
+      var canvas = document.getElementById("turtleCanvas");
+      var ctx = canvas.getContext("2d");
+
+      // Set up a coordinate system similar to turtle:
+      // Move the origin to the center and flip the y-axis so positive y goes upward.
+      ctx.translate(canvas.width / 2, canvas.height / 2);
+      ctx.scale(1, -1);
+
+      // Create a new pen.
+      var pen = new Pen(ctx);
+      
+      // --- Example 1: Draw a square ---
+      for (var i = 0; i < 4; i++) {
+        pen.forward(100);
+        pen.right(90);
+      }
+      
+      // --- Reset position to draw a circle ---
+      pen.penup();
+      pen.goto(0, -150);
+      pen.pendown();
+      
+      // --- Example 2: Draw a circle of radius 60 ---
+      pen.circle(60);
+      
+      // --- Reset position to draw a star ---
+      pen.penup();
+      pen.goto(-200, 0);
+      pen.pendown();
+      
+      // --- Example 3: Draw a star ---
+      for (var i = 0; i < 5; i++) {
+        pen.forward(100);
+        pen.right(144);
+      }
+      
+      // No explicit "done" is needed; the drawing stays on the canvas.
+    };
+  </script>
+</body>
+</html>
