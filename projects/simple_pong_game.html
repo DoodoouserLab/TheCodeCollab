@@ -1,0 +1,95 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Simple Pong Game</title>
+    <style>
+        body {
+            text-align: center;
+            background-color: black;
+            color: white;
+        }
+        canvas {
+            background: #222;
+            display: block;
+            margin: auto;
+            border: 2px solid white;
+        }
+    </style>
+</head>
+<body>
+    <h1>Simple Pong Game</h1>
+    <canvas id="gameCanvas" width="600" height="400"></canvas>
+    <script>
+        const canvas = document.getElementById("gameCanvas");
+        const ctx = canvas.getContext("2d");
+
+        let ballX = canvas.width / 2;
+        let ballY = canvas.height / 2;
+        let ballSpeedX = 3;
+        let ballSpeedY = 3;
+        const ballSize = 10;
+
+        let paddleX = (canvas.width - 100) / 2;
+        const paddleY = canvas.height - 20;
+        const paddleWidth = 100;
+        const paddleHeight = 10;
+        const paddleSpeed = 6;
+
+        function updateGame() {
+            ballX += ballSpeedX;
+            ballY += ballSpeedY;
+
+            if (ballX < 0 || ballX > canvas.width - ballSize) {
+                ballSpeedX *= -1;
+            }
+
+            if (ballY < 0) {
+                ballSpeedY *= -1;
+            }
+
+            if (
+                ballY + ballSize > paddleY &&
+                ballX > paddleX &&
+                ballX < paddleX + paddleWidth
+            ) {
+                ballSpeedY *= -1;
+            }
+
+            if (ballY > canvas.height) {
+                ballX = canvas.width / 2;
+                ballY = canvas.height / 2;
+                ballSpeedX = 3;
+                ballSpeedY = 3;
+            }
+        }
+
+        function drawGame() {
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+            ctx.fillStyle = "white";
+            ctx.fillRect(paddleX, paddleY, paddleWidth, paddleHeight);
+
+            ctx.beginPath();
+            ctx.arc(ballX, ballY, ballSize, 0, Math.PI * 2);
+            ctx.fillStyle = "white";
+            ctx.fill();
+            ctx.closePath();
+        }
+
+        function gameLoop() {
+            updateGame();
+            drawGame();
+            requestAnimationFrame(gameLoop);
+        }
+
+        document.addEventListener("mousemove", (event) => {
+            let rect = canvas.getBoundingClientRect();
+            paddleX = event.clientX - rect.left - paddleWidth / 2;
+        });
+
+        gameLoop();
+    </script>
+</body>
+</html>
