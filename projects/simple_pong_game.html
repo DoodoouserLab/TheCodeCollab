@@ -19,7 +19,7 @@
     </style>
 </head>
 <body>
-    <h1>Simple Pong Game</h1>
+    <h1>Simple Pong Game1</h1>
     <canvas id="gameCanvas" width="600" height="400"></canvas>
     <script>
         const canvas = document.getElementById("gameCanvas");
@@ -38,18 +38,18 @@
         const paddleSpeed = 6;
 
         function updatePaddle() {
-                        document.addEventListener('keydown', function(e) {
+            document.addEventListener('keydown', function(e) {
   
                 // left arrow key
-              if (e.which === 37 && paddleX >= 0) {
-                paddleX = paddleX - 3;
-              }
-              // right arrow key
-              else if (e.which === 39 && paddleX <= 600) {
-                paddleX = paddleX + 3;
-              }
-        }
-                                                  }
+                if (e.which === 37 && paddleX >= 0) {
+                    paddleX = paddleX - 3;
+                }
+                // right arrow key
+                else if (e.which === 39 && paddleX <= 600) {
+                    paddleX = paddleX + 3;
+                }
+            }
+         }            
 
         function updateGame() {
             ballX += ballSpeedX;
