@@ -20,6 +20,7 @@ Thank you for considering contributing to this project! Below are the guidelines
 - Attach logs or screenshots if possible.
 
 ## Community Standards
+- Please review and follow our [Code of Conduct](/CODE_OF_CONDUCT.md) to ensure a respectful and inclusive environment.
 - Be respectful and inclusive.
 - Do not use offensive language.
 
