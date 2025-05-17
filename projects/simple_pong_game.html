@@ -84,10 +84,10 @@
             requestAnimationFrame(gameLoop);
         }
 
-        document.addEventListener("mousemove", (event) => {
-            let rect = canvas.getBoundingClientRect();
-            paddleX = event.clientX - rect.left - paddleWidth / 2;
-        }
+       // document.addEventListener("mousemove", (event) => {
+           // let rect = canvas.getBoundingClientRect();
+          //  paddleX = event.clientX - rect.left - paddleWidth / 2;
+      //  }
 
 
             document.addEventListener('keydown', function(e) {
@@ -99,16 +99,16 @@
 
   // left arrow key
   if (e.which === 37 && paddleX >= 0) {
-    paddleX = paddleX - paddleSpeed;
+    paddleX = paddleX - 6;
   }
  // right arrow key
   else if (e.which === 39 && paddleX <= 600) {
-    paddleX = paddleX + paddleSpeed;
+    paddleX = paddleX + 6;
   }
         }
  
   
-        });
+        );
 
         gameLoop();
     </script>
