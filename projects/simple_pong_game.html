@@ -19,7 +19,7 @@
     </style>
 </head>
 <body>
-    <h1>Simple Pong Game1</h1>
+    <h1>Simple Pong Game</h1>
     <canvas id="gameCanvas" width="600" height="400"></canvas>
     <script>
         const canvas = document.getElementById("gameCanvas");
@@ -84,60 +84,15 @@
         }
         
         function gameLoop() {
-            ballX += ballSpeedX;
-            ballY += ballSpeedY;
-
-            if (ballX < 0 || ballX > canvas.width - ballSize) {
-                ballSpeedX *= -1;
-            }
-
-            if (ballY < 0) {
-                ballSpeedY *= -1;
-            }
-
-            if (
-                ballY + ballSize > paddleY &&
-                ballX > paddleX &&
-                ballX < paddleX + paddleWidth
-            ) {
-                ballSpeedY *= -1;
-            }
-
-            if (ballY > canvas.height) {
-                ballX = canvas.width / 2;
-                ballY = canvas.height / 2;
-                ballSpeedX = 3;
-                ballSpeedY = 3;
-            }
-            
-            document.addEventListener('keydown', function(e) {
-  
-                // left arrow key
-                if (e.which === 37 && paddleX >= 0) {
-                    paddleX = paddleX - 3;
-                }
-                // right arrow key
-                else if (e.which === 39 && paddleX <= 600) {
-                    paddleX = paddleX + 3;
-                }
-            }
-            ctx.clearRect(0, 0, canvas.width, canvas.height);
-
-            ctx.fillStyle = "white";
-            ctx.fillRect(paddleX, paddleY, paddleWidth, paddleHeight);
-
-            ctx.beginPath();
-            ctx.arc(ballX, ballY, ballSize, 0, Math.PI * 2);
-            ctx.fillStyle = "white";
-            ctx.fill();
-            ctx.closePath();
+            updateGame();
+            drawGame();
             requestAnimationFrame(gameLoop);
         }
 
-//        document.addEventListener("mousemove", (event) => {
-          //  let rect = canvas.getBoundingClientRect();
-        //    paddleX = event.clientX - rect.left - paddleWidth / 2;
-      // }
+        document.addEventListener("mousemove", (event) => {
+            let rect = canvas.getBoundingClientRect();
+            paddleX = event.clientX - rect.left - paddleWidth / 2;
+       }
 
 
 
