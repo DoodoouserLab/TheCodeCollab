@@ -84,9 +84,28 @@
             requestAnimationFrame(gameLoop);
         }
 
-        document.addEventListener("mousemove", (event) => {
-            let rect = canvas.getBoundingClientRect();
-            paddleX = event.clientX - rect.left - paddleWidth / 2;
+      //  document.addEventListener("mousemove", (event) => {
+        //    let rect = canvas.getBoundingClientRect();
+          //  paddleX = event.clientX - rect.left - paddleWidth / 2;
+
+
+            document.addEventListener('keydown', function(e) {
+  // prevent snake from backtracking on itself by checking that it's
+  // not already moving on the same axis (pressing left while moving
+  // left won't do anything, and pressing right while moving left
+  // shouldn't let you collide with your own body)
+
+
+  // left arrow key
+  if (e.which === 37 && paddleX >= 0) {
+    paddleX = paddleX - 1
+  }
+ // right arrow key
+  else if (e.which === 39 && paddleX <= 600) {
+    paddleX = paddleX + 1
+  }
+ 
+  }
         });
 
         gameLoop();
