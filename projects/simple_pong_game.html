@@ -84,9 +84,10 @@
             requestAnimationFrame(gameLoop);
         }
 
-        document.addEventListener("mousemove", (event) => {
-            let rect = canvas.getBoundingClientRect();
-            paddleX = event.clientX - rect.left - paddleWidth / 2;
+        //document.addEventListener("mousemove", (event) => {
+           // let rect = canvas.getBoundingClientRect();
+          //  paddleX = event.clientX - rect.left - paddleWidth / 2;
+        //}
 
 
             document.addEventListener('keydown', function(e) {
@@ -105,7 +106,7 @@
     paddleX = paddleX + 1
   }
  
-  }
+  
         });
 
         gameLoop();
