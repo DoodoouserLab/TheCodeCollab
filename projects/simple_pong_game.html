@@ -67,19 +67,7 @@
 
         }
 
-         function updatePaddle() {
-            document.addEventListener('keydown', function(e) {
-  
-                // left arrow key
-                if (e.which === 37 && paddleX >= 0) {
-                    paddleX = paddleX - 3;
-                }
-                // right arrow key
-                else if (e.which === 39 && paddleX <= 600) {
-                    paddleX = paddleX + 3;
-                }
-            }
-         }            
+                
 
 
         function drawGame() {
@@ -96,8 +84,18 @@
         }
 
         function gameLoop() {
-            updatePaddle(); 
             updateGame();
+            document.addEventListener('keydown', function(e) {
+  
+                // left arrow key
+                if (e.which === 37 && paddleX >= 0) {
+                    paddleX = paddleX - 3;
+                }
+                // right arrow key
+                else if (e.which === 39 && paddleX <= 600) {
+                    paddleX = paddleX + 3;
+                }
+            }
             drawGame();
             requestAnimationFrame(gameLoop);
         }
