@@ -36,6 +36,45 @@
         const paddleWidth = 100;
         const paddleHeight = 10;
         const paddleSpeed = 6;
+
+            function updateBallandPaddle() {
+                if (paddleX >= 1 && paddleX !== 600) {
+                    paddleX = paddleX + 1;
+                } 
+                else if paddleX == 600 {
+                    paddleX = 1;
+                }
+                if ballY < 400 {
+                    ballY = ballY + 1;
+                }
+                else if ballY == 400 {
+                    ballY = 1;
+                }
+                ballX = ballY;
+            }
+                    
+        
+            function drawGame() {
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+            ctx.fillStyle = "white";
+            ctx.fillRect(paddleX, paddleY, paddleWidth, paddleHeight);
+
+            ctx.beginPath();
+            ctx.arc(ballX, ballY, ballSize, 0, Math.PI * 2);
+            ctx.fillStyle = "white";
+            ctx.fill();
+            ctx.closePath();
+        }
+
+        function Game() {
+            updateBallandPaddle();
+            drawGame();
+            requestAnimationFrame(Game);
+        }
+
+        drawGame();
+        
     </script>
 </body>
 </html>  
