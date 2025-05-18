@@ -88,6 +88,7 @@
         ballX < paddleX + paddleWidth
       ) {
         ballSpeedY = -ballSpeedY;
+        score = score + 1;
         // Position the ball just above the paddle to prevent sticking.
         ballY = paddleY - ballSize;
       }
@@ -113,6 +114,8 @@
       ctx.fillStyle = "white";
       ctx.fill();
       ctx.closePath();
+      ctx.font = "20px Arial";
+      ctx.fillText("Score: " + paddleX, 100, canvas.height+380);
     }
 
     function gameLoop() {
