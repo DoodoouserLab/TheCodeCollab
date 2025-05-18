@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Simple Pong Game with Paddle Bounce</title>
+  <title>Pong Game with Scoring</title>
   <style>
     body {
       text-align: center;
@@ -40,8 +40,12 @@
     const paddleSpeed = 6;
     let paddleVelocity = 0;
 
-    // Update paddle based on arrow key input.
-    document.addEventListener("keydown", function(event) {
+    // Scoring variables:
+    let playerScore = 0;
+    let computerScore = 0;
+
+    // Update paddle movement using arrow keys.
+    document.addEventListener("keydown", function (event) {
       if (event.key === "ArrowLeft") {
         paddleVelocity = -paddleSpeed;
       } else if (event.key === "ArrowRight") {
@@ -49,14 +53,14 @@
       }
     });
 
-    document.addEventListener("keyup", function(event) {
+    document.addEventListener("keyup", function (event) {
       if (event.key === "ArrowLeft" || event.key === "ArrowRight") {
         paddleVelocity = 0;
       }
     });
 
     function updateBallandPaddle() {
-      // Update paddle position.
+      // Update the paddle position based on keyboard input.
       paddleX += paddleVelocity;
       if (paddleX < 0) {
         paddleX = 0;
@@ -65,57 +69,67 @@
         paddleX = canvas.width - paddleWidth;
       }
 
-      // Update ball position.
+      // Update the ball position.
       ballX += ballSpeedX;
       ballY += ballSpeedY;
 
-      // Bounce ball off the left and right edges.
+      // Bounce the ball off the left and right canvas edges.
       if (ballX - ballSize < 0 || ballX + ballSize > canvas.width) {
         ballSpeedX = -ballSpeedX;
       }
-      // Bounce ball off the top edge.
+      // Bounce off the top edge.
       if (ballY - ballSize < 0) {
         ballSpeedY = -ballSpeedY;
       }
 
       // Check for collision with the paddle.
-      // If the ball's bottom edge is at or below the paddle's top
-      // and its x-coordinate lies within the paddle's width, we reverse the vertical velocity.
       if (
         ballY + ballSize >= paddleY &&
         ballY + ballSize <= paddleY + paddleHeight &&
         ballX > paddleX &&
-        ballX < paddleX + paddleWidth
+        ballX < paddleX + paddleWidth &&
+        ballSpeedY > 0
       ) {
         ballSpeedY = -ballSpeedY;
-        score = score + 1;
-        // Position the ball just above the paddle to prevent sticking.
-        ballY = paddleY - ballSize;
+        ballY = paddleY - ballSize; // Reposition the ball above the paddle.
+        playerScore++; // Increase player score on successful hit.
       }
 
-      // Optionally, reset the ball if it misses the paddle.
+      // If the ball goes below the canvas, it’s a miss.
       if (ballY - ballSize > canvas.height) {
-        ballX = canvas.width / 2;
-        ballY = canvas.height / 2;
-        ballSpeedY = 3;
+        computerScore++; // Increase computer score.
+        resetBall();
       }
     }
 
+    // Reset the ball to the center with default speeds.
+    function resetBall() {
+      ballX = canvas.width / 2;
+      ballY = canvas.height / 2;
+      ballSpeedY = 3;
+      // Optionally, maintain the same horizontal direction.
+      ballSpeedX = ballSpeedX > 0 ? 3 : -3;
+    }
+
     function drawGame() {
+      // Clear the canvas.
       ctx.clearRect(0, 0, canvas.width, canvas.height);
 
-      // Draw paddle.
+      // Draw the paddle.
       ctx.fillStyle = "white";
       ctx.fillRect(paddleX, paddleY, paddleWidth, paddleHeight);
 
-      // Draw ball.
+      // Draw the ball.
       ctx.beginPath();
       ctx.arc(ballX, ballY, ballSize, 0, Math.PI * 2);
-      ctx.fillStyle = "white";
       ctx.fill();
       ctx.closePath();
+
+      // Draw the scores.
       ctx.font = "20px Arial";
-      ctx.fillText("Score: " + paddleX, 100, canvas.height+380);
+      ctx.fillStyle = "white";
+      ctx.fillText("Player: " + playerScore, 20, 30);
+      ctx.fillText("Computer: " + computerScore, canvas.width - 150, 30);
     }
 
     function gameLoop() {
