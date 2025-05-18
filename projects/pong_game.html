@@ -24,15 +24,13 @@
   <script>
     const canvas = document.getElementById("gameCanvas");
     const ctx = canvas.getContext("2d");
-
-    // Ball properties
+    
     let ballX = canvas.width / 2;
     let ballY = canvas.height / 2;
     let ballSpeedX = 3;
     let ballSpeedY = 3;
     const ballSize = 10;
 
-    // Paddle properties
     let paddleX = (canvas.width - 100) / 2;
     const paddleY = canvas.height - 20;
     const paddleWidth = 100;
@@ -40,12 +38,10 @@
     const paddleSpeed = 6;
     let paddleVelocity = 0;
 
-    // Scoring variables:
     let playerScore = 0;
     let computerScore = 0;
     let highscore = 0;
 
-    // Update paddle movement using arrow keys.
     document.addEventListener("keydown", function (event) {
       if (event.key === "ArrowLeft") {
         paddleVelocity = -paddleSpeed;
@@ -61,7 +57,6 @@
     });
 
     function updateBallandPaddle() {
-      // Update the paddle position based on keyboard input.
       paddleX += paddleVelocity;
       if (paddleX < 0) {
         paddleX = 0;
@@ -69,21 +64,18 @@
       if (paddleX + paddleWidth > canvas.width) {
         paddleX = canvas.width - paddleWidth;
       }
-
-      // Update the ball position.
+    }
+    
       ballX += ballSpeedX;
       ballY += ballSpeedY;
 
-      // Bounce the ball off the left and right canvas edges.
       if (ballX - ballSize < 0 || ballX + ballSize > canvas.width) {
         ballSpeedX = -ballSpeedX;
       }
-      // Bounce off the top edge.
       if (ballY - ballSize < 0) {
         ballSpeedY = -ballSpeedY;
       }
 
-      // Check for collision with the paddle.
       if (
         ballY + ballSize >= paddleY &&
         ballY + ballSize <= paddleY + paddleHeight &&
@@ -91,15 +83,14 @@
         ballX < paddleX + paddleWidth &&
         ballSpeedY > 0
       ) {
-        ballSpeedY = -ballSpeedY * 1.1; 
-        ballY = paddleY - ballSize; // Reposition the ball above the paddle.
-        playerScore++; // Increase player score on successful hit.
-        ballSpeedX = ballSpeedX * 1.1;
+        ballSpeedY = -ballSpeedY * 1.05; 
+        ballY = paddleY - ballSize; 
+        playerScore++; 
+        ballSpeedX = ballSpeedX * 1.05;
       }
 
-      // If the ball goes below the canvas, it’s a miss.
       if (ballY - ballSize > canvas.height) {
-        computerScore++; // Increase computer score.
+        computerScore++; 
         if (playerScore > highscore) {
           highscore = playerScore;
         }
@@ -108,30 +99,24 @@
       }
     }
 
-    // Reset the ball to the center with default speeds.
     function resetBall() {
       ballX = canvas.width / 2;
       ballY = canvas.height / 2;
       ballSpeedY = 3;
-      // Optionally, maintain the same horizontal direction.
       ballSpeedX = ballSpeedX > 0 ? 3 : -3;
     }
 
     function drawGame() {
-      // Clear the canvas.
       ctx.clearRect(0, 0, canvas.width, canvas.height);
 
-      // Draw the paddle.
       ctx.fillStyle = "white";
       ctx.fillRect(paddleX, paddleY, paddleWidth, paddleHeight);
 
-      // Draw the ball.
       ctx.beginPath();
       ctx.arc(ballX, ballY, ballSize, 0, Math.PI * 2);
       ctx.fill();
       ctx.closePath();
 
-      // Draw the scores.
       ctx.font = "20px Arial";
       ctx.fillStyle = "white";
       ctx.fillText("Highscore: " + highscore, 200, 30);
