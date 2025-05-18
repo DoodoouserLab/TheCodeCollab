@@ -90,9 +90,10 @@
         ballX < paddleX + paddleWidth &&
         ballSpeedY > 0
       ) {
-        ballSpeedY = -ballSpeedY;
+        ballSpeedY = -ballSpeedY * 1.1; 
         ballY = paddleY - ballSize; // Reposition the ball above the paddle.
         playerScore++; // Increase player score on successful hit.
+        ballSpeedX = ballSpeedY;
       }
 
       // If the ball goes below the canvas, it’s a miss.
