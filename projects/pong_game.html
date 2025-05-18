@@ -19,7 +19,7 @@
     </style>
 </head>
 <body>
-    <h1>Simple Pong Game</h1>
+    <h1>Pong Game</h1>
     <canvas id="gameCanvas" width="600" height="400"></canvas>
     <script>
         const canvas = document.getElementById("gameCanvas");
@@ -38,7 +38,7 @@
         const paddleSpeed = 6;
 
             function updateBallandPaddle() {
-                if (paddleX >= 1 && paddleX !== 600) {
+                if paddleX < 600 {
                     paddleX = paddleX + 1;
                 } 
                 else if paddleX == 600 {
@@ -67,10 +67,10 @@
             ctx.closePath();
         }
 
-        function Game() {
+        function playGame() {
             updateBallandPaddle();
             drawGame();
-            requestAnimationFrame(Game);
+            requestAnimationFrame(playGame);
         }
 
         drawGame();
