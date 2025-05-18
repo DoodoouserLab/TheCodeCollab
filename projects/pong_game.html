@@ -64,6 +64,8 @@
             ctx.beginPath();
             ctx.arc(ballX, ballY, ballSize, 0, Math.PI * 2);
             ctx.fillStyle = "white";
+            ctx.fillText("ballx: " + ballX, 10, canvas.height-10);
+            ctx.fillText("paddlex: " + paddleX, 10, canvas.height-10);
             ctx.fill();
             ctx.closePath();
         }
