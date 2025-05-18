@@ -43,6 +43,7 @@
     // Scoring variables:
     let playerScore = 0;
     let computerScore = 0;
+    let highscore = 0;
 
     // Update paddle movement using arrow keys.
     document.addEventListener("keydown", function (event) {
@@ -93,12 +94,15 @@
         ballSpeedY = -ballSpeedY * 1.1; 
         ballY = paddleY - ballSize; // Reposition the ball above the paddle.
         playerScore++; // Increase player score on successful hit.
-        ballSpeedX = ballSpeedY;
+        ballSpeedX = -ballSpeedY;
       }
 
       // If the ball goes below the canvas, it’s a miss.
       if (ballY - ballSize > canvas.height) {
         computerScore++; // Increase computer score.
+        if (playerScore > highscore) {
+          highscore = playerScore;
+        }
         resetBall();
       }
     }
@@ -129,6 +133,7 @@
       // Draw the scores.
       ctx.font = "20px Arial";
       ctx.fillStyle = "white";
+      ctx.fillText("Highscore: " + highscore, 200, 30);
       ctx.fillText("Player: " + playerScore, 20, 30);
       ctx.fillText("Computer: " + computerScore, canvas.width - 150, 30);
     }
