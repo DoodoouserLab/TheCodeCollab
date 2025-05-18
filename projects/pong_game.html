@@ -38,19 +38,19 @@
         const paddleSpeed = 6;
 
             function updateBallandPaddle() {
-                if paddleX < 600 {
-                    paddleX = paddleX + 1;
+                if (paddleX < 600) {
+                    paddleX = paddleX + ballSpeedX;
                 } 
-                else if paddleX == 600 {
+                else if (paddleX === 600) {
                     paddleX = 1;
                 }
-                if ballY < 400 {
-                    ballY = ballY + 1;
+                if (ballY < 400) {
+                    ballY = ballY + ballSpeedY;
                 }
-                else if ballY == 400 {
+                else if (ballY === 400) {
                     ballY = 1;
                 }
-                ballX = ballY;
+                
             }
                     
         
@@ -73,7 +73,7 @@
             requestAnimationFrame(playGame);
         }
 
-        drawGame();
+        playGame();
         
     </script>
 </body>
