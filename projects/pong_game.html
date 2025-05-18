@@ -70,7 +70,7 @@
       }
 
       // Update ball position and bounce off the top and bottom edges:
-      if (ballY - ballSize < 0 || ballY + ballSize > canvas.height) {
+      if (ballY - ballSize < 0 || ballY + ballSize > canvas.height || paddleX < ballX < paddleX + paddleWidth && ballY === paddleY + ballSize / 2) {
         ballSpeedY = -ballSpeedY;
       }
       // Bounce off the left and right edges:
