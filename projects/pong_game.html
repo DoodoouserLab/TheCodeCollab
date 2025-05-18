@@ -1,86 +1,110 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Simple Pong Game</title>
-    <style>
-        body {
-            text-align: center;
-            background-color: black;
-            color: white;
-        }
-        canvas {
-            background: #222;
-            display: block;
-            margin: auto;
-            border: 2px solid white;
-        }
-    </style>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Simple Pong Game</title>
+  <style>
+    body {
+      text-align: center;
+      background-color: black;
+      color: white;
+    }
+    canvas {
+      background: #222;
+      display: block;
+      margin: auto;
+      border: 2px solid white;
+    }
+  </style>
 </head>
 <body>
-    <h1>Pong Game</h1>
-    <canvas id="gameCanvas" width="600" height="400"></canvas>
-    <script>
-        const canvas = document.getElementById("gameCanvas");
-        const ctx = canvas.getContext("2d");
+  <h1>Pong Game</h1>
+  <canvas id="gameCanvas" width="600" height="400"></canvas>
+  <script>
+    const canvas = document.getElementById("gameCanvas");
+    const ctx = canvas.getContext("2d");
 
-        let ballX = canvas.width / 2;
-        let ballY = canvas.height / 2;
-        let ballSpeedX = 3;
-        let ballSpeedY = 3;
-        const ballSize = 10;
+    // Ball properties
+    let ballX = canvas.width / 2;
+    let ballY = canvas.height / 2;
+    let ballSpeedX = 3;
+    let ballSpeedY = 3;
+    const ballSize = 10;
 
-        let paddleX = (canvas.width - 100) / 2;
-        const paddleY = canvas.height - 20;
-        const paddleWidth = 100;
-        const paddleHeight = 10;
-        const paddleSpeed = 6;
+    // Paddle properties
+    let paddleX = (canvas.width - 100) / 2;
+    const paddleY = canvas.height - 20;
+    const paddleWidth = 100;
+    const paddleHeight = 10;
+    const paddleSpeed = 6;
 
-            function updateBallandPaddle() {
-  // Update paddle (assuming paddleSpeed is defined properly for the paddle)
-  // This example doesn't change paddle logic for brevity
+    // This velocity will be set by arrow key events.
+    let paddleVelocity = 0;
 
-  // Bounce the ball off the top and bottom:
-  if (ballY - ballSize < 0 || ballY + ballSize > canvas.height) {
-    ballSpeedY = -ballSpeedY;
-  }
-  
-  // Update the ball's position with the newly inverted (if needed) velocity:
-  ballY += ballSpeedY;
-  
-  // Similarly, update horizontal position (if you want bouncing or scoring):
-  if (ballX - ballSize < 0 || ballX + ballSize > canvas.width) {
-    ballSpeedX = -ballSpeedX;
-  }
-  ballX += ballSpeedX;
-}
+    // Event listeners for arrow key input:
+    document.addEventListener("keydown", function (event) {
+      if (event.key === "ArrowLeft") {
+        paddleVelocity = -paddleSpeed;
+      } else if (event.key === "ArrowRight") {
+        paddleVelocity = paddleSpeed;
+      }
+    });
 
-                    
-        
-            function drawGame() {
-            ctx.clearRect(0, 0, canvas.width, canvas.height);
+    document.addEventListener("keyup", function (event) {
+      if (event.key === "ArrowLeft" || event.key === "ArrowRight") {
+        paddleVelocity = 0;
+      }
+    });
 
-            ctx.fillStyle = "white";
-            ctx.fillRect(paddleX, paddleY, paddleWidth, paddleHeight);
+    function updateBallandPaddle() {
+      // Update paddle position based on user input:
+      paddleX += paddleVelocity;
 
-            ctx.beginPath();
-            ctx.arc(ballX, ballY, ballSize, 0, Math.PI * 2);
-            ctx.fillStyle = "white";
-            ctx.fillText("ballx: " + ballX, 10, canvas.height-10);
-            ctx.fillText("paddlex: " + paddleX, 100, canvas.height-10);
-            ctx.fill();
-            ctx.closePath();
-        }
+      // Prevent the paddle from going off the canvas:
+      if (paddleX < 0) {
+        paddleX = 0;
+      }
+      if (paddleX + paddleWidth > canvas.width) {
+        paddleX = canvas.width - paddleWidth;
+      }
 
-        function playGame() {
-            updateBallandPaddle();
-            drawGame();
-            requestAnimationFrame(playGame);
-        }
+      // Update ball position and bounce off the top and bottom edges:
+      if (ballY - ballSize < 0 || ballY + ballSize > canvas.height) {
+        ballSpeedY = -ballSpeedY;
+      }
+      // Bounce off the left and right edges:
+      if (ballX - ballSize < 0 || ballX + ballSize > canvas.width) {
+        ballSpeedX = -ballSpeedX;
+      }
 
-        playGame();
-        
-    </script>
+      ballX += ballSpeedX;
+      ballY += ballSpeedY;
+    }
+
+    function drawGame() {
+      // Clear the canvas.
+      ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+      // Draw the paddle.
+      ctx.fillStyle = "white";
+      ctx.fillRect(paddleX, paddleY, paddleWidth, paddleHeight);
+
+      // Draw the ball.
+      ctx.beginPath();
+      ctx.arc(ballX, ballY, ballSize, 0, Math.PI * 2);
+      ctx.fillStyle = "white";
+      ctx.fill();
+      ctx.closePath();
+    }
+
+    function playGame() {
+      updateBallandPaddle();
+      drawGame();
+      requestAnimationFrame(playGame);
+    }
+
+    playGame();
+  </script>
 </body>
-</html>  
+</html>
