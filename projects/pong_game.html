@@ -39,7 +39,7 @@
 
             function updateBallandPaddle() {
                 if (paddleX < 600) {
-                    paddleX = paddleX + ballSpeedX;
+                    paddleX = paddleX + paddleSpeedX;
                 } 
                 else if (paddleX > 600) {
                     paddleX = 1;
@@ -47,10 +47,15 @@
                 if (ballY < 400) {
                     ballY = ballY + ballSpeedY;
                 }
-                else if (ballY > 400) {
+                else if (ballY >= 400) {
                     ballY = 1;
                 }
-                ballX = ballY;
+                if (ballX < 600) {
+                    ballX = ballX + ballSpeedX;
+                }
+                else if (ballX >= 600) {
+                    ballX = 1;
+                }
                 
             }
                     
