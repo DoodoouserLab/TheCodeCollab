@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Simple Pong Game</title>
+  <title>Simple Pong Game with Paddle Bounce</title>
   <style>
     body {
       text-align: center;
@@ -38,12 +38,10 @@
     const paddleWidth = 100;
     const paddleHeight = 10;
     const paddleSpeed = 6;
-
-    // This velocity will be set by arrow key events.
     let paddleVelocity = 0;
 
-    // Event listeners for arrow key input:
-    document.addEventListener("keydown", function (event) {
+    // Update paddle based on arrow key input.
+    document.addEventListener("keydown", function(event) {
       if (event.key === "ArrowLeft") {
         paddleVelocity = -paddleSpeed;
       } else if (event.key === "ArrowRight") {
@@ -51,17 +49,15 @@
       }
     });
 
-    document.addEventListener("keyup", function (event) {
+    document.addEventListener("keyup", function(event) {
       if (event.key === "ArrowLeft" || event.key === "ArrowRight") {
         paddleVelocity = 0;
       }
     });
 
     function updateBallandPaddle() {
-      // Update paddle position based on user input:
+      // Update paddle position.
       paddleX += paddleVelocity;
-
-      // Prevent the paddle from going off the canvas:
       if (paddleX < 0) {
         paddleX = 0;
       }
@@ -69,28 +65,49 @@
         paddleX = canvas.width - paddleWidth;
       }
 
-      // Update ball position and bounce off the top and bottom edges:
-      if (ballY - ballSize < 0 || ballY + ballSize > canvas.height || paddleX < ballX && ballX < paddleX + paddleWidth && ballY === paddleY + ballSize / 2) {
-        ballSpeedY = -ballSpeedY;
-      }
-      // Bounce off the left and right edges:
+      // Update ball position.
+      ballX += ballSpeedX;
+      ballY += ballSpeedY;
+
+      // Bounce ball off the left and right edges.
       if (ballX - ballSize < 0 || ballX + ballSize > canvas.width) {
         ballSpeedX = -ballSpeedX;
       }
+      // Bounce ball off the top edge.
+      if (ballY - ballSize < 0) {
+        ballSpeedY = -ballSpeedY;
+      }
 
-      ballX += ballSpeedX;
-      ballY += ballSpeedY;
+      // Check for collision with the paddle.
+      // If the ball's bottom edge is at or below the paddle's top
+      // and its x-coordinate lies within the paddle's width, we reverse the vertical velocity.
+      if (
+        ballY + ballSize >= paddleY &&
+        ballY + ballSize <= paddleY + paddleHeight &&
+        ballX > paddleX &&
+        ballX < paddleX + paddleWidth
+      ) {
+        ballSpeedY = -ballSpeedY;
+        // Position the ball just above the paddle to prevent sticking.
+        ballY = paddleY - ballSize;
+      }
+
+      // Optionally, reset the ball if it misses the paddle.
+      if (ballY - ballSize > canvas.height) {
+        ballX = canvas.width / 2;
+        ballY = canvas.height / 2;
+        ballSpeedY = 3;
+      }
     }
 
     function drawGame() {
-      // Clear the canvas.
       ctx.clearRect(0, 0, canvas.width, canvas.height);
 
-      // Draw the paddle.
+      // Draw paddle.
       ctx.fillStyle = "white";
       ctx.fillRect(paddleX, paddleY, paddleWidth, paddleHeight);
 
-      // Draw the ball.
+      // Draw ball.
       ctx.beginPath();
       ctx.arc(ballX, ballY, ballSize, 0, Math.PI * 2);
       ctx.fillStyle = "white";
@@ -98,13 +115,13 @@
       ctx.closePath();
     }
 
-    function playGame() {
+    function gameLoop() {
       updateBallandPaddle();
       drawGame();
-      requestAnimationFrame(playGame);
+      requestAnimationFrame(gameLoop);
     }
 
-    playGame();
+    gameLoop();
   </script>
 </body>
 </html>
