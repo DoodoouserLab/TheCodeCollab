@@ -2,17 +2,16 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8">
-  <title>Mini Terraria – Crafting, Enhanced Mining & Extra Mining</title>
+  <title>Mini Terraria – Tools & Crafting</title>
   <style>
     html, body {
       margin: 0;
       padding: 0;
       overflow: hidden;
-      background: #87CEEB;
+      background: #000;
     }
     canvas {
       display: block;
-      background: #87CEEB;
     }
   </style>
 </head>
@@ -22,7 +21,6 @@
     /***** Canvas Setup *****/
     const canvas = document.getElementById("game");
     const ctx = canvas.getContext("2d");
-
     function resizeCanvas() {
       canvas.width = window.innerWidth;
       canvas.height = window.innerHeight;
@@ -124,11 +122,11 @@
       height: tileSize * 1.8,
       vx: 0,
       vy: 0,
-      speed: 4,  // Increased speed for faster walking!
+      speed: 4,
       jumpStrength: 8,
       grounded: false,
       health: 100,
-      // Inventory for mined blocks and crafted items.
+      // Inventory includes gathered materials AND crafted tools.
       inventory: {
         dirt: 0,
         stone: 0,
@@ -171,6 +169,7 @@
     }
 
     /***** Crafting Setup *****/
+    // Recipes (tools must be crafted from gathered materials)
     const recipes = [
       {
         name: "Wooden Pickaxe",
@@ -188,7 +187,9 @@
         result: { key: "torch", amount: 4 }
       }
     ];
+    // Toggle the crafting menu with the "c" key.
     let craftingMenuActive = false;
+    // Will hold recipe box positions when drawing the crafting menu.
     let recipeMenuBoxes = [];
 
     function canCraft(recipe) {
@@ -224,6 +225,47 @@
       }
     });
 
+    // Mouse handling for mining & crafting
+    let isMining = false;
+    let currentMiningTarget = null; // {x, y} tile coordinates being mined.
+    let lastMousePos = { x: 0, y: 0 };
+    canvas.addEventListener("mousemove", e => {
+      const rect = canvas.getBoundingClientRect();
+      lastMousePos.x = e.clientX - rect.left;
+      lastMousePos.y = e.clientY - rect.top;
+    });
+    canvas.addEventListener("mousedown", e => {
+      if (craftingMenuActive) {
+        handleCraftingMenuClick(e);
+      } else {
+        isMining = true;
+        const rect = canvas.getBoundingClientRect();
+        lastMousePos.x = e.clientX - rect.left;
+        lastMousePos.y = e.clientY - rect.top;
+      }
+    });
+    canvas.addEventListener("mouseup", e => {
+      if (!craftingMenuActive) {
+        isMining = false;
+        currentMiningTarget = null;
+      }
+    });
+    function handleCraftingMenuClick(e) {
+      const rect = canvas.getBoundingClientRect();
+      let mouseX = e.clientX - rect.left;
+      let mouseY = e.clientY - rect.top;
+      // Check if the mouse is within any recipe box.
+      for (let box of recipeMenuBoxes) {
+        if (
+          mouseX >= box.x && mouseX <= box.x + box.width &&
+          mouseY >= box.y && mouseY <= box.y + box.height
+        ) {
+          craftItem(box.recipe);
+          console.log("Crafted: " + box.recipe.result.key);
+        }
+      }
+    }
+
     /***** Helper Functions *****/
     function isSolid(block) {
       return block !== 0;
@@ -238,8 +280,7 @@
               a.y < b.y + b.height &&
               a.y + a.height > b.y);
     }
-
-    // Incremental movement: move in small steps along an axis and check collisions.
+    // Incremental movement: move in steps and check collisions.
     function isColliding(entity) {
       let leftTile = Math.floor(entity.x / tileSize);
       let rightTile = Math.floor((entity.x + entity.width) / tileSize);
@@ -254,9 +295,8 @@
       }
       return false;
     }
-
     function updateEntityPhysics(entity) {
-      // Horizontal movement (incremental steps).
+      // Horizontal movement in small increments.
       let steps = Math.ceil(Math.abs(entity.vx));
       let moveX = (steps === 0) ? 0 : entity.vx / steps;
       for (let i = 0; i < steps; i++) {
@@ -267,7 +307,7 @@
           break;
         }
       }
-      // Vertical movement (incremental steps).
+      // Vertical movement in small increments.
       steps = Math.ceil(Math.abs(entity.vy));
       let moveY = (steps === 0) ? 0 : entity.vy / steps;
       entity.grounded = false;
@@ -282,11 +322,68 @@
       }
     }
 
+    // Mining tool multiplier: mining is faster with a Wooden Pickaxe.
+    function getMiningMultiplier() {
+      if (player.inventory.wooden_pickaxe > 0) return 2;
+      return 0.5;
+    }
+
+    /***** Enhanced Mining Mechanic *****/
+    // Base damage applied per tick.
+    const miningDamage = 0.1;
+    function updateMining() {
+      if (!isMining) return;
+
+      // Compute camera offset (as in rendering).
+      let cameraX = player.x - canvas.width / 2 + player.width / 2;
+      let cameraY = player.y - canvas.height / 2 + player.height / 2;
+      // Determine the world tile coordinates of the mouse.
+      let targetX = Math.floor((lastMousePos.x + cameraX) / tileSize);
+      let targetY = Math.floor((lastMousePos.y + cameraY) / tileSize);
+      // Update the current mining target if it changes.
+      if (!currentMiningTarget ||
+          currentMiningTarget.x !== targetX || currentMiningTarget.y !== targetY) {
+        currentMiningTarget = { x: targetX, y: targetY };
+      }
+      // Check for valid block.
+      if (targetX < 0 || targetX >= worldWidth || targetY < 0 || targetY >= worldHeight) return;
+      let block = world[targetX][targetY];
+      if (block === 0 || blockDurability[block] === undefined) {
+        currentMiningTarget = null;
+        return;
+      }
+      // Check if the block is within reach.
+      const blockCenterX = (targetX + 0.5) * tileSize;
+      const blockCenterY = (targetY + 0.5) * tileSize;
+      const playerCenterX = player.x + player.width / 2;
+      const playerCenterY = player.y + player.height / 2;
+      const dx = blockCenterX - playerCenterX;
+      const dy = blockCenterY - playerCenterY;
+      const distance = Math.sqrt(dx * dx + dy * dy);
+      const miningReach = 80;
+      if (distance > miningReach) return;
+
+      // Apply mining damage multiplied by tool efficiency.
+      const effectiveDamage = miningDamage * getMiningMultiplier();
+      blockHealth[targetX][targetY] -= effectiveDamage;
+      if (blockHealth[targetX][targetY] <= 0) {
+        // Award materials based on block type.
+        switch (block) {
+          case 1: player.inventory.dirt++; break;
+          case 2: player.inventory.stone++; break;
+          case 3: player.inventory.grass++; break;
+          case 4: player.inventory.wood++; break;
+          case 5: player.inventory.leaves++; break;
+        }
+        setBlock(targetX, targetY, 0);
+        currentMiningTarget = null;
+      }
+    }
+
     /***** Player Update *****/
     function updatePlayer() {
-      // When the crafting menu is open, ignore player motion.
+      // When the crafting menu is open, suspend movement.
       if (craftingMenuActive) return;
-
       if (keys["a"] || keys["ArrowLeft"]) {
         player.vx = -player.speed;
       } else if (keys["d"] || keys["ArrowRight"]) {
@@ -325,103 +422,100 @@
       }
     }
 
-    /***** Enhanced Mining Mechanic *****/
-    // Mining variables:
-    const miningDamage = 0.1; // Damage applied to a block per update tick.
-    let isMining = false;
-    let currentMiningTarget = null; // {x, y} tile coordinates being mined.
-    let lastMousePos = { x: 0, y: 0 };
-
-    // Update the last mouse position from movement.
-    canvas.addEventListener("mousemove", e => {
-      const rect = canvas.getBoundingClientRect();
-      lastMousePos.x = e.clientX - rect.left;
-      lastMousePos.y = e.clientY - rect.top;
-    });
-    canvas.addEventListener("mousedown", e => {
-      isMining = true;
-      const rect = canvas.getBoundingClientRect();
-      lastMousePos.x = e.clientX - rect.left;
-      lastMousePos.y = e.clientY - rect.top;
-    });
-    canvas.addEventListener("mouseup", e => {
-      isMining = false;
-      currentMiningTarget = null;
-    });
-
-    // Call this from the game loop when the mouse is held down.
-    function updateMining() {
-      if (!isMining) return;
-
-      // Compute camera offset (same as used in rendering).
-      let cameraX = player.x - canvas.width / 2 + player.width / 2;
-      let cameraY = player.y - canvas.height / 2 + player.height / 2;
-
-      // Determine the tile the mouse is over.
-      let targetX = Math.floor((lastMousePos.x + cameraX) / tileSize);
-      let targetY = Math.floor((lastMousePos.y + cameraY) / tileSize);
-
-      // Update the current mining target if it changes.
-      if (!currentMiningTarget ||
-          currentMiningTarget.x !== targetX || currentMiningTarget.y !== targetY) {
-        currentMiningTarget = { x: targetX, y: targetY };
+    /***** UI Rendering *****/
+    // Draw a simple inventory bar at the bottom center of the screen.
+    function drawInventory() {
+      const items = Object.keys(player.inventory);
+      const invSize = 40;
+      const padding = 10;
+      const totalWidth = items.length * (invSize + padding) - padding;
+      const startX = (canvas.width - totalWidth) / 2;
+      const y = canvas.height - invSize - 10;
+      ctx.font = "12px Arial";
+      ctx.textAlign = "center";
+      ctx.textBaseline = "middle";
+      for (let i = 0; i < items.length; i++) {
+        const key = items[i];
+        const count = player.inventory[key];
+        const x = startX + i * (invSize + padding);
+        ctx.fillStyle = "rgba(0,0,0,0.5)";
+        ctx.fillRect(x, y, invSize, invSize);
+        ctx.strokeStyle = "white";
+        ctx.strokeRect(x, y, invSize, invSize);
+        ctx.fillStyle = "white";
+        ctx.fillText(key, x + invSize / 2, y + invSize / 2 - 8);
+        ctx.fillText(count, x + invSize / 2, y + invSize / 2 + 8);
       }
+    }
 
-      // Ensure the target is within world bounds.
-      if (targetX < 0 || targetX >= worldWidth || targetY < 0 || targetY >= worldHeight) return;
-
-      let block = world[targetX][targetY];
-      if (block === 0 || blockDurability[block] === undefined) {
-        currentMiningTarget = null;
-        return;
-      }
-
-      // Check if the block is within reach.
-      const blockCenterX = (targetX + 0.5) * tileSize;
-      const blockCenterY = (targetY + 0.5) * tileSize;
-      const playerCenterX = player.x + player.width / 2;
-      const playerCenterY = player.y + player.height / 2;
-      const dx = blockCenterX - playerCenterX;
-      const dy = blockCenterY - playerCenterY;
-      const distance = Math.sqrt(dx * dx + dy * dy);
-      const miningReach = 80;
-      if (distance > miningReach) return;
-
-      // Apply continuous mining damage.
-      // (You can adjust miningDamage for speed or add tool multipliers later.)
-      blockHealth[targetX][targetY] -= miningDamage;
-      if (blockHealth[targetX][targetY] <= 0) {
-        // Award materials based on block type.
-        switch (block) {
-          case 1: player.inventory.dirt++; break;
-          case 2: player.inventory.stone++; break;
-          case 3: player.inventory.grass++; break;
-          case 4: player.inventory.wood++; break;
-          case 5: player.inventory.leaves++; break;
+    // Draw the crafting menu overlay with recipe boxes.
+    function drawCraftingMenu() {
+      // Semi-transparent overlay.
+      ctx.fillStyle = "rgba(0, 0, 0, 0.7)";
+      ctx.fillRect(0, 0, canvas.width, canvas.height);
+      const panelWidth = canvas.width * 0.8;
+      const panelHeight = canvas.height * 0.6;
+      const panelX = (canvas.width - panelWidth) / 2;
+      const panelY = (canvas.height - panelHeight) / 2;
+      // Panel background.
+      ctx.fillStyle = "#333";
+      ctx.fillRect(panelX, panelY, panelWidth, panelHeight);
+      ctx.fillStyle = "white";
+      ctx.font = "30px Arial";
+      ctx.textAlign = "center";
+      ctx.fillText("Crafting Menu", canvas.width / 2, panelY + 40);
+      const recipeBoxWidth = panelWidth * 0.9;
+      const recipeBoxHeight = 70;
+      const gap = 20;
+      recipeMenuBoxes = [];
+      ctx.font = "16px Arial";
+      ctx.textAlign = "left";
+      for (let i = 0; i < recipes.length; i++) {
+        const boxX = panelX + (panelWidth - recipeBoxWidth) / 2;
+        const boxY = panelY + 60 + i * (recipeBoxHeight + gap);
+        ctx.fillStyle = canCraft(recipes[i]) ? "#555" : "#222";
+        ctx.fillRect(boxX, boxY, recipeBoxWidth, recipeBoxHeight);
+        ctx.strokeStyle = "white";
+        ctx.strokeRect(boxX, boxY, recipeBoxWidth, recipeBoxHeight);
+        ctx.fillStyle = "white";
+        ctx.fillText(recipes[i].name, boxX + 10, boxY + 25);
+        let ingredText = "Ingredients: ";
+        for (let ingr in recipes[i].ingredients) {
+          ingredText += ingr + " x" + recipes[i].ingredients[ingr] + " ";
         }
-        setBlock(targetX, targetY, 0);
-        currentMiningTarget = null;
+        ctx.fillText(ingredText, boxX + 10, boxY + 45);
+        ctx.fillText("Result: " + recipes[i].result.key + " x" + recipes[i].result.amount, boxX + 10, boxY + 65);
+        recipeMenuBoxes.push({
+          recipe: recipes[i],
+          x: boxX,
+          y: boxY,
+          width: recipeBoxWidth,
+          height: recipeBoxHeight
+        });
       }
     }
 
     /***** Rendering *****/
     function draw() {
-      ctx.clearRect(0, 0, canvas.width, canvas.height);
+      // Draw a background gradient.
+      const grd = ctx.createLinearGradient(0, 0, 0, canvas.height);
+      grd.addColorStop(0, "#87CEEB");
+      grd.addColorStop(1, "#FFFFFF");
+      ctx.fillStyle = grd;
+      ctx.fillRect(0, 0, canvas.width, canvas.height);
 
-      // Center the camera on the player.
-      let cameraX = player.x - canvas.width / 2 + player.width / 2;
-      let cameraY = player.y - canvas.height / 2 + player.height / 2;
-
-      // Determine the visible area to only draw necessary tiles.
-      let startCol = Math.floor(cameraX / tileSize) - 1;
-      let endCol = startCol + Math.ceil(canvas.width / tileSize) + 2;
-      let startRow = Math.floor(cameraY / tileSize) - 1;
-      let endRow = startRow + Math.ceil(canvas.height / tileSize) + 2;
-
+      // Determine camera offset.
+      const cameraX = player.x - canvas.width / 2 + player.width / 2;
+      const cameraY = player.y - canvas.height / 2 + player.height / 2;
+      const startCol = Math.floor(cameraX / tileSize) - 1;
+      const endCol = startCol + Math.ceil(canvas.width / tileSize) + 2;
+      const startRow = Math.floor(cameraY / tileSize) - 1;
+      const endRow = startRow + Math.ceil(canvas.height / tileSize) + 2;
+      // Render only visible tiles.
       for (let x = startCol; x <= endCol; x++) {
         for (let y = startRow; y <= endRow; y++) {
           if (x >= 0 && x < worldWidth && y >= 0 && y < worldHeight) {
-            let block = world[x][y];
+            const block = world[x][y];
             if (block !== 0) {
               ctx.fillStyle = blockColors[block];
               ctx.fillRect(x * tileSize - cameraX, y * tileSize - cameraY, tileSize, tileSize);
@@ -429,40 +523,33 @@
           }
         }
       }
-
       // Draw player.
       ctx.fillStyle = "red";
       ctx.fillRect(player.x - cameraX, player.y - cameraY, player.width, player.height);
-
       // Draw enemies.
       for (let enemy of enemies) {
         ctx.fillStyle = "green";
         ctx.fillRect(enemy.x - cameraX, enemy.y - cameraY, enemy.width, enemy.height);
       }
-
-      // Draw simple UI.
+      // Simple health display.
       ctx.fillStyle = "black";
       ctx.font = "16px Arial";
       ctx.fillText("Health: " + Math.floor(player.health), 10, 20);
 
-      // If a block is being mined, show a visual progress overlay.
+      // If a block is being mined, draw a progress overlay.
       if (currentMiningTarget) {
-        let tx = currentMiningTarget.x;
-        let ty = currentMiningTarget.y;
-        // Check bounds and that the block is still present.
+        const tx = currentMiningTarget.x;
+        const ty = currentMiningTarget.y;
         if (tx >= 0 && tx < worldWidth && ty >= 0 && ty < worldHeight) {
-          let block = world[tx][ty];
+          const block = world[tx][ty];
           if (block !== 0 && blockDurability[block] !== undefined) {
-            let bx = tx * tileSize - cameraX;
-            let by = ty * tileSize - cameraY;
-            // Compute progress: how much damage has been dealt relative to its total durability.
-            let originalDurability = blockDurability[block];
+            const bx = tx * tileSize - cameraX;
+            const by = ty * tileSize - cameraY;
+            const originalDurability = blockDurability[block];
             let progress = 1 - (blockHealth[tx][ty] / originalDurability);
-            progress = Math.max(0, Math.min(progress, 1));
-            // Overlay: gradually darken the block as it’s mined.
+            progress = Math.max(0, Math.min(1, progress));
             ctx.fillStyle = "rgba(0, 0, 0, " + (0.5 * progress) + ")";
             ctx.fillRect(bx, by, tileSize, tileSize);
-            // Draw a progress bar above the block.
             ctx.fillStyle = "gray";
             ctx.fillRect(bx, by - 6, tileSize, 4);
             ctx.fillStyle = "yellow";
@@ -471,6 +558,12 @@
             ctx.strokeRect(bx, by - 6, tileSize, 4);
           }
         }
+      }
+      // Draw the inventory bar.
+      drawInventory();
+      // If the crafting menu is active, overlay it.
+      if (craftingMenuActive) {
+        drawCraftingMenu();
       }
     }
 
