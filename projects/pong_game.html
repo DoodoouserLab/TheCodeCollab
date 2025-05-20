@@ -85,7 +85,7 @@
         ballSpeedY = -ballSpeedY * 1.05; 
         ballY = paddleY - ballSize; 
         playerScore++; 
-        ballSpeedX = ballSpeedX * 1.05;
+        ballSpeedX = ballSpeedX * 1.05 + paddleVelocity;
       }
 
       if (ballY - ballSize > canvas.height) {
