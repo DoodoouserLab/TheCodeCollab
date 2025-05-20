@@ -2,295 +2,221 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8">
-  <title>3D Cube – No Libraries</title>
+  <title>Mini Terraria Clone</title>
   <style>
-    /* Make sure the canvas fills the screen */
     html, body {
       margin: 0;
       padding: 0;
-      width: 100%;
-      height: 100%;
+      overflow: hidden;
+      background: #87CEEB; /* Sky blue */
     }
     canvas {
       display: block;
-      width: 100%;
-      height: 100%;
-      background-color: #000;
+      background: #87CEEB;
     }
   </style>
 </head>
 <body>
-  <canvas id="glCanvas"></canvas>
+  <canvas id="game"></canvas>
   <script>
-    // Get the canvas and initialize a WebGL context.
-    const canvas = document.getElementById("glCanvas");
-    canvas.width = window.innerWidth;
-    canvas.height = window.innerHeight;
-    const gl = canvas.getContext("webgl");
-    if (!gl) {
-      alert("WebGL not supported in this browser.");
+    // Setup canvas and context
+    const canvas = document.getElementById('game');
+    const ctx = canvas.getContext('2d');
+
+    // Adjust canvas size to full window
+    function resizeCanvas() {
+      canvas.width = window.innerWidth;
+      canvas.height = window.innerHeight;
     }
+    window.addEventListener('resize', resizeCanvas);
+    resizeCanvas();
 
-    // --- Shader Source Code ---
-    const vsSource = `
-      attribute vec3 aPosition;
-      attribute vec3 aColor;
-      uniform mat4 uModelViewMatrix;
-      uniform mat4 uProjectionMatrix;
-      varying vec3 vColor;
-      void main(void) {
-        gl_Position = uProjectionMatrix * uModelViewMatrix * vec4(aPosition, 1.0);
-        vColor = aColor;
-      }
-    `;
+    // Define world configuration
+    const tileSize = 16; // size of each block in pixels
+    const worldWidth = 200; // number of horizontal blocks in the world
+    const worldHeight = 100; // number of vertical blocks
 
-    const fsSource = `
-      precision mediump float;
-      varying vec3 vColor;
-      void main(void) {
-        gl_FragColor = vec4(vColor, 1.0);
-      }
-    `;
+    // World tile legend:
+    // 0 = air, 1 = dirt, 2 = stone, 3 = grass
+    const world = [];
 
-    // --- Shader Compilation Helper Functions ---
-    function loadShader(type, source) {
-      const shader = gl.createShader(type);
-      gl.shaderSource(shader, source);
-      gl.compileShader(shader);
-      if (!gl.getShaderParameter(shader, gl.COMPILE_STATUS)) {
-        alert("Error compiling shader: " + gl.getShaderInfoLog(shader));
-        gl.deleteShader(shader);
-        return null;
-      }
-      return shader;
-    }
-
-    function initShaderProgram(vsSource, fsSource) {
-      const vertexShader = loadShader(gl.VERTEX_SHADER, vsSource);
-      const fragmentShader = loadShader(gl.FRAGMENT_SHADER, fsSource);
-      const shaderProgram = gl.createProgram();
-      gl.attachShader(shaderProgram, vertexShader);
-      gl.attachShader(shaderProgram, fragmentShader);
-      gl.linkProgram(shaderProgram);
-      if (!gl.getProgramParameter(shaderProgram, gl.LINK_STATUS)) {
-        alert("Unable to initialize the shader program: " + gl.getProgramInfoLog(shaderProgram));
-        return null;
-      }
-      return shaderProgram;
-    }
-
-    const shaderProgram = initShaderProgram(vsSource, fsSource);
-    gl.useProgram(shaderProgram);
-
-    // --- Look Up Locations ---
-    const programInfo = {
-      attribLocations: {
-        vertexPosition: gl.getAttribLocation(shaderProgram, 'aPosition'),
-        vertexColor: gl.getAttribLocation(shaderProgram, 'aColor')
-      },
-      uniformLocations: {
-        projectionMatrix: gl.getUniformLocation(shaderProgram, 'uProjectionMatrix'),
-        modelViewMatrix: gl.getUniformLocation(shaderProgram, 'uModelViewMatrix')
-      }
-    };
-
-    // --- Cube Geometry Data ---
-    const positions = [
-      // Front face
-      -1.0, -1.0,  1.0,
-       1.0, -1.0,  1.0,
-       1.0,  1.0,  1.0,
-      -1.0,  1.0,  1.0,
-      // Back face
-      -1.0, -1.0, -1.0,
-      -1.0,  1.0, -1.0,
-       1.0,  1.0, -1.0,
-       1.0, -1.0, -1.0,
-      // Top face
-      -1.0,  1.0, -1.0,
-      -1.0,  1.0,  1.0,
-       1.0,  1.0,  1.0,
-       1.0,  1.0, -1.0,
-      // Bottom face
-      -1.0, -1.0, -1.0,
-       1.0, -1.0, -1.0,
-       1.0, -1.0,  1.0,
-      -1.0, -1.0,  1.0,
-      // Right face
-       1.0, -1.0, -1.0,
-       1.0,  1.0, -1.0,
-       1.0,  1.0,  1.0,
-       1.0, -1.0,  1.0,
-      // Left face
-      -1.0, -1.0, -1.0,
-      -1.0, -1.0,  1.0,
-      -1.0,  1.0,  1.0,
-      -1.0,  1.0, -1.0,
-    ];
-
-    // Each face gets a solid color.
-    const faceColors = [
-      [1.0, 0.0, 0.0], // Front: red
-      [0.0, 1.0, 0.0], // Back: green
-      [0.0, 0.0, 1.0], // Top: blue
-      [1.0, 1.0, 0.0], // Bottom: yellow
-      [1.0, 0.0, 1.0], // Right: magenta
-      [0.0, 1.0, 1.0]  // Left: cyan
-    ];
-
-    let colors = [];
-    for (let i = 0; i < faceColors.length; i++) {
-      const c = faceColors[i];
-      // Repeat once for each of the face's 4 vertices.
-      for (let j = 0; j < 4; j++) {
-        colors.push(c[0], c[1], c[2]);
-      }
-    }
-
-    // Define the indices for the cube (2 triangles per face)
-    const indices = [
-      0, 1, 2,    0, 2, 3,      // Front face
-      4, 5, 6,    4, 6, 7,      // Back face
-      8, 9, 10,   8, 10, 11,    // Top face
-      12, 13, 14, 12, 14, 15,    // Bottom face
-      16, 17, 18, 16, 18, 19,    // Right face
-      20, 21, 22, 20, 22, 23     // Left face
-    ];
-
-    // --- Create and Bind Buffers ---
-    const positionBuffer = gl.createBuffer();
-    gl.bindBuffer(gl.ARRAY_BUFFER, positionBuffer);
-    gl.bufferData(gl.ARRAY_BUFFER, new Float32Array(positions), gl.STATIC_DRAW);
-
-    const colorBuffer = gl.createBuffer();
-    gl.bindBuffer(gl.ARRAY_BUFFER, colorBuffer);
-    gl.bufferData(gl.ARRAY_BUFFER, new Float32Array(colors), gl.STATIC_DRAW);
-
-    const indexBuffer = gl.createBuffer();
-    gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, indexBuffer);
-    gl.bufferData(gl.ELEMENT_ARRAY_BUFFER, new Uint16Array(indices), gl.STATIC_DRAW);
-
-    gl.bindBuffer(gl.ARRAY_BUFFER, positionBuffer);
-    gl.vertexAttribPointer(programInfo.attribLocations.vertexPosition,
-                           3, gl.FLOAT, false, 0, 0);
-    gl.enableVertexAttribArray(programInfo.attribLocations.vertexPosition);
-
-    gl.bindBuffer(gl.ARRAY_BUFFER, colorBuffer);
-    gl.vertexAttribPointer(programInfo.attribLocations.vertexColor,
-                           3, gl.FLOAT, false, 0, 0);
-    gl.enableVertexAttribArray(programInfo.attribLocations.vertexColor);
-
-    // --- Matrix Utility Functions (Column-Major Order) ---
-    function identity() {
-      return [
-         1, 0, 0, 0,
-         0, 1, 0, 0,
-         0, 0, 1, 0,
-         0, 0, 0, 1
-      ];
-    }
-
-    // Multiply two 4x4 matrices (both in column-major order)
-    function multiplyMatrix(a, b) {
-      let out = new Array(16);
-      for (let j = 0; j < 4; j++) {
-        for (let i = 0; i < 4; i++) {
-          out[i + j * 4] =
-            a[i + 0 * 4] * b[0 + j * 4] +
-            a[i + 1 * 4] * b[1 + j * 4] +
-            a[i + 2 * 4] * b[2 + j * 4] +
-            a[i + 3 * 4] * b[3 + j * 4];
+    // Generate a basic 2D world:
+    // We'll use a mix of sine waves and random variation to create simple terrain.
+    for (let x = 0; x < worldWidth; x++) {
+      world[x] = [];
+      // Calculate a pseudo-ground level for current x. 
+      let groundHeight = Math.floor(30 + 10 * Math.sin(x * 0.2) + Math.random() * 3);
+      for (let y = 0; y < worldHeight; y++) {
+        if (y > groundHeight) { 
+          // For blocks under the ground surface, mix stone and dirt.
+          if (y === groundHeight + 1) {
+            world[x][y] = 1; // dirt layer right below the surface
+          } else {
+            world[x][y] = (Math.random() < 0.2) ? 1 : 2; // Occasionally mix dirt with stone
+          }
+        } else if (y === groundHeight) {
+          world[x][y] = 3; // surface grass block
+        } else {
+          world[x][y] = 0; // air above ground
         }
       }
-      return out;
     }
 
-    // Perspective matrix (column-major)
-    function perspective(fov, aspect, near, far) {
-      const f = 1.0 / Math.tan(fov / 2);
-      return [
-         f / aspect, 0,                       0,  0,
-         0,          f,                       0,  0,
-         0,          0,   (far + near) / (near - far), -1,
-         0,          0, (2 * far * near) / (near - far),  0
-      ];
+    // Player object
+    const player = {
+      x: 50, // in world coordinates
+      y: 20,
+      width: tileSize,
+      height: tileSize * 1.8, // roughly two blocks high
+      vx: 0,
+      vy: 0,
+      speed: 2,
+      grounded: false
+    };
+
+    // Keyboard input handling
+    const keys = {};
+    window.addEventListener('keydown', e => { keys[e.key] = true; });
+    window.addEventListener('keyup', e => { keys[e.key] = false; });
+
+    // Utility functions to check and manipulate blocks
+    function isSolid(block) {
+      return block > 0; // all non-air blocks are solid
     }
 
-    // Translation matrix (column-major)
-    function translate(tx, ty, tz) {
-      return [
-         1, 0, 0, 0,
-         0, 1, 0, 0,
-         0, 0, 1, 0,
-         tx, ty, tz, 1
-      ];
+    function getBlock(x, y) {
+      if (x < 0 || x >= worldWidth || y < 0 || y >= worldHeight) return 0;
+      return world[x][y];
     }
 
-    // Rotation around the X axis.
-    function rotateX(angle) {
-      const c = Math.cos(angle);
-      const s = Math.sin(angle);
-      return [
-        1,  0,  0, 0,
-        0,  c,  s, 0,
-        0, -s,  c, 0,
-        0,  0,  0, 1
-      ];
+    function setBlock(x, y, block) {
+      if (x < 0 || x >= worldWidth || y < 0 || y >= worldHeight) return;
+      world[x][y] = block;
     }
 
-    // Rotation around the Y axis.
-    function rotateY(angle) {
-      const c = Math.cos(angle);
-      const s = Math.sin(angle);
-      return [
-         c, 0, -s, 0,
-         0, 1,  0, 0,
-         s, 0,  c, 0,
-         0, 0,  0, 1
-      ];
+    // Update player physics and handle collisions
+    function updatePlayer() {
+      // Handle horizontal movement
+      if (keys['a'] || keys['ArrowLeft']) {
+        player.vx = -player.speed;
+      } else if (keys['d'] || keys['ArrowRight']) {
+        player.vx = player.speed;
+      } else {
+        player.vx = 0;
+      }
+
+      // Jump if on ground
+      if ((keys['w'] || keys['ArrowUp'] || keys[' ']) && player.grounded) {
+        player.vy = -8;
+        player.grounded = false;
+      }
+
+      // Apply gravity
+      player.vy += 0.4;
+
+      // --- Horizontal Movement Collision ---
+      player.x += player.vx;
+      let leftTile = Math.floor(player.x / tileSize);
+      let rightTile = Math.floor((player.x + player.width) / tileSize);
+      let topTile = Math.floor(player.y / tileSize);
+      let bottomTile = Math.floor((player.y + player.height) / tileSize);
+      for (let x = leftTile; x <= rightTile; x++) {
+        for (let y = topTile; y <= bottomTile; y++) {
+          if (isSolid(getBlock(x, y))) {
+            if (player.vx > 0) {
+              player.x = x * tileSize - player.width;
+            } else if (player.vx < 0) {
+              player.x = (x + 1) * tileSize;
+            }
+            player.vx = 0;
+          }
+        }
+      }
+
+      // --- Vertical Movement Collision ---
+      player.y += player.vy;
+      player.grounded = false;
+      leftTile = Math.floor(player.x / tileSize);
+      rightTile = Math.floor((player.x + player.width) / tileSize);
+      topTile = Math.floor(player.y / tileSize);
+      bottomTile = Math.floor((player.y + player.height) / tileSize);
+      for (let x = leftTile; x <= rightTile; x++) {
+        for (let y = topTile; y <= bottomTile; y++) {
+          if (isSolid(getBlock(x, y))) {
+            if (player.vy > 0) {
+              player.y = y * tileSize - player.height;
+              player.grounded = true;
+            } else if (player.vy < 0) {
+              player.y = (y + 1) * tileSize;
+            }
+            player.vy = 0;
+          }
+        }
+      }
     }
 
-    // --- Animation Loop ---
-    let previousTime = 0;
-    let angle = 0;
-    function render(currentTime) {
-      currentTime *= 0.001; // convert to seconds
-      const deltaTime = currentTime - previousTime;
-      previousTime = currentTime;
-      angle += deltaTime;
+    // Mining mechanic: on mouse click, remove a block if it is close enough.
+    canvas.addEventListener('click', e => {
+      const rect = canvas.getBoundingClientRect();
+      const mouseX = e.clientX - rect.left;
+      const mouseY = e.clientY - rect.top;
 
-      gl.viewport(0, 0, canvas.width, canvas.height);
-      gl.clearColor(0.0, 0.0, 0.0, 1.0);
-      gl.clearDepth(1.0);
-      gl.enable(gl.DEPTH_TEST);
-      gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT);
+      // Camera offset in world coordinates
+      let camX = player.x - canvas.width / 2;
+      let camY = player.y - canvas.height / 2;
+      let blockX = Math.floor((mouseX + camX) / tileSize);
+      let blockY = Math.floor((mouseY + camY) / tileSize);
 
-      // Build the projection matrix.
-      const fieldOfView = 60 * Math.PI / 180; // in radians
-      const aspect = canvas.width / canvas.height;
-      const projMatrix = perspective(fieldOfView, aspect, 0.1, 100.0);
+      // Check distance between player and block (roughly within 5 tiles)
+      const playerTileX = Math.floor(player.x / tileSize);
+      const playerTileY = Math.floor(player.y / tileSize);
+      const dx = blockX - playerTileX;
+      const dy = blockY - playerTileY;
+      if (dx * dx + dy * dy <= 25 && isSolid(getBlock(blockX, blockY))) {
+        setBlock(blockX, blockY, 0); // "mine" by removing the block
+      }
+    });
 
-      // Build the model-view matrix:
-      // 1. Translate away from the camera.
-      // 2. Apply rotations.
-      let modelMatrix = identity();
-      modelMatrix = multiplyMatrix(modelMatrix, translate(0, 0, -6));
-      modelMatrix = multiplyMatrix(modelMatrix, rotateY(angle));
-      modelMatrix = multiplyMatrix(modelMatrix, rotateX(angle * 0.7));
+    // Render the world and the player
+    function render() {
+      // Clear the screen
+      ctx.clearRect(0, 0, canvas.width, canvas.height);
 
-      // Send the matrices to the shader.
-      gl.uniformMatrix4fv(programInfo.uniformLocations.projectionMatrix,
-                          false, new Float32Array(projMatrix));
-      gl.uniformMatrix4fv(programInfo.uniformLocations.modelViewMatrix,
-                          false, new Float32Array(modelMatrix));
+      // Simple camera: center on the player
+      let camX = player.x - canvas.width / 2;
+      let camY = player.y - canvas.height / 2;
+      // Clamp camera to world bounds
+      camX = Math.max(0, Math.min(camX, worldWidth * tileSize - canvas.width));
+      camY = Math.max(0, Math.min(camY, worldHeight * tileSize - canvas.height));
 
-      // Draw the cube.
-      gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, indexBuffer);
-      gl.drawElements(gl.TRIANGLES, indices.length, gl.UNSIGNED_SHORT, 0);
+      // Render world tiles
+      for (let x = 0; x < worldWidth; x++) {
+        for (let y = 0; y < worldHeight; y++) {
+          const block = getBlock(x, y);
+          if (block !== 0) {
+            let color = "#000";
+            if (block === 1) color = "#8B4513";   // Dirt
+            if (block === 2) color = "#808080";     // Stone
+            if (block === 3) color = "#228B22";     // Grass
+            ctx.fillStyle = color;
+            ctx.fillRect(x * tileSize - camX, y * tileSize - camY, tileSize, tileSize);
+          }
+        }
+      }
 
-      requestAnimationFrame(render);
+      // Render player as a red rectangle
+      ctx.fillStyle = "#FF0000";
+      ctx.fillRect(player.x - camX, player.y - camY, player.width, player.height);
     }
-    requestAnimationFrame(render);
+
+    // Main game loop
+    function gameLoop() {
+      updatePlayer();
+      render();
+      requestAnimationFrame(gameLoop);
+    }
+
+    gameLoop();
   </script>
 </body>
 </html>
