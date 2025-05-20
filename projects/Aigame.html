@@ -2,231 +2,310 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>Mini Minecraft Clone</title>
+  <title>3D Minecraft-like Demo (No Libraries)</title>
   <style>
-    /* Center the canvas and give it a border */
-    canvas {
-      border: 1px solid black;
-      display: block;
-      margin: 20px auto;
-      background-color: #87CEEB; /* A sky-blue background */
-    }
+    /* Remove default margins and ensure the canvas fills the screen */
+    body, html { margin: 0; padding: 0; width: 100%; height: 100%; }
+    canvas { display: block; width: 100%; height: 100%; background-color: #000; }
   </style>
 </head>
 <body>
-  <canvas id="gameCanvas" width="960" height="640"></canvas>
-
+  <canvas id="glCanvas"></canvas>
   <script>
-    /**************************************
-     * Configuration and World Generation *
-     **************************************/
-    const canvas = document.getElementById('gameCanvas');
-    const ctx = canvas.getContext('2d');
+    // Get the canvas and initialize WebGL.
+    const canvas = document.getElementById("glCanvas");
+    canvas.width = window.innerWidth;
+    canvas.height = window.innerHeight;
+    const gl = canvas.getContext("webgl");
+    if (!gl) {
+      alert("WebGL not supported in this browser.");
+    }
 
-    // Define block size and world dimensions (in blocks)
-    const BLOCK_SIZE = 32;
-    const WORLD_WIDTH = canvas.width / BLOCK_SIZE;   // e.g., 30 columns
-    const WORLD_HEIGHT = canvas.height / BLOCK_SIZE;   // e.g., 20 rows
-
-    // World grid: 0 represents air, 1 represents a solid block.
-    let world = [];
-    for (let y = 0; y < WORLD_HEIGHT; y++) {
-      world[y] = [];
-      for (let x = 0; x < WORLD_WIDTH; x++) {
-        // Bottom three rows are "ground" while the rest is air.
-        if (y > WORLD_HEIGHT - 4) {
-          world[y][x] = 1;
-        } else {
-          world[y][x] = 0;
-        }
+    // --- Shader sources ---
+    // Vertex Shader: Transforms vertex positions and passes vertex color.
+    const vsSource = `
+      attribute vec3 aPosition;
+      attribute vec3 aColor;
+      uniform mat4 uModelViewMatrix;
+      uniform mat4 uProjectionMatrix;
+      varying vec3 vColor;
+      void main(void) {
+        gl_Position = uProjectionMatrix * uModelViewMatrix * vec4(aPosition, 1.0);
+        vColor = aColor;
       }
+    `;
+
+    // Fragment Shader: Outputs the interpolated color.
+    const fsSource = `
+      precision mediump float;
+      varying vec3 vColor;
+      void main(void) {
+        gl_FragColor = vec4(vColor, 1.0);
+      }
+    `;
+
+    // --- Shader compilation helper functions ---
+    function loadShader(type, source) {
+      const shader = gl.createShader(type);
+      gl.shaderSource(shader, source);
+      gl.compileShader(shader);
+      if (!gl.getShaderParameter(shader, gl.COMPILE_STATUS)) {
+        alert("Error compiling shader: " + gl.getShaderInfoLog(shader));
+        gl.deleteShader(shader);
+        return null;
+      }
+      return shader;
     }
 
-    // Add a few random floating blocks for variety.
-    for (let i = 0; i < 20; i++) {
-      let rx = Math.floor(Math.random() * WORLD_WIDTH);
-      let ry = Math.floor(Math.random() * (WORLD_HEIGHT - 5));
-      world[ry][rx] = 1;
+    function initShaderProgram(vsSource, fsSource) {
+      const vertexShader = loadShader(gl.VERTEX_SHADER, vsSource);
+      const fragmentShader = loadShader(gl.FRAGMENT_SHADER, fsSource);
+      const shaderProgram = gl.createProgram();
+      gl.attachShader(shaderProgram, vertexShader);
+      gl.attachShader(shaderProgram, fragmentShader);
+      gl.linkProgram(shaderProgram);
+      if (!gl.getProgramParameter(shaderProgram, gl.LINK_STATUS)) {
+        alert("Unable to initialize the shader program: " + gl.getProgramInfoLog(shaderProgram));
+        return null;
+      }
+      return shaderProgram;
     }
 
-    /**********************
-     * Player Definition  *
-     **********************/
-    const player = {
-      x: BLOCK_SIZE * 2,               // Starting x (in pixels)
-      y: canvas.height - BLOCK_SIZE * 5, // Starting y above the ground
-      width: 20,
-      height: 30,
-      vx: 0,
-      vy: 0,
-      speed: 2,
-      jumpStrength: -8,
-      onGround: false
+    const shaderProgram = initShaderProgram(vsSource, fsSource);
+    gl.useProgram(shaderProgram);
+
+    // --- Look up attribute and uniform locations ---
+    const programInfo = {
+      attribLocations: {
+        vertexPosition: gl.getAttribLocation(shaderProgram, 'aPosition'),
+        vertexColor: gl.getAttribLocation(shaderProgram, 'aColor'),
+      },
+      uniformLocations: {
+        projectionMatrix: gl.getUniformLocation(shaderProgram, 'uProjectionMatrix'),
+        modelViewMatrix: gl.getUniformLocation(shaderProgram, 'uModelViewMatrix'),
+      },
     };
 
-    // Object to keep track of key states.
-    let keys = {};
-    window.addEventListener('keydown', (e) => {
-      keys[e.code] = true;
-    });
-    window.addEventListener('keyup', (e) => {
-      keys[e.code] = false;
-    });
+    // --- Cube Geometry Data ---
+    // Define vertices for 6 faces (4 vertices per face).
+    const positions = [
+      // Front face
+      -1.0, -1.0,  1.0,
+       1.0, -1.0,  1.0,
+       1.0,  1.0,  1.0,
+      -1.0,  1.0,  1.0,
+      // Back face
+      -1.0, -1.0, -1.0,
+      -1.0,  1.0, -1.0,
+       1.0,  1.0, -1.0,
+       1.0, -1.0, -1.0,
+      // Top face
+      -1.0,  1.0, -1.0,
+      -1.0,  1.0,  1.0,
+       1.0,  1.0,  1.0,
+       1.0,  1.0, -1.0,
+      // Bottom face
+      -1.0, -1.0, -1.0,
+       1.0, -1.0, -1.0,
+       1.0, -1.0,  1.0,
+      -1.0, -1.0,  1.0,
+      // Right face
+       1.0, -1.0, -1.0,
+       1.0,  1.0, -1.0,
+       1.0,  1.0,  1.0,
+       1.0, -1.0,  1.0,
+      // Left face
+      -1.0, -1.0, -1.0,
+      -1.0, -1.0,  1.0,
+      -1.0,  1.0,  1.0,
+      -1.0,  1.0, -1.0,
+    ];
 
-    /******************************************
-     * Mouse Interaction for Block Editing    *
-     ******************************************/
-    // Prevent the browser’s context menu on right click.
-    canvas.addEventListener('contextmenu', (e) => e.preventDefault());
+    // Each face has a solid color.
+    const faceColors = [
+      [1.0,  0.0,  0.0], // Front: red
+      [0.0,  1.0,  0.0], // Back: green
+      [0.0,  0.0,  1.0], // Top: blue
+      [1.0,  1.0,  0.0], // Bottom: yellow
+      [1.0,  0.0,  1.0], // Right: magenta
+      [0.0,  1.0,  1.0], // Left: cyan
+    ];
 
-    // When the canvas is clicked, determine which block cell is affected.
-    canvas.addEventListener('mousedown', (e) => {
-      const rect = canvas.getBoundingClientRect();
-      const mouseX = e.clientX - rect.left;
-      const mouseY = e.clientY - rect.top;
-      const cellX = Math.floor(mouseX / BLOCK_SIZE);
-      const cellY = Math.floor(mouseY / BLOCK_SIZE);
-
-      // Left click (button 0) mines a block.
-      if (e.button === 0) {
-        if (cellX >= 0 && cellX < WORLD_WIDTH && cellY >= 0 && cellY < WORLD_HEIGHT) {
-          if (world[cellY][cellX] === 1) {
-            world[cellY][cellX] = 0;
-          }
-        }
-      }
-      // Right click (button 2) places a block,
-      // unless the cell is where the player's center is.
-      else if (e.button === 2) {
-        if (cellX >= 0 && cellX < WORLD_WIDTH && cellY >= 0 && cellY < WORLD_HEIGHT) {
-          const playerCellX = Math.floor((player.x + player.width / 2) / BLOCK_SIZE);
-          const playerCellY = Math.floor((player.y + player.height / 2) / BLOCK_SIZE);
-          if (!(cellX === playerCellX && cellY === playerCellY)) {
-            world[cellY][cellX] = 1;
-          }
-        }
-      }
-    });
-
-    /*************************
-     * Collision Detection   *
-     *************************/
-    // Simple axis-aligned bounding box intersection.
-    function rectIntersect(x1, y1, w1, h1, x2, y2, w2, h2) {
-      return !(x1 + w1 <= x2 ||
-               x1 >= x2 + w2 ||
-               y1 + h1 <= y2 ||
-               y1 >= y2 + h2);
-    }
-
-    // Check if moving the player to (newX, newY) would collide with any solid blocks.
-    function checkCollision(newX, newY) {
-      const startCol = Math.floor(newX / BLOCK_SIZE);
-      const endCol = Math.floor((newX + player.width) / BLOCK_SIZE);
-      const startRow = Math.floor(newY / BLOCK_SIZE);
-      const endRow = Math.floor((newY + player.height) / BLOCK_SIZE);
-      
-      for (let row = startRow; row <= endRow; row++) {
-        for (let col = startCol; col <= endCol; col++) {
-          if (row >= 0 && row < WORLD_HEIGHT && col >= 0 && col < WORLD_WIDTH) {
-            if (world[row][col] === 1) {
-              if (rectIntersect(newX, newY, player.width, player.height, col * BLOCK_SIZE, row * BLOCK_SIZE, BLOCK_SIZE, BLOCK_SIZE)) {
-                return true;
-              }
-            }
-          }
-        }
-      }
-      return false;
-    }
-
-    /************************
-     * Player Physics Update *
-     ************************/
-    // Apply input, gravity and resolve collisions.
-    const gravity = 0.4;
-    function updatePlayer() {
-      // Horizontal movement
-      if (keys["ArrowLeft"] || keys["KeyA"]) {
-        player.vx = -player.speed;
-      } else if (keys["ArrowRight"] || keys["KeyD"]) {
-        player.vx = player.speed;
-      } else {
-        player.vx = 0;
-      }
-
-      // Jump when on the ground.
-      if ((keys["ArrowUp"] || keys["KeyW"] || keys["Space"]) && player.onGround) {
-        player.vy = player.jumpStrength;
-        player.onGround = false;
-      }
-
-      // Apply gravity
-      player.vy += gravity;
-
-      // Attempt horizontal move
-      let newX = player.x + player.vx;
-      if (!checkCollision(newX, player.y)) {
-        player.x = newX;
-      } else {
-        player.vx = 0;  // simple collision response
-      }
-
-      // Attempt vertical move
-      let newY = player.y + player.vy;
-      if (!checkCollision(player.x, newY)) {
-        player.y = newY;
-        player.onGround = false;
-      } else {
-        // If falling, place the player neatly on top of the block.
-        if (player.vy > 0) {
-          const row = Math.floor((player.y + player.height) / BLOCK_SIZE);
-          player.y = row * BLOCK_SIZE - player.height;
-          player.onGround = true;
-        } 
-        // If moving upward, adjust downward.
-        else if (player.vy < 0) {
-          const row = Math.floor(player.y / BLOCK_SIZE);
-          player.y = (row + 1) * BLOCK_SIZE;
-        }
-        player.vy = 0;
+    let colors = [];
+    for (let i = 0; i < faceColors.length; i++) {
+      const c = faceColors[i];
+      // Repeat for each of the 4 vertices of the face.
+      for (let j = 0; j < 4; j++) {
+        colors = colors.concat(c);
       }
     }
 
-    /*********************
-     * Rendering Routine *
-     *********************/
-    function draw() {
-      // Clear the canvas.
-      ctx.clearRect(0, 0, canvas.width, canvas.height);
+    // Index array: two triangles per face.
+    const indices = [
+      0, 1, 2,    0, 2, 3,      // Front face
+      4, 5, 6,    4, 6, 7,      // Back face
+      8, 9, 10,   8, 10, 11,    // Top face
+      12, 13, 14, 12, 14, 15,    // Bottom face
+      16, 17, 18, 16, 18, 19,    // Right face
+      20, 21, 22, 20, 22, 23     // Left face
+    ];
 
-      // Draw world blocks.
-      for (let y = 0; y < WORLD_HEIGHT; y++) {
-        for (let x = 0; x < WORLD_WIDTH; x++) {
-          if (world[y][x] === 1) {
-            ctx.fillStyle = "#8B4513"; // Brown color for blocks (dirt/stone)
-            ctx.fillRect(x * BLOCK_SIZE, y * BLOCK_SIZE, BLOCK_SIZE, BLOCK_SIZE);
-            ctx.strokeStyle = "black";
-            ctx.strokeRect(x * BLOCK_SIZE, y * BLOCK_SIZE, BLOCK_SIZE, BLOCK_SIZE);
-          }
+    // --- Create and Bind Buffers ---
+    // Position buffer.
+    const positionBuffer = gl.createBuffer();
+    gl.bindBuffer(gl.ARRAY_BUFFER, positionBuffer);
+    gl.bufferData(gl.ARRAY_BUFFER, new Float32Array(positions), gl.STATIC_DRAW);
+
+    // Color buffer.
+    const colorBuffer = gl.createBuffer();
+    gl.bindBuffer(gl.ARRAY_BUFFER, colorBuffer);
+    gl.bufferData(gl.ARRAY_BUFFER, new Float32Array(colors), gl.STATIC_DRAW);
+
+    // Index buffer.
+    const indexBuffer = gl.createBuffer();
+    gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, indexBuffer);
+    gl.bufferData(gl.ELEMENT_ARRAY_BUFFER, new Uint16Array(indices), gl.STATIC_DRAW);
+
+    // Set up attribute pointers.
+    gl.bindBuffer(gl.ARRAY_BUFFER, positionBuffer);
+    gl.vertexAttribPointer(
+      programInfo.attribLocations.vertexPosition,
+      3,        // components per vertex (x, y, z)
+      gl.FLOAT,
+      false,
+      0,
+      0
+    );
+    gl.enableVertexAttribArray(programInfo.attribLocations.vertexPosition);
+
+    gl.bindBuffer(gl.ARRAY_BUFFER, colorBuffer);
+    gl.vertexAttribPointer(
+      programInfo.attribLocations.vertexColor,
+      3,       // r, g, b
+      gl.FLOAT,
+      false,
+      0,
+      0
+    );
+    gl.enableVertexAttribArray(programInfo.attribLocations.vertexColor);
+
+    // --- Minimal Matrix Utility Functions ---
+    // 4x4 Identity matrix.
+    function identity() {
+      return [
+         1, 0, 0, 0,
+         0, 1, 0, 0,
+         0, 0, 1, 0,
+         0, 0, 0, 1
+      ];
+    }
+
+    // Return a perspective projection matrix.
+    function perspective(fov, aspect, near, far) {
+      const f = 1.0 / Math.tan(fov / 2);
+      const rangeInv = 1 / (near - far);
+      return [
+        f / aspect, 0, 0,                             0,
+        0,          f, 0,                             0,
+        0,          0, (near + far) * rangeInv,        -1,
+        0,          0, near * far * rangeInv * 2,       0
+      ];
+    }
+
+    // Multiply two 4x4 matrices.
+    function multiply(a, b) {
+      const out = new Array(16);
+      for (let i = 0; i < 4; ++i) {
+        for (let j = 0; j < 4; ++j) {
+          out[i * 4 + j] =
+            a[i * 4 + 0] * b[0 * 4 + j] +
+            a[i * 4 + 1] * b[1 * 4 + j] +
+            a[i * 4 + 2] * b[2 * 4 + j] +
+            a[i * 4 + 3] * b[3 * 4 + j];
         }
       }
-
-      // Draw the player as a red rectangle.
-      ctx.fillStyle = "red";
-      ctx.fillRect(player.x, player.y, player.width, player.height);
+      return out;
     }
 
-    /***************
-     * Game Loop   *
-     ***************/
-    function gameLoop() {
-      updatePlayer();
-      draw();
-      requestAnimationFrame(gameLoop);
+    // Rotate matrix around the Y axis.
+    function rotateY(m, angle) {
+      const c = Math.cos(angle);
+      const s = Math.sin(angle);
+      const rotation = [
+         c, 0, s, 0,
+         0, 1, 0, 0,
+        -s, 0, c, 0,
+         0, 0, 0, 1
+      ];
+      return multiply(m, rotation);
     }
-    gameLoop();
+
+    // Rotate matrix around the X axis.
+    function rotateX(m, angle) {
+      const c = Math.cos(angle);
+      const s = Math.sin(angle);
+      const rotation = [
+        1,  0, 0, 0,
+        0,  c, s, 0,
+        0, -s, c, 0,
+        0,  0, 0, 1
+      ];
+      return multiply(m, rotation);
+    }
+
+    // Create a translation matrix.
+    // Here we make a quick 4x4 translation matrix and multiply.
+    function translate(m, tx, ty, tz) {
+      const translation = [
+         1, 0, 0, 0,
+         0, 1, 0, 0,
+         0, 0, 1, 0,
+         tx, ty, tz, 1
+      ];
+      return multiply(m, translation);
+    }
+
+    // --- Animation Loop ---
+    let previousTime = 0;
+    let angle = 0;
+    function render(currentTime) {
+      currentTime *= 0.001; // convert to seconds
+      const deltaTime = currentTime - previousTime;
+      previousTime = currentTime;
+      angle += deltaTime;
+
+      // Set viewport and clear buffers.
+      gl.viewport(0, 0, canvas.width, canvas.height);
+      gl.clearColor(0.0, 0.0, 0.0, 1.0);
+      gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT);
+      gl.enable(gl.DEPTH_TEST);
+
+      // Create the projection matrix.
+      const fieldOfView = 60 * Math.PI / 180; // 60° field of view
+      const aspect = canvas.clientWidth / canvas.clientHeight;
+      const projectionMatrix = perspective(fieldOfView, aspect, 0.1, 100.0);
+
+      // Build the model-view matrix.
+      let modelViewMatrix = identity();
+      // Translate the scene away from the camera.
+      modelViewMatrix = translate(modelViewMatrix, 0, 0, -6);
+      // Rotate around the Y and X axes.
+      modelViewMatrix = rotateY(modelViewMatrix, angle);
+      modelViewMatrix = rotateX(modelViewMatrix, angle * 0.7);
+
+      // Pass the matrices to the shader.
+      gl.uniformMatrix4fv(programInfo.uniformLocations.projectionMatrix,
+                          false, new Float32Array(projectionMatrix));
+      gl.uniformMatrix4fv(programInfo.uniformLocations.modelViewMatrix,
+                          false, new Float32Array(modelViewMatrix));
+
+      // Draw the cube using the index buffer.
+      gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, indexBuffer);
+      gl.drawElements(gl.TRIANGLES, indices.length, gl.UNSIGNED_SHORT, 0);
+
+      requestAnimationFrame(render);
+    }
+    requestAnimationFrame(render);
   </script>
 </body>
 </html>
