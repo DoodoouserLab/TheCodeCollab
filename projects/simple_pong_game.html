@@ -2,210 +2,208 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8">
-  <title>Territorial.io - JS Demo vs Bots</title>
+  <title>Territorial: Bots Only</title>
   <style>
     body {
-      font-family: Arial, sans-serif;
-      text-align: center;
       margin: 0;
-      padding: 20px;
-      background: #f4f4f4;
+      padding: 0;
+      background-color: #202020;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      height: 100vh;
     }
-    #gameCanvas {
-      border: 1px solid #000;
-      background: #fff;
-    }
-    #controls {
-      margin-top: 10px;
-    }
-    #scoreboard {
-      margin-top: 20px;
-    }
-    button {
-      padding: 8px 16px;
-      margin: 5px;
-      font-size: 16px;
-      cursor: pointer;
+    canvas {
+      background-color: #1E1E1E;
+      border: 2px solid #333;
     }
   </style>
 </head>
 <body>
-  <h1>Territorial.io - Play vs Bots</h1>
   <canvas id="gameCanvas" width="600" height="600"></canvas>
-  <div id="controls">
-    <button id="botTurnBtn">Bot Turn</button>
-    <button id="newGameBtn">New Game</button>
-  </div>
-  <div id="scoreboard">
-    <h2>Scoreboard</h2>
-    <div id="scores"></div>
-  </div>
-  
   <script>
-    // Game settings
-    const GRID_ROWS = 30;
-    const GRID_COLS = 30;
-    const CELL_SIZE = 20; // Each cell is 20px x 20px so canvas is 600x600
+    // Canvas setup
+    const canvas = document.getElementById('gameCanvas');
+    const ctx = canvas.getContext('2d');
 
-    // Grid data: 0 means neutral, 1 = Human, 2-4 = Bots
+    // Grid setup
+    const GRID_WIDTH = 20;
+    const GRID_HEIGHT = 20;
+    const CELL_SIZE = 30; // Canvas is 600x600, so 20*30
+
+    // Colors
+    const COLOR_BG = "#1E1E1E";       // Canvas background color
+    const COLOR_GRID = "#323232";     // Grid lines
+    const COLOR_PLAYER = "#00FF00";   // Player color (green)
+    const COLOR_BOT = "#FF0000";      // Bots color (red)
+    const COLOR_NEUTRAL = "#C8C8C8";  // Unclaimed cell color
+
+    // Create grid (2D array): Each cell is either null (unclaimed) or holds an identifier ("player" or "bot_x")
     let grid = [];
-
-    // Color mapping for players
-    const colors = {
-      0: "#ffffff",     // neutral: white
-      1: "#007bff",     // human: blue
-      2: "#dc3545",     // bot: red
-      3: "#28a745",     // bot: green
-      4: "#6f42c1"      // bot: purple
-    };
-
-    // Global canvas and drawing context
-    let canvas, ctx;
-
-    // Initialize the game board and starting positions
-    function initGame() {
-      // Create an empty grid filled with zeros
-      grid = [];
-      for (let r = 0; r < GRID_ROWS; r++) {
-        const row = [];
-        for (let c = 0; c < GRID_COLS; c++) {
-          row.push(0);
-        }
-        grid.push(row);
+    for (let y = 0; y < GRID_HEIGHT; y++) {
+      grid[y] = [];
+      for (let x = 0; x < GRID_WIDTH; x++) {
+        grid[y][x] = null;
       }
-      
-      // Set starting corners:
-      // Top-left: Human (id 1)
-      grid[0][0] = 1; 
-      // Top-right: Bot (id 2)
-      grid[0][GRID_COLS - 1] = 2;
-      // Bottom-left: Bot (id 3)
-      grid[GRID_ROWS - 1][0] = 3;
-      // Bottom-right: Bot (id 4)
-      grid[GRID_ROWS - 1][GRID_COLS - 1] = 4;
-      
-      drawGrid();
-      updateScoreboard();
     }
 
-    // Draw the board on the canvas
+    // Entity class for both player and bots
+    class Entity {
+      constructor(x, y, owner) {
+        this.x = x;
+        this.y = y;
+        this.owner = owner;
+      }
+      move(dx, dy) {
+        const newX = this.x + dx;
+        const newY = this.y + dy;
+        if (newX >= 0 && newX < GRID_WIDTH && newY >= 0 && newY < GRID_HEIGHT) {
+          this.x = newX;
+          this.y = newY;
+          grid[newY][newX] = this.owner;
+        }
+      }
+    }
+
+    // Create the player in the middle of the grid
+    const player = new Entity(Math.floor(GRID_WIDTH / 2), Math.floor(GRID_HEIGHT / 2), "player");
+    grid[player.y][player.x] = player.owner;
+
+    // Create bots at random unclaimed cells
+    const numBots = 3;
+    const bots = [];
+    function getRandomCell() {
+      return {
+        x: Math.floor(Math.random() * GRID_WIDTH),
+        y: Math.floor(Math.random() * GRID_HEIGHT)
+      };
+    }
+    for (let i = 0; i < numBots; i++) {
+      let pos;
+      do {
+        pos = getRandomCell();
+      } while (grid[pos.y][pos.x] !== null);
+      const bot = new Entity(pos.x, pos.y, "bot_" + i);
+      bots.push(bot);
+      grid[pos.y][pos.x] = bot.owner;
+    }
+
+    // Draw the grid and color the cells based on ownership
     function drawGrid() {
-      ctx.clearRect(0, 0, canvas.width, canvas.height);
-      for (let r = 0; r < GRID_ROWS; r++) {
-        for (let c = 0; c < GRID_COLS; c++) {
-          // Fill each cell with the color of its owner
-          ctx.fillStyle = colors[ grid[r][c] ];
-          ctx.fillRect(c * CELL_SIZE, r * CELL_SIZE, CELL_SIZE, CELL_SIZE);
-          // Optional: draw borders for clarity
-          ctx.strokeStyle = "#ccc";
-          ctx.strokeRect(c * CELL_SIZE, r * CELL_SIZE, CELL_SIZE, CELL_SIZE);
+      for (let y = 0; y < GRID_HEIGHT; y++) {
+        for (let x = 0; x < GRID_WIDTH; x++) {
+          let color;
+          if (grid[y][x] === null) {
+            color = COLOR_NEUTRAL;
+          } else {
+            color = (grid[y][x] === "player") ? COLOR_PLAYER : COLOR_BOT;
+          }
+          ctx.fillStyle = color;
+          ctx.fillRect(x * CELL_SIZE, y * CELL_SIZE, CELL_SIZE, CELL_SIZE);
+          // Draw grid borders for clarity
+          ctx.strokeStyle = COLOR_GRID;
+          ctx.strokeRect(x * CELL_SIZE, y * CELL_SIZE, CELL_SIZE, CELL_SIZE);
         }
       }
     }
 
-    // Update the scoreboard with the current territory counts
-    function updateScoreboard() {
-      // Count cells for each player
-      const counts = {1: 0, 2: 0, 3: 0, 4: 0};
-      for (let r = 0; r < GRID_ROWS; r++) {
-        for (let c = 0; c < GRID_COLS; c++) {
-          const owner = grid[r][c];
-          if (owner !== 0) counts[owner]++;
-        }
-      }
-      const scoreHTML = `
-        <p><strong>You (Blue):</strong> ${counts[1]}</p>
-        <p><strong>Bot Red:</strong> ${counts[2]}</p>
-        <p><strong>Bot Green:</strong> ${counts[3]}</p>
-        <p><strong>Bot Purple:</strong> ${counts[4]}</p>
-      `;
-      document.getElementById("scores").innerHTML = scoreHTML;
-    }
-
-    // Helper: Return valid neighbors (up, down, left, right) for a given cell
-    function getNeighbors(r, c) {
-      const neighbors = [];
-      const directions = [
-        [-1, 0], // up
-        [1, 0],  // down
-        [0, -1], // left
-        [0, 1]   // right
+    // Simple random move for bots: chooses one direction (up, down, left, right) and moves if within bounds
+    function botMove(bot) {
+      const moves = [
+        [0, 1],
+        [0, -1],
+        [1, 0],
+        [-1, 0]
       ];
-      for (const [dr, dc] of directions) {
-        const nr = r + dr, nc = c + dc;
-        if (nr >= 0 && nr < GRID_ROWS && nc >= 0 && nc < GRID_COLS) {
-          neighbors.push({ r: nr, c: nc });
+      // Shuffle moves
+      for (let i = moves.length - 1; i > 0; i--) {
+        const j = Math.floor(Math.random() * (i + 1));
+        [moves[i], moves[j]] = [moves[j], moves[i]];
+      }
+      // Try each move until a valid one is found
+      for (const [dx, dy] of moves) {
+        const newX = bot.x + dx;
+        const newY = bot.y + dy;
+        if (newX >= 0 && newX < GRID_WIDTH && newY >= 0 && newY < GRID_HEIGHT) {
+          bot.move(dx, dy);
+          break;
         }
       }
-      return neighbors;
     }
 
-    // Human move: When the canvas is clicked, try to capture a neutral cell
-    // but only if it is adjacent to an already owned (human) cell.
-    function handleCanvasClick(e) {
-      const rect = canvas.getBoundingClientRect();
-      const x = e.clientX - rect.left;
-      const y = e.clientY - rect.top;
-      const c = Math.floor(x / CELL_SIZE);
-      const r = Math.floor(y / CELL_SIZE);
-      
-      // Allow capture only if the clicked cell is neutral
-      if (grid[r][c] !== 0) {
-        alert("This cell is already claimed.");
-        return;
-      }
-      
-      // Check neighbors—at least one must belong to the human (id 1)
-      const neighbors = getNeighbors(r, c);
-      const valid = neighbors.some(n => grid[n.r][n.c] === 1);
-      
-      if (!valid) {
-        alert("You can only capture cells adjacent to your territory.");
-        return;
-      }
-      
-      // Claim the cell for the human player
-      grid[r][c] = 1;
-      drawGrid();
-      updateScoreboard();
-    }
-
-    // Bot turn: For each bot (ids 2, 3, 4), find frontier cells (neutral cells
-    // adjacent to any cell they own) and randomly capture one.
-    function botTurn() {
-      for (const botId of [2, 3, 4]) {
-        const frontier = [];
-        for (let r = 0; r < GRID_ROWS; r++) {
-          for (let c = 0; c < GRID_COLS; c++) {
-            if (grid[r][c] === botId) {
-              const neighbors = getNeighbors(r, c);
-              for (const n of neighbors) {
-                if (grid[n.r][n.c] === 0) {
-                  frontier.push({ r: n.r, c: n.c });
-                }
-              }
-            }
+    // Count territory for player and bots
+    function countTerritory() {
+      let playerTerr = 0, botTerr = 0;
+      for (let y = 0; y < GRID_HEIGHT; y++) {
+        for (let x = 0; x < GRID_WIDTH; x++) {
+          if (grid[y][x] === "player") {
+            playerTerr++;
+          } else if (grid[y][x] !== null) {
+            botTerr++;
           }
         }
-        if (frontier.length > 0) {
-          // Select a random neutral cell from the frontier
-          const choice = frontier[Math.floor(Math.random() * frontier.length)];
-          grid[choice.r][choice.c] = botId;
-        }
       }
-      drawGrid();
-      updateScoreboard();
+      return { playerTerr, botTerr };
     }
 
-    // Set up the canvas and event listeners once the page loads.
-    window.onload = function() {
-      canvas = document.getElementById("gameCanvas");
-      ctx = canvas.getContext("2d");
-      initGame();
-      canvas.addEventListener("click", handleCanvasClick);
-      document.getElementById("botTurnBtn").addEventListener("click", botTurn);
-      document.getElementById("newGameBtn").addEventListener("click", initGame);
-    }
+    // Listen for arrow key presses to move the player
+    document.addEventListener("keydown", function(e) {
+      switch (e.key) {
+        case "ArrowUp":
+          player.move(0, -1);
+          break;
+        case "ArrowDown":
+          player.move(0, 1);
+          break;
+        case "ArrowLeft":
+          player.move(-1, 0);
+          break;
+        case "ArrowRight":
+          player.move(1, 0);
+          break;
+      }
+    });
+
+    // Main game loop using setInterval (approx. 5 frames per second, or every 200ms)
+    let gameOver = false;
+    const gameInterval = setInterval(() => {
+      // Each bot makes a move
+      bots.forEach(bot => botMove(bot));
+
+      // Clear and redraw the game board
+      ctx.fillStyle = COLOR_BG;
+      ctx.fillRect(0, 0, canvas.width, canvas.height);
+      drawGrid();
+
+      // Update document title with current scores
+      const { playerTerr, botTerr } = countTerritory();
+      document.title = `Player: ${playerTerr} vs Bots: ${botTerr}`;
+
+      // Check if every cell has been claimed (game over)
+      let allClaimed = true;
+      outer: for (let y = 0; y < GRID_HEIGHT; y++) {
+        for (let x = 0; x < GRID_WIDTH; x++) {
+          if (grid[y][x] === null) {
+            allClaimed = false;
+            break outer;
+          }
+        }
+      }
+
+      if (allClaimed) {
+        clearInterval(gameInterval);
+        gameOver = true;
+        let message = `Game Over!\nPlayer territory: ${playerTerr}\nBots territory: ${botTerr}\n`;
+        if (playerTerr > botTerr) {
+          message += "You win!";
+        } else if (playerTerr < botTerr) {
+          message += "Bots win!";
+        } else {
+          message += "It's a tie!";
+        }
+        alert(message);
+      }
+    }, 200);
   </script>
 </body>
 </html>
