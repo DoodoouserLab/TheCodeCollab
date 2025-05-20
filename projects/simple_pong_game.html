@@ -1,334 +1,339 @@
 <!DOCTYPE html>
-<html lang="en">
+<html>
 <head>
-  <meta charset="UTF-8" />
-  <title>Territorial – Scandinavia Edition</title>
+  <meta charset="utf-8">
+  <title>Complicated Territorial.io – Scandinavia Edition (HTML)</title>
   <style>
+    /* Basic reset and centering */
     body {
       margin: 0;
-      background: #222;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      height: 100vh;
+      padding: 0;
+      background-color: #000;
+      overflow: hidden;
     }
     canvas {
-      border: 2px solid #333;
-      background: #0077be; /* Water color for non-playable cells */
+      display: block;
+      margin: 0 auto;
+      background-color: #0000FF; /* blue background (water) */
     }
   </style>
 </head>
 <body>
-  <canvas id="gameCanvas" width="1000" height="1000"></canvas>
+  <canvas id="gameCanvas" width="1200" height="800"></canvas>
   <script>
-    /***** CONFIGURATION *****/
-    // Grid settings – 50x50 grid gives a 1000×1000 canvas with each cell 20×20.
-    const GRID_WIDTH = 50;
-    const GRID_HEIGHT = 50;
-    const CELL_SIZE = 20;
+    // Global Constants
+    const SCREEN_WIDTH = 1200;
+    const SCREEN_HEIGHT = 800;
+    const FPS = 30;
 
-    // Attack configuration (simulating gradual territorial takeover)
-    const ATTACK_FACTOR = 5;      // Each friendly neighbor adds this much progress per tick.
-    const ATTACK_THRESHOLD = 100; // When progress reaches this, the cell is captured.
-    const TICK_INTERVAL = 200;    // Milliseconds between updates.
+    // Team colors by owner (Player, Bot1, Bot2)
+    const TEAM_COLORS = {
+      "Player": "#00C800", // green
+      "Bot1": "#C80000",   // red
+      "Bot2": "#0000C8"    // blue-ish
+    };
 
-    // Colors
-    const COLOR_NEUTRAL = "#C8C8C8";  // Unclaimed land cell
-    const COLOR_PLAYER  = "#00FF00";  // Player’s territory (green)
-    const COLOR_BOT     = "#FF0000";  // Bots’ territory (red)
-    const COLOR_WATER   = "#0077be";  // Non‑playable (water)
-    
-    // We'll use the four cardinal directions.
-    const DIRECTIONS = [
-      { dx:  0, dy: -1 },  // Up
-      { dx:  0, dy:  1 },  // Down
-      { dx: -1, dy:  0 },  // Left
-      { dx:  1, dy:  0 }   // Right
-    ];
+    // Standard colors
+    const BLUE = "#0000FF";  // water and background
+    const WHITE = "#FFFFFF";
+    const BLACK = "#000000";
 
-    /***** DEFINE THE SCANDINAVIA LAND (PLAYABLE AREA) *****/
-    // In Territorial.io the blue part is water. The following polygon (in grid coordinates)
-    // approximates a Scandinavian peninsula. Cells whose centers fall inside it are "land."
-    const scandinaviaPolygon = [
-      { x: 12, y: 4 },  // Top–left
-      { x: 38, y: 4 },  // Top–right
-      { x: 46, y: 14 }, // East curve
-      { x: 44, y: 28 }, // East down
-      { x: 36, y: 40 }, // Southeast
-      { x: 26, y: 46 }, // South tip
-      { x: 16, y: 40 }, // Southwest
-      { x: 8,  y: 28 }  // West curve
-    ];
-    // Standard ray–casting algorithm.
-    function pointInPolygon(x, y, polygon) {
+    // ------------------------------
+    // Utility Functions
+    // ------------------------------
+
+    // Compute the center of a polygon (average of all vertices)
+    function computeCenter(polygon) {
+      let sumX = 0, sumY = 0;
+      for (let pt of polygon) {
+        sumX += pt[0];
+        sumY += pt[1];
+      }
+      return [sumX / polygon.length, sumY / polygon.length];
+    }
+
+    // Ray-cast algorithm to check if a point [x,y] is within a polygon
+    function pointInPolygon(point, polygon) {
+      let x = point[0], y = point[1];
       let inside = false;
       for (let i = 0, j = polygon.length - 1; i < polygon.length; j = i++) {
-        const xi = polygon[i].x, yi = polygon[i].y;
-        const xj = polygon[j].x, yj = polygon[j].y;
-        const intersect = ((yi > y) !== (yj > y)) &&
-          (x < ((xj - xi) * (y - yi)) / (yj - yi) + xi);
+        let xi = polygon[i][0], yi = polygon[i][1];
+        let xj = polygon[j][0], yj = polygon[j][1];
+        let intersect = ((yi > y) !== (yj > y)) &&
+                        (x < (xj - xi) * (y - yi) / (yj - yi) + xi);
         if (intersect) inside = !inside;
       }
       return inside;
     }
 
-    /***** GRID & CELL SETUP *****/
-    // Each cell is an object:
-    // { owner: null | "player" | "bot_i", playable: boolean, attack: null | { attacker, progress } }
-    let grid = [];
-    for (let y = 0; y < GRID_HEIGHT; y++) {
-      grid[y] = [];
-      for (let x = 0; x < GRID_WIDTH; x++) {
-        // Compute the center (in grid units)
-        const cx = x + 0.5;
-        const cy = y + 0.5;
-        const playable = pointInPolygon(cx, cy, scandinaviaPolygon);
-        grid[y][x] = {
-          owner: null,
-          playable: playable,
-          attack: null
-        };
+    // Helper to determine if two line segments (p1→p2 and p3→p4) intersect.
+    function linesIntersect(p1, p2, p3, p4) {
+      function ccw(a, b, c) {
+        return (c[1] - a[1]) * (b[0] - a[0]) > (b[1] - a[1]) * (c[0] - a[0]);
       }
+      return (ccw(p1, p3, p4) !== ccw(p2, p3, p4)) && (ccw(p1, p2, p3) !== ccw(p1, p2, p4));
     }
 
-    /***** INITIALIZE PLAYER & BOTS *****/
-    // Helper function: find a random playable cell that is unclaimed.
-    function getRandomPlayableCell() {
-      let cell;
-      do {
-        const x = Math.floor(Math.random() * GRID_WIDTH);
-        const y = Math.floor(Math.random() * GRID_HEIGHT);
-        cell = { x, y };
-      } while (!grid[cell.y][cell.x].playable || grid[cell.y][cell.x].owner !== null);
-      return cell;
-    }
-
-    // Player: try the center of the grid; if not playable, pick random.
-    let player;
-    if (grid[Math.floor(GRID_HEIGHT / 2)][Math.floor(GRID_WIDTH / 2)].playable) {
-      player = { x: Math.floor(GRID_WIDTH / 2), y: Math.floor(GRID_HEIGHT / 2), id: "player" };
-    } else {
-      player = { ...getRandomPlayableCell(), id: "player" };
-    }
-    grid[player.y][player.x].owner = player.id;
-
-    // Bots: create (for example) three bots.
-    const NUM_BOTS = 3;
-    let bots = [];
-    for (let i = 0; i < NUM_BOTS; i++) {
-      const pos = getRandomPlayableCell();
-      const bot = { x: pos.x, y: pos.y, id: "bot_" + i };
-      bots.push(bot);
-      grid[bot.y][bot.x].owner = bot.id;
-    }
-
-    /***** HELPER FUNCTIONS *****/
-    // Returns the number of adjacent cells (up, down, left, right) that are owned by "attacker".
-    function countFriendlyNeighbors(x, y, attacker) {
-      let count = 0;
-      for (const {dx, dy} of DIRECTIONS) {
-        const nx = x + dx, ny = y + dy;
-        if (nx < 0 || nx >= GRID_WIDTH || ny < 0 || ny >= GRID_HEIGHT) continue;
-        if (grid[ny][nx].owner === attacker) count++;
+    // Check if a line between two points (p1, p2) crosses any edge of a polygon
+    function lineIntersectsPolygon(p1, p2, polygon) {
+      for (let i = 0; i < polygon.length; i++) {
+        const p3 = polygon[i];
+        const p4 = polygon[(i + 1) % polygon.length];
+        if (linesIntersect(p1, p2, p3, p4)) {
+          return true;
+        }
       }
-      return count;
+      return false;
     }
 
-    // Checks if the given (x, y) is a valid grid coordinate.
-    function inBounds(x, y) {
-      return x >= 0 && x < GRID_WIDTH && y >= 0 && y < GRID_HEIGHT;
+    // Determine whether the direct route between two territories goes over water.
+    function requiresBoat(fromTerritory, toTerritory, waterTerritories) {
+      const start = computeCenter(fromTerritory.polygon);
+      const end = computeCenter(toTerritory.polygon);
+      for (let water of waterTerritories) {
+        if (lineIntersectsPolygon(start, end, water.polygon)) {
+          return true;
+        }
+      }
+      return false;
     }
 
-    /***** PLAYER ATTACK INPUT *****/
-    // When arrow keys are pressed, for every border cell that belongs to the player,
-    // look in that direction. If the neighbor cell is playable and not already yours,
-    // begin (or continue) an attack on that cell.
-    function startPlayerAttack(direction) {
-      for (let y = 0; y < GRID_HEIGHT; y++) {
-        for (let x = 0; x < GRID_WIDTH; x++) {
-          if (grid[y][x].owner === "player") {
-            const nx = x + direction.dx, ny = y + direction.dy;
-            if (!inBounds(nx, ny)) continue;
-            const neighbor = grid[ny][nx];
-            if (!neighbor.playable) continue; // Cannot attack water.
-            if (neighbor.owner === "player") continue; // Already yours.
-            // If no attack is ongoing (or if already attacking by player), start/ensure attack.
-            if (!neighbor.attack) {
-              neighbor.attack = { attacker: "player", progress: 0 };
-            } else if (neighbor.attack.attacker === "player") {
-              // Optionally boost progress a little on repeated button presses.
-              neighbor.attack.progress += 5;
-            }
-          }
+    // ------------------------------
+    // Class Definitions
+    // ------------------------------
+
+    // Territory: a polygon on our map.
+    class Territory {
+      constructor(name, polygon, owner, isWater = false) {
+        this.name = name;
+        this.polygon = polygon;  // array of [x, y] points
+        this.owner = owner;      // "Player", "Bot1", etc.
+        this.isWater = isWater;
+        if (!isWater) {
+          this.population = Math.floor(Math.random() * 71) + 50; // random between 50 and 120
+          this.growthRate = Math.random() * 0.4 + 0.1;           // random between 0.1 and 0.5
+        } else {
+          this.population = 0;
+          this.growthRate = 0;
+        }
+        this.neighbors = []; // will be assigned manually
+      }
+      updatePopulation() {
+        if (!this.isWater) {
+          this.population += this.growthRate;
         }
       }
     }
 
-    /***** BOT ATTACK LOGIC *****/
-    // For each bot, find one border cell (owned by the bot) and try to attack one neighboring cell.
-    function botAttemptAttack(botId) {
-      // List of border cells (cells owned by bot that touch at least one cell not owned by bot)
-      let borderCells = [];
-      for (let y = 0; y < GRID_HEIGHT; y++) {
-        for (let x = 0; x < GRID_WIDTH; x++) {
-          if (grid[y][x].owner === botId) {
-            // Check if any neighbor cell is attackable.
-            for (const {dx, dy} of DIRECTIONS) {
-              const nx = x + dx, ny = y + dy;
-              if (!inBounds(nx, ny)) continue;
-              const neighbor = grid[ny][nx];
-              if (!neighbor.playable) continue;
-              if (neighbor.owner !== botId) {
-                borderCells.push({ x, y, dx, dy });
-                break;
+    // Unit: an army (or boat unit) moving from one territory to another.
+    class Unit {
+      constructor(fromTerritory, toTerritory, number, isBoat = false, owner = null) {
+        this.fromTerritory = fromTerritory;
+        this.toTerritory = toTerritory;
+        this.number = number;
+        this.isBoat = isBoat;
+        this.owner = owner;
+        this.progress = 0; // 0 (start) to 1 (arrival)
+      }
+      update(dt) {
+        const travelTime = this.isBoat ? 3.0 : 2.0; // boat units move slower
+        this.progress += dt / travelTime;
+      }
+    }
+
+    // Main Game class manages updating, rendering, and actions.
+    class Game {
+      constructor(canvas) {
+        this.canvas = canvas;
+        this.ctx = canvas.getContext("2d");
+        this.lastTime = performance.now();
+
+        this.territories = [];
+        this.waterTerritories = [];
+        this.units = [];
+
+        // ----- Setup Territories (Map of Scandinavia) -----
+        // Arbitrary coordinates for demonstration purposes.
+        const norway = new Territory("Norway", [[100, 100], [300, 100], [280, 300], [120, 300]], "Bot1");
+        const sweden = new Territory("Sweden", [[300, 100], [550, 120], [580, 300], [280, 300]], "Player");
+        const finland = new Territory("Finland", [[580, 300], [600, 300], [630, 400], [580, 400]], "Bot1");
+        const denmark = new Territory("Denmark", [[280, 300], [580, 300], [500, 500], [200, 500]], "Bot2");
+
+        this.territories.push(norway, sweden, finland, denmark);
+
+        // Define neighboring relationships manually.
+        norway.neighbors = [sweden, denmark];
+        sweden.neighbors = [norway, finland, denmark];
+        finland.neighbors = [sweden, denmark];
+        denmark.neighbors = [norway, sweden, finland];
+
+        // Water territories: drawn in blue and cannot be claimed.
+        const skagerrak = new Territory("Skagerrak", [[280, 300], [580, 300], [580, 320], [280, 320]], null, true);
+        const baltic = new Territory("Baltic Sea", [[580, 300], [630, 310], [630, 400], [580, 400]], null, true);
+        this.waterTerritories.push(skagerrak, baltic);
+
+        this.bots = ["Bot1", "Bot2"];
+        this.player = "Player";
+
+        // Add mouse click event listener for player actions.
+        this.canvas.addEventListener("click", (e) => this.handleClick(e));
+      }
+
+      // Handle clicks: If a player clicks an enemy territory, find a neighboring friendly territory to attack from.
+      handleClick(event) {
+        const rect = this.canvas.getBoundingClientRect();
+        const mouseX = event.clientX - rect.left;
+        const mouseY = event.clientY - rect.top;
+        const mousePos = [mouseX, mouseY];
+
+        for (let territory of this.territories) {
+          if (!territory.isWater && pointInPolygon(mousePos, territory.polygon)) {
+            if (territory.owner !== this.player) {
+              for (let neighbor of territory.neighbors) {
+                if (neighbor.owner === this.player) {
+                  const num = Math.floor(neighbor.population * 0.5);
+                  if (num > 0) {
+                    neighbor.population -= num;
+                    const boat = requiresBoat(neighbor, territory, this.waterTerritories);
+                    this.units.push(new Unit(neighbor, territory, num, boat, this.player));
+                  }
+                  break;
+                }
+              }
+            }
+            break;
+          }
+        }
+      }
+
+      // Update units: if a unit reaches its destination, resolve the combat.
+      handleUnitArrivals() {
+        for (let i = this.units.length - 1; i >= 0; i--) {
+          const unit = this.units[i];
+          if (unit.progress >= 1) {
+            this.resolveAttack(unit);
+            this.units.splice(i, 1);
+          }
+        }
+      }
+
+      // Resolve an attack: if attackers outnumber defenders, capture the territory.
+      resolveAttack(unit) {
+        const target = unit.toTerritory;
+        if (unit.number > target.population) {
+          target.owner = unit.owner;
+          target.population = unit.number - target.population;
+        } else {
+          target.population -= unit.number;
+        }
+      }
+
+      // Bot behavior: non-player territories randomly attack adjacent enemy territories.
+      botActions() {
+        for (let territory of this.territories) {
+          if (territory.owner !== this.player && !territory.isWater) {
+            for (let neighbor of territory.neighbors) {
+              if (neighbor.owner !== territory.owner) {
+                if (Math.random() < 0.005) {
+                  const num = Math.floor(territory.population * (Math.random() * 0.3 + 0.3));
+                  if (num > 0) {
+                    territory.population -= num;
+                    const boat = requiresBoat(territory, neighbor, this.waterTerritories);
+                    this.units.push(new Unit(territory, neighbor, num, boat, territory.owner));
+                  }
+                }
               }
             }
           }
         }
       }
-      if (borderCells.length === 0) return;
-      // Choose a random border cell and attempt to attack in its corresponding direction.
-      const { dx, dy } = borderCells[Math.floor(Math.random() * borderCells.length)];
-      // Now, for every cell owned by this bot, check the neighbor in the (dx,dy) direction.
-      for (let y = 0; y < GRID_HEIGHT; y++) {
-        for (let x = 0; x < GRID_WIDTH; x++) {
-          if (grid[y][x].owner === botId) {
-            const nx = x + dx, ny = y + dy;
-            if (!inBounds(nx, ny)) continue;
-            const neighbor = grid[ny][nx];
-            if (!neighbor.playable) continue;
-            if (neighbor.owner === botId) continue;
-            if (!neighbor.attack) {
-              neighbor.attack = { attacker: botId, progress: 0 };
-              // To limit one attack per bot per update cycle:
-              return;
-            }
-          }
+
+      update(dt) {
+        // Grow the population in each territory.
+        for (let territory of this.territories) {
+          territory.updatePopulation();
         }
+        // Update moving units.
+        for (let unit of this.units) {
+          unit.update(dt);
+        }
+        this.handleUnitArrivals();
+        // Let bots take their turns.
+        this.botActions();
+      }
+
+      // Draw all elements on the canvas.
+      draw() {
+        // Clear the screen with blue (water).
+        this.ctx.fillStyle = BLUE;
+        this.ctx.fillRect(0, 0, SCREEN_WIDTH, SCREEN_HEIGHT);
+
+        // Draw water territories.
+        for (let water of this.waterTerritories) {
+          this.drawPolygon(water.polygon, BLUE, BLUE);
+        }
+
+        // Draw land territories with border and text labels.
+        for (let territory of this.territories) {
+          if (territory.isWater) continue;
+          const color = TEAM_COLORS[territory.owner] || WHITE;
+          this.drawPolygon(territory.polygon, color, BLACK);
+          const center = computeCenter(territory.polygon);
+          this.ctx.fillStyle = BLACK;
+          this.ctx.font = "16px Arial";
+          this.ctx.fillText(territory.name, center[0] - 20, center[1] - 30);
+          this.ctx.fillText(Math.floor(territory.population).toString(), center[0] - 10, center[1] - 10);
+        }
+
+        // Draw moving units (as circles).
+        for (let unit of this.units) {
+          const start = computeCenter(unit.fromTerritory.polygon);
+          const end = computeCenter(unit.toTerritory.polygon);
+          const currentX = start[0] + (end[0] - start[0]) * unit.progress;
+          const currentY = start[1] + (end[1] - start[1]) * unit.progress;
+          this.ctx.beginPath();
+          this.ctx.arc(currentX, currentY, unit.isBoat ? 7 : 5, 0, 2 * Math.PI);
+          this.ctx.fillStyle = TEAM_COLORS[unit.owner] || BLACK;
+          this.ctx.fill();
+        }
+      }
+
+      // Helper for drawing a filled polygon with border.
+      drawPolygon(points, fillColor, strokeColor) {
+        this.ctx.beginPath();
+        this.ctx.moveTo(points[0][0], points[0][1]);
+        for (let i = 1; i < points.length; i++) {
+          this.ctx.lineTo(points[i][0], points[i][1]);
+        }
+        this.ctx.closePath();
+        this.ctx.fillStyle = fillColor;
+        this.ctx.fill();
+        this.ctx.strokeStyle = strokeColor;
+        this.ctx.lineWidth = 2;
+        this.ctx.stroke();
+      }
+
+      // Main game loop using requestAnimationFrame.
+      gameLoop(timestamp) {
+        const dt = (timestamp - this.lastTime) / 1000;
+        this.lastTime = timestamp;
+        this.update(dt);
+        this.draw();
+        requestAnimationFrame((ts) => this.gameLoop(ts));
+      }
+
+      run() {
+        requestAnimationFrame((ts) => this.gameLoop(ts));
       }
     }
 
-    /***** GAME UPDATE *****/
-    let gameOver = false;
-    let lastTick = performance.now();
-    function updateGame(deltaTime) {
-      // First, update all ongoing attacks.
-      for (let y = 0; y < GRID_HEIGHT; y++) {
-        for (let x = 0; x < GRID_WIDTH; x++) {
-          const cell = grid[y][x];
-          if (cell.attack !== null) {
-            // Calculate support: the number of adjacent cells owned by the attacker.
-            let support = countFriendlyNeighbors(x, y, cell.attack.attacker);
-            // Increase progress based on support.
-            cell.attack.progress += support * ATTACK_FACTOR;
-            if (cell.attack.progress >= ATTACK_THRESHOLD) {
-              cell.owner = cell.attack.attacker;
-              cell.attack = null;
-            }
-          }
-        }
-      }
-      // Let bots attempt attacks.
-      bots.forEach(bot => {
-        botAttemptAttack(bot.id);
-      });
-      
-      // Check for game end: if every playable cell is claimed.
-      let allClaimed = true;
-      for (let y = 0; y < GRID_HEIGHT; y++) {
-        for (let x = 0; x < GRID_WIDTH; x++) {
-          if (grid[y][x].playable && grid[y][x].owner === null) {
-            allClaimed = false;
-            break;
-          }
-        }
-        if (!allClaimed) break;
-      }
-      if (allClaimed) gameOver = true;
-    }
+    // ------------------------------
+    // Start the Game
+    // ------------------------------
 
-    /***** RENDERING *****/
     const canvas = document.getElementById("gameCanvas");
-    const ctx = canvas.getContext("2d");
-
-    function drawGrid() {
-      for (let y = 0; y < GRID_HEIGHT; y++) {
-        for (let x = 0; x < GRID_WIDTH; x++) {
-          const cell = grid[y][x];
-          let fillColor;
-          if (!cell.playable) {
-            fillColor = COLOR_WATER;
-          } else if (cell.owner === "player") {
-            fillColor = COLOR_PLAYER;
-          } else if (cell.owner && cell.owner.startsWith("bot")) {
-            fillColor = COLOR_BOT;
-          } else {
-            fillColor = COLOR_NEUTRAL;
-          }
-          // Draw the cell.
-          ctx.fillStyle = fillColor;
-          ctx.fillRect(x * CELL_SIZE, y * CELL_SIZE, CELL_SIZE, CELL_SIZE);
-
-          // If the cell is under attack, overlay a translucent white showing progress.
-          if (cell.attack) {
-            const progressRatio = Math.min(cell.attack.progress / ATTACK_THRESHOLD, 1);
-            ctx.fillStyle = "rgba(255, 255, 255," + (progressRatio * 0.6) + ")";
-            ctx.fillRect(x * CELL_SIZE, y * CELL_SIZE, CELL_SIZE, CELL_SIZE);
-          }
-          // Optional: Draw grid borders.
-          ctx.strokeStyle = "#333";
-          ctx.strokeRect(x * CELL_SIZE, y * CELL_SIZE, CELL_SIZE, CELL_SIZE);
-        }
-      }
-    }
-
-    // Draw the polygon border of the Scandinavian land.
-    function drawPolygonOutline() {
-      ctx.strokeStyle = "#FFD700";
-      ctx.lineWidth = 3;
-      ctx.beginPath();
-      scandinaviaPolygon.forEach((pt, index) => {
-        // Convert grid coordinate to canvas pixel (center of cell)
-        const px = (pt.x + 0.5) * CELL_SIZE;
-        const py = (pt.y + 0.5) * CELL_SIZE;
-        if (index === 0) {
-          ctx.moveTo(px, py);
-        } else {
-          ctx.lineTo(px, py);
-        }
-      });
-      ctx.closePath();
-      ctx.stroke();
-      ctx.lineWidth = 1;
-    }
-
-    // Draw a scoreboard overlay.
-    function drawScoreboard() {
-      let playerCount = 0, botCount = 0;
-      for (let y = 0; y < GRID_HEIGHT; y++) {
-        for (let x = 0; x < GRID_WIDTH; x++) {
-          if (grid[y][x].playable && grid[y][x].owner) {
-            if (grid[y][x].owner === "player") playerCount++;
-            else botCount++;
-          }
-        }
-      }
-      ctx.fillStyle = "rgba(0, 0, 0, 0.5)";
-      ctx.fillRect(10, 10, 220, 50);
-      ctx.fillStyle = "#fff";
-      ctx.font = "16px Arial";
-      ctx.fillText("Player: " + playerCount, 20, 30);
-      ctx.fillText("Bots: " + botCount, 20, 50);
-    }
-
-    // Draw game over overlay.
-    function drawGameOver() {
-      ctx.fillStyle = "rgba(0,0,0,0.8)";
-      ctx.fillRect(0, canvas.height/2 - 50, canvas.width, 100);
-      ctx.fillStyle = "#fff";
-      ctx.font = "40px Arial";
-      ctx.textAlign = "center";
-      let playerCount = 0, botCount = 0;
-      for (let y = 0; y < GRID_HEIGHT; y++) {
-        for (let x = 0; x < GRID_WIDTH; x++) {
-          if (grid[y][x].playable && grid[y][x].owner)
+    const game = new Game(canvas);
+    game.run();
+  </script>
+</body>
+</html>
