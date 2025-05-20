@@ -1,73 +1,92 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Battle With the Bits</title>
-    <style>
-        body { margin: 0; overflow: hidden; background: black; }
-        canvas { display: block; background: #222; }
-    </style>
+  <meta charset="UTF-8">
+  <title>Terminal Prompt Game</title>
+  <link href="https://fonts.googleapis.com/css?family=Inconsolata" rel="stylesheet">
+  <style>
+    html, body {
+      min-height: 100%;
+      background: #000;
+      color: rgba(128, 255, 128, 0.8);
+      font-family: 'Inconsolata', Helvetica, sans-serif;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+    }
+
+    .terminal {
+      width: 600px;
+      padding: 2rem;
+      background: rgba(0, 0, 0, 0.8);
+      border: 2px solid rgba(51, 255, 51, 0.8);
+      box-shadow: 0 0 10px rgba(51, 255, 51, 0.5);
+      text-shadow: 0 0 1px rgba(51, 255, 51, 0.4), 0 0 2px rgba(255, 255, 255, 0.8);
+    }
+
+    .prompt {
+      margin-bottom: 1rem;
+    }
+
+    input {
+      width: 100%;
+      padding: 0.5rem;
+      font-size: 1rem;
+      background: black;
+      color: rgba(128, 255, 128, 0.8);
+      border: none;
+      outline: none;
+    }
+
+    button {
+      margin-top: 1rem;
+      padding: 0.5rem 1rem;
+      font-size: 1rem;
+      background: rgba(51, 255, 51, 0.8);
+      border: none;
+      cursor: pointer;
+    }
+
+    .response {
+      margin-top: 1rem;
+    }
+  </style>
 </head>
 <body>
-    <canvas id="gameCanvas"></canvas>
-    <script>
-        const canvas = document.getElementById("gameCanvas");
-        const ctx = canvas.getContext("2d");
+  <div class="terminal">
+    <div class="prompt">Enter your name:</div>
+    <input type="text" id="userInput">
+    <button onclick="processInput()">Submit</button>
+    <div class="response"></div>
+  </div>
 
-        canvas.width = window.innerWidth;
-        canvas.height = window.innerHeight;
+  <script>
+    const questions = [
+      "Enter your name:",
+      "What is your favorite color?",
+      "What is your quest?",
+      "What is the meaning of life?"
+    ];
 
-        class Player {
-            constructor() {
-                this.x = 100;
-                this.y = canvas.height - 150;
-                this.width = 50;
-                this.height = 50;
-                this.color = "cyan";
-                this.velocityY = 0;
-                this.gravity = 0.5;
-            }
+    let index = 0;
 
-            update() {
-                this.velocityY += this.gravity;
-                this.y += this.velocityY;
-                if (this.y > canvas.height - 150) {
-                    this.y = canvas.height - 150;
-                    this.velocityY = 0;
-                }
-            }
+    function processInput() {
+      const inputField = document.getElementById("userInput");
+      const responseDiv = document.querySelector(".response");
+      
+      if (inputField.value.trim() !== "") {
+        responseDiv.innerHTML += `<p>> ${inputField.value}</p>`;
+        index++;
 
-            jump() {
-                if (this.y >= canvas.height - 150) {
-                    this.velocityY = -10;
-                }
-            }
-
-            draw() {
-                ctx.fillStyle = this.color;
-                ctx.fillRect(this.x, this.y, this.width, this.height);
-            }
+        if (index < questions.length) {
+          document.querySelector(".prompt").textContent = questions[index];
+          inputField.value = "";
+        } else {
+          responseDiv.innerHTML += `<p>> Thank you for participating in the game.</p>`;
+          document.querySelector("button").disabled = true;
         }
-
-        const player = new Player();
-
-        window.addEventListener("keydown", (event) => {
-            if (event.code === "Space") {
-                player.jump();
-            }
-        });
-
-        function gameLoop() {
-            ctx.clearRect(0, 0, canvas.width, canvas.height);
-
-            player.update();
-            player.draw();
-
-            requestAnimationFrame(gameLoop);
-        }
-
-        gameLoop();
-    </script>
+      }
+    }
+  </script>
 </body>
 </html>
