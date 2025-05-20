@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8">
-  <title>Mini Terraria – Place Blocks, Big & Varied World</title>
+  <title>Mini Terraria – Caves, Slime & Block Placement</title>
   <style>
     html, body {
       margin: 0;
@@ -10,7 +10,7 @@
       overflow: hidden;
       background: #000;
     }
-    /* Ensure a retro, pixelated look */
+    /* Enforce a retro, pixelated look */
     canvas {
       display: block;
       image-rendering: pixelated;
@@ -32,66 +32,102 @@
     resizeCanvas();
 
     /***** World Generation *****/
-    // Increase world size for a bigger map.
+    // Larger world dimensions.
     const worldWidth = 500;    
     const worldHeight = 200;  
-    
-    const tileSize = 16; // each block 16x16 pixels
+    const tileSize = 16; // Each block: 16x16 pixels
 
-    // We'll use our block types:
+    // Block types:
     // 0: Air; 1: Dirt; 2: Stone; 3: Grass; 4: Wood; 5: Leaves
     const world = [];
-    // Generate ground heights with a random walk.
+    // Use a random-walk to generate natural ground heights.
     let minGround = 20, maxGround = 80;
-    let groundHeights = [];
-    let currentGround = 50; // starting height for x=0
+    const groundHeights = [];
+    let currentGround = 50;
     for (let x = 0; x < worldWidth; x++) {
-      // Random step between -2 and 2.
-      currentGround += Math.floor(Math.random() * 5) - 2;
+      currentGround += Math.floor(Math.random() * 5) - 2; // step between -2 and 2
       if (currentGround < minGround) currentGround = minGround;
       if (currentGround > maxGround) currentGround = maxGround;
       groundHeights[x] = currentGround;
     }
-    // Fill world array:
+    // Create the world array.
     for (let x = 0; x < worldWidth; x++) {
       world[x] = [];
-      let groundHeight = groundHeights[x];
+      let ground = groundHeights[x];
       for (let y = 0; y < worldHeight; y++) {
-        if (y > groundHeight) {
-          // Underground: randomly choose dirt or stone.
+        if (y > ground) {
+          // Underground: mix dirt and stone.
           world[x][y] = (Math.random() < 0.2) ? 1 : 2;
-        } else if (y === groundHeight) {
-          world[x][y] = 3; // Surface: grass.
+        } else if (y === ground) {
+          world[x][y] = 3; // Grass surface.
         } else {
-          world[x][y] = 0; // Air above ground.
+          world[x][y] = 0; // Air.
         }
       }
     }
-    // Generate simple trees on grass.
+    // Simple tree generation on grass surfaces.
     for (let x = 5; x < worldWidth - 5; x++) {
       for (let y = 0; y < worldHeight; y++) {
         if (world[x][y] === 3 && Math.random() < 0.03) {
-          let treeHeight = 3 + Math.floor(Math.random() * 3);
+          const treeHeight = 3 + Math.floor(Math.random() * 3);
           for (let t = 1; t <= treeHeight; t++) {
             if (y - t >= 0) {
               world[x][y - t] = 4; // Wood trunk.
             }
           }
-          let topY = y - treeHeight;
+          const topY = y - treeHeight;
           for (let dx = -1; dx <= 1; dx++) {
             for (let dy = -1; dy <= 1; dy++) {
               if (x + dx >= 0 && x + dx < worldWidth && topY + dy >= 0) {
-                if (Math.random() < 0.7) {
-                  world[x + dx][topY + dy] = 5; // Leaves.
-                }
+                if (Math.random() < 0.7) world[x + dx][topY + dy] = 5; // Leaves.
               }
             }
           }
         }
       }
     }
+    // ----- NEW: Cave Generation -----
+    // Carve out random cave tunnels in the underground.
+    function generateCaves() {
+      const numCaves = 30; // Many tunnels for a larger world.
+      for (let i = 0; i < numCaves; i++) {
+        let startX = Math.floor(Math.random() * worldWidth);
+        // Start below ground. Ensure we are at least a few tiles under the surface.
+        let startY = groundHeights[startX] + 5 + Math.floor(Math.random() * 20);
+        const length = Math.floor(Math.random() * 100) + 50; // Tunnel length 50-150
+        let angle = Math.random() * 2 * Math.PI;
+        for(let j = 0; j < length; j++){
+          const cx = Math.floor(startX);
+          const cy = Math.floor(startY);
+          const radius = Math.floor(Math.random() * 2) + 1; // radius between 1 and 2
+          for (let ax = -radius; ax <= radius; ax++){
+            for(let ay = -radius; ay <= radius; ay++){
+              const dx = cx + ax;
+              const dy = cy + ay;
+              if(dx >= 0 && dx < worldWidth && dy >= 0 && dy < worldHeight){
+                if(ax * ax + ay * ay <= radius * radius){
+                  world[dx][dy] = 0;      // Carve out (air)
+                  // Also reset block health.
+                  // (Air blocks have 0 health.)
+                }
+              }
+            }
+          }
+          // Move the cave tunnel in the current direction.
+          startX += Math.cos(angle);
+          startY += Math.sin(angle);
+          // Add a small random variation to the angle.
+          angle += (Math.random() - 0.5) * 0.3;
+          if(startX < 0 || startX >= worldWidth || startY < 0 || startY >= worldHeight) break;
+        }
+      }
+    }
+    generateCaves();
+    // -------------------------------
+
+    // Colors used for blocks.
     const blockColors = {
-      0: "#87CEEB", // Air (not drawn)
+      0: "#87CEEB", // Air (sky blue, although air is not drawn)
       1: "#8B4513", // Dirt
       2: "#808080", // Stone
       3: "#228B22", // Grass
@@ -101,20 +137,22 @@
 
     /***** Block Durability & Health *****/
     const blockDurability = {
-      1: 2,
-      2: 3,
-      3: 2,
-      4: 3,
-      5: 1
+      1: 2, // Dirt
+      2: 3, // Stone
+      3: 2, // Grass
+      4: 3, // Wood
+      5: 1  // Leaves
     };
+    // Create a parallel array to track block health.
     const blockHealth = [];
     for (let x = 0; x < worldWidth; x++) {
       blockHealth[x] = [];
       for (let y = 0; y < worldHeight; y++) {
-        let b = world[x][y];
+        const b = world[x][y];
         blockHealth[x][y] = (b !== 0 && blockDurability[b] !== undefined) ? blockDurability[b] : 0;
       }
     }
+    // Helper to set a block and its health.
     function setBlock(x, y, block) {
       if (x < 0 || x >= worldWidth || y < 0 || y >= worldHeight) return;
       world[x][y] = block;
@@ -137,12 +175,12 @@
       jumpStrength: 8,
       grounded: false,
       health: 100,
-      // Inventory now has materials and tools.
+      // Inventory holds materials and tools.
       // Pre-populated for testing.
       inventory: {
         wood: 20,
         stone: 20,
-        gel: 10,
+        gel: 10,  // Gel represents slime drops.
         dirt: 0,
         grass: 0,
         leaves: 0,
@@ -150,9 +188,9 @@
         wooden_sword: 0,
         torch: 0
       },
-      selectedSlot: 0 // refers to hotbar slot (index into inventoryOrder)
+      selectedSlot: 0 // Index into hotbar.
     };
-    // Inventory order determines the hotbar layout.
+    // Define the order in which items appear in the hotbar.
     const inventoryOrder = ["wood", "stone", "gel", "dirt", "grass", "leaves", "wooden_pickaxe", "wooden_sword", "torch"];
 
     /***** Enemy Setup *****/
@@ -171,6 +209,7 @@
         type: "slime"
       });
     }
+    // Initially spawn a few slimes near the surface.
     for (let i = 0; i < 5; i++) {
       let ex = Math.floor(Math.random() * (worldWidth - 20)) + 10;
       let ey = 0;
@@ -178,6 +217,21 @@
         if (world[ex][y] !== 0) { ey = y - 1; break; }
       }
       spawnEnemy(ex * tileSize, ey * tileSize);
+    }
+    // Periodically spawn new slime enemies (mostly in cave depths).
+    function updateSlimeSpawning() {
+      // Limit overall slime count.
+      if (enemies.length < 10) {
+        if (Math.random() < 0.005) {
+          // Spawn a slime in a cave region (y > ground height + 10)
+          const spawnX = Math.floor(Math.random() * worldWidth);
+          const spawnYStart = groundHeights[spawnX] + 10;
+          if (spawnYStart < worldHeight - 10) {
+            const spawnY = spawnYStart + Math.floor(Math.random() * (worldHeight - spawnYStart - 10));
+            spawnEnemy(spawnX * tileSize, spawnY * tileSize);
+          }
+        }
+      }
     }
 
     /***** Crafting Setup *****/
@@ -213,26 +267,24 @@
         for (let ingr in recipe.ingredients) {
           player.inventory[ingr] -= recipe.ingredients[ingr];
         }
-        let resKey = recipe.result.key;
+        const resKey = recipe.result.key;
         player.inventory[resKey] = (player.inventory[resKey] || 0) + recipe.result.amount;
         console.log("Crafted " + recipe.name);
       }
     }
 
     /***** Block Placement *****/
-    // Mapping from inventory key to block type.
+    // Mapping from inventory key to a placeable block.
     const placeableMapping = {
       "dirt": 1,
       "stone": 2,
       "grass": 3,
       "wood": 4,
       "leaves": 5
-      // (Other items like gel, tools, or torch are not treated as simple blocks here.)
     };
-    // Check that a block may be placed at (x, y):
+    // Allow placement only if the target tile is empty and at least one neighbor is non–air (or at the world’s bottom).
     function canPlaceBlockAt(x, y) {
-      if (getBlock(x, y) !== 0) return false; // tile must be empty.
-      // Allow placement if tile is at world bottom or if at least one neighbor is non-air.
+      if (getBlock(x, y) !== 0) return false;
       if (y === worldHeight - 1) return true;
       const deltas = [
         {dx: -1, dy: 0},
@@ -246,27 +298,24 @@
       return false;
     }
     function handleBlockPlacement(event) {
-      // Use the event (mouse or touch) to compute target tile.
       const rect = canvas.getBoundingClientRect();
       let clientX = event.clientX || event.touches[0].clientX;
       let clientY = event.clientY || event.touches[0].clientY;
       const mx = clientX - rect.left;
       const my = clientY - rect.top;
-      // Compute camera offset.
       const cameraX = player.x - canvas.width / 2 + player.width / 2;
       const cameraY = player.y - canvas.height / 2 + player.height / 2;
       let targetX = Math.floor((mx + cameraX) / tileSize);
       let targetY = Math.floor((my + cameraY) / tileSize);
-      // Get currently selected hotbar item.
-      let selectedItem = inventoryOrder[player.selectedSlot];
-      if (!(selectedItem in placeableMapping)) return; // not a placeable block.
+      // Only allow placement if the selected hotbar item is a placeable block.
+      const selectedItem = inventoryOrder[player.selectedSlot];
+      if (!(selectedItem in placeableMapping)) return;
       if (player.inventory[selectedItem] <= 0) return;
       if (!canPlaceBlockAt(targetX, targetY)) return;
-      // Place the block:
       setBlock(targetX, targetY, placeableMapping[selectedItem]);
-      player.inventory[selectedItem]--; // reduce inventory count.
+      player.inventory[selectedItem]--;
     }
-    // Listen for right-click (contextmenu) to place blocks.
+    // Use right-click (or touch equivalent) to place blocks.
     canvas.addEventListener("contextmenu", function(e) {
       e.preventDefault();
       handleBlockPlacement(e);
@@ -276,12 +325,10 @@
     /***** Input Handling *****/
     const keys = {};
     window.addEventListener("keydown", e => {
-      if (e.key === "c" || e.key === "C") {
-        craftingMenuActive = !craftingMenuActive;
-      }
-      // Number keys 1-9 change selected hotbar slot.
+      if (e.key === "c" || e.key === "C") { craftingMenuActive = !craftingMenuActive; }
+      // Number keys 1–9 change the selected hotbar slot.
       if (!isNaN(e.key) && e.key !== "0") {
-        let slot = parseInt(e.key) - 1;
+        const slot = parseInt(e.key) - 1;
         if (slot < inventoryOrder.length) { player.selectedSlot = slot; }
       }
       if (!craftingMenuActive) { keys[e.key] = true; }
@@ -289,9 +336,9 @@
     window.addEventListener("keyup", e => {
       if (!craftingMenuActive) { keys[e.key] = false; }
     });
-    // Mouse handling (for mining and crafting).
+    // Mouse events for mining and crafting.
     let isMining = false;
-    let currentMiningTarget = null; // {x, y} tile coordinates
+    let currentMiningTarget = null; // {x, y} of target tile being mined.
     let lastMousePos = { x: 0, y: 0 };
     canvas.addEventListener("mousemove", e => {
       const rect = canvas.getBoundingClientRect();
@@ -314,7 +361,7 @@
         currentMiningTarget = null;
       }
     });
-    // Touch events for touchscreen support.
+    // Touch events for mining and crafting.
     canvas.addEventListener("touchstart", e => {
       e.preventDefault();
       const touch = e.touches[0];
@@ -368,10 +415,10 @@
               a.y + a.height > b.y);
     }
     function isColliding(entity) {
-      let leftTile = Math.floor(entity.x / tileSize);
-      let rightTile = Math.floor((entity.x + entity.width) / tileSize);
-      let topTile = Math.floor(entity.y / tileSize);
-      let bottomTile = Math.floor((entity.y + entity.height) / tileSize);
+      const leftTile = Math.floor(entity.x / tileSize);
+      const rightTile = Math.floor((entity.x + entity.width) / tileSize);
+      const topTile = Math.floor(entity.y / tileSize);
+      const bottomTile = Math.floor((entity.y + entity.height) / tileSize);
       for (let x = leftTile; x <= rightTile; x++) {
         for (let y = topTile; y <= bottomTile; y++) {
           if (isSolid(getBlock(x, y))) return true;
@@ -403,7 +450,7 @@
         }
       }
     }
-    // If you have a wooden pickaxe in your inventory, mining goes faster.
+    // The mining efficiency increases if you have a wooden pickaxe.
     function getMiningMultiplier() {
       return player.inventory.wooden_pickaxe > 0 ? 2 : 0.5;
     }
@@ -412,7 +459,6 @@
     const miningDamage = 0.1;
     function updateMining() {
       if (!isMining) return;
-      // Calculate camera offset.
       const cameraX = player.x - canvas.width / 2 + player.width / 2;
       const cameraY = player.y - canvas.height / 2 + player.height / 2;
       let targetX = Math.floor((lastMousePos.x + cameraX) / tileSize);
@@ -437,7 +483,7 @@
       const effectiveDamage = miningDamage * getMiningMultiplier();
       blockHealth[targetX][targetY] -= effectiveDamage;
       if (blockHealth[targetX][targetY] <= 0) {
-        // Award materials based on the block type.
+        // When a block is broken, award materials based on block type.
         switch (block) {
           case 1: player.inventory.dirt++; break;
           case 2: player.inventory.stone++; break;
@@ -447,6 +493,45 @@
         }
         setBlock(targetX, targetY, 0);
         currentMiningTarget = null;
+      }
+    }
+
+    /***** Enemy Update & Slime Drops *****/
+    function updateEnemies() {
+      for (let i = enemies.length - 1; i >= 0; i--) {
+        let enemy = enemies[i];
+        if (Math.abs(enemy.x - player.x) < 300) {
+          enemy.vx = enemy.x < player.x ? enemy.speed : -enemy.speed;
+        } else {
+          enemy.vx += (Math.random() - 0.5) * 0.2;
+          if (enemy.vx > enemy.speed) enemy.vx = enemy.speed;
+          if (enemy.vx < -enemy.speed) enemy.vx = -enemy.speed;
+        }
+        enemy.vy += 0.4;
+        updateEntityPhysics(enemy);
+        if (checkCollision(enemy, player)) {
+          player.health -= 0.2;
+        }
+        if (enemy.health <= 0) {
+          // If the enemy is a slime, drop 1–2 gel.
+          if (enemy.type === "slime") {
+            player.inventory.gel += Math.floor(Math.random() * 2) + 1;
+          }
+          enemies.splice(i, 1);
+        }
+      }
+    }
+    // Function to periodically spawn new slime enemies in cave areas.
+    function updateSlimeSpawning() {
+      if (enemies.length < 10) {
+        if (Math.random() < 0.005) {
+          const spawnX = Math.floor(Math.random() * worldWidth);
+          const spawnYStart = groundHeights[spawnX] + 10;
+          if (spawnYStart < worldHeight - 10) {
+            const spawnY = spawnYStart + Math.floor(Math.random() * (worldHeight - spawnYStart - 10));
+            spawnEnemy(spawnX * tileSize, spawnY * tileSize);
+          }
+        }
       }
     }
 
@@ -598,22 +683,22 @@
       ctx.fill();
       ctx.strokeStyle = "#E59400";
       ctx.stroke();
-
-      // Camera offset computed so that the player is roughly centered.
+      
+      // Camera offset: center on player.
       const cameraX = player.x - canvas.width / 2 + player.width / 2;
       const cameraY = player.y - canvas.height / 2 + player.height / 2;
       const startCol = Math.floor(cameraX / tileSize) - 1;
       const endCol = startCol + Math.ceil(canvas.width / tileSize) + 2;
       const startRow = Math.floor(cameraY / tileSize) - 1;
       const endRow = startRow + Math.ceil(canvas.height / tileSize) + 2;
-      // Draw visible world tiles with a light outline.
+      // Draw visible world tiles with a subtle outline.
       for (let x = startCol; x <= endCol; x++) {
         for (let y = startRow; y <= endRow; y++) {
           if (x >= 0 && x < worldWidth && y >= 0 && y < worldHeight) {
             const block = world[x][y];
             if (block !== 0) {
-              let drawX = x * tileSize - cameraX;
-              let drawY = y * tileSize - cameraY;
+              const drawX = x * tileSize - cameraX;
+              const drawY = y * tileSize - cameraY;
               ctx.fillStyle = blockColors[block];
               ctx.fillRect(drawX, drawY, tileSize, tileSize);
               ctx.strokeStyle = "rgba(0,0,0,0.3)";
@@ -639,11 +724,10 @@
         ctx.fillStyle = "green";
         ctx.fillRect(enemy.x - cameraX, enemy.y - cameraY, enemy.width, enemy.height);
       }
-      // Draw health.
       ctx.fillStyle = "#000";
       ctx.font = "16px Courier New";
       ctx.fillText("Health: " + Math.floor(player.health), 10, 20);
-      // If mining, draw a progress overlay on the targeted block.
+      // If mining is active, draw mining progress over the targeted block.
       if (currentMiningTarget) {
         const tx = currentMiningTarget.x;
         const ty = currentMiningTarget.y;
@@ -666,9 +750,9 @@
           }
         }
       }
-      // Draw the inventory hotbar.
+      // Draw inventory hotbar.
       drawInventory();
-      // If the crafting menu is active, overlay it.
+      // If the crafting menu is active, draw it.
       if (craftingMenuActive) {
         drawCraftingMenu();
       }
@@ -678,6 +762,7 @@
     function gameLoop() {
       updatePlayer();
       updateEnemies();
+      updateSlimeSpawning();
       updateMining();
       draw();
       requestAnimationFrame(gameLoop);
@@ -714,6 +799,10 @@
           player.health -= 0.2;
         }
         if (enemy.health <= 0) {
+          // If the enemy is a slime, drop 1-2 gel.
+          if (enemy.type === "slime") {
+            player.inventory.gel += Math.floor(Math.random() * 2) + 1;
+          }
           enemies.splice(i, 1);
         }
       }
