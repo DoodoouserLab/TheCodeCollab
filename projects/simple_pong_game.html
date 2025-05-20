@@ -2,11 +2,11 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8" />
-  <title>Advanced Territorial: Bots &amp; Power-Ups</title>
+  <title>Territorial – Scandinavia Edition</title>
   <style>
     body {
       margin: 0;
-      background: #202020;
+      background: #222;
       display: flex;
       align-items: center;
       justify-content: center;
@@ -14,335 +14,297 @@
     }
     canvas {
       border: 2px solid #333;
-      background: #202020;
+      background: #1E1E1E;
     }
   </style>
 </head>
 <body>
-  <canvas id="gameCanvas" width="600" height="600"></canvas>
+  <canvas id="gameCanvas" width="800" height="800"></canvas>
   <script>
-    /***** Configuration & Global Variables *****/
+    /***** Configuration *****/
+    // Grid parameters – we use a 40×40 grid so that each cell is 20×20 (800×800 canvas)
+    const GRID_WIDTH = 40;
+    const GRID_HEIGHT = 40;
+    const CELL_SIZE = 20;
+    const TICK_INTERVAL = 200; // game logic updates every 200ms
+
+    // Colors for various cell types
+    const COLOR_NEUTRAL = "#C8C8C8";  // Unclaimed (playable) cell
+    const COLOR_PLAYER  = "#00FF00";  // Player’s territory (green)
+    const COLOR_BOT     = "#FF0000";  // Bot territory (red)
+    const COLOR_INACTIVE = "#111";    // Non-playable (outside the map)
+
+    // Entity movement directions
+    const directions = [
+      { dx: 0, dy: -1 },
+      { dx: 0, dy: 1 },
+      { dx: -1, dy: 0 },
+      { dx: 1, dy: 0 }
+    ];
+
+    /***** Define the Scandinavia Map Polygon *****/
+    // These points are specified in grid coordinates (each coordinate refers to a cell unit).
+    // Adjust these vertices to change the shape of the playable area.
+    const scandinaviaPolygon = [
+      { x: 5,  y: 8 },
+      { x: 35, y: 8 },
+      { x: 38, y: 20 },
+      { x: 35, y: 32 },
+      { x: 20, y: 37 },
+      { x: 5,  y: 32 },
+      { x: 2,  y: 20 }
+    ];
+
+    // Standard ray-casting algorithm for point-in-polygon.
+    function pointInPolygon(x, y, polygon) {
+      let inside = false;
+      for (let i = 0, j = polygon.length - 1; i < polygon.length; j = i++) {
+        const xi = polygon[i].x, yi = polygon[i].y;
+        const xj = polygon[j].x, yj = polygon[j].y;
+        const intersect = ((yi > y) !== (yj > y)) &&
+          (x < ((xj - xi) * (y - yi)) / (yj - yi) + xi);
+        if (intersect) inside = !inside;
+      }
+      return inside;
+    }
+
+    /***** Build the Grid *****/
+    // Each cell is represented as an object: { owner, playable }.
+    // Only cells whose center lies inside scandinaviaPolygon are playable.
+    let grid = [];
+    for (let y = 0; y < GRID_HEIGHT; y++) {
+      grid[y] = [];
+      for (let x = 0; x < GRID_WIDTH; x++) {
+        // Compute the center of the cell in grid units.
+        const cx = x + 0.5;
+        const cy = y + 0.5;
+        const playable = pointInPolygon(cx, cy, scandinaviaPolygon);
+        grid[y][x] = { owner: null, playable: playable };
+      }
+    }
+
+    /***** Entities: Player & Bots *****/
+    // Helper function to pick a random playable cell that is unoccupied.
+    function getRandomPlayableCell() {
+      let cell;
+      do {
+        const x = Math.floor(Math.random() * GRID_WIDTH);
+        const y = Math.floor(Math.random() * GRID_HEIGHT);
+        cell = { x, y };
+      } while (!grid[cell.y][cell.x].playable || grid[cell.y][cell.x].owner !== null);
+      return cell;
+    }
+
+    // Spawn the player.
+    // Try to choose a cell near the center of the grid; if it's not playable, use a random one.
+    let player;
+    if (grid[Math.floor(GRID_HEIGHT / 2)][Math.floor(GRID_WIDTH / 2)].playable) {
+      player = { x: Math.floor(GRID_WIDTH / 2), y: Math.floor(GRID_HEIGHT / 2), owner: "player" };
+    } else {
+      const pos = getRandomPlayableCell();
+      player = { x: pos.x, y: pos.y, owner: "player" };
+    }
+    grid[player.y][player.x].owner = player.owner;
+
+    // Create some bots (e.g., 4 bots)
+    const bots = [];
+    const NUM_BOTS = 4;
+    for (let i = 0; i < NUM_BOTS; i++) {
+      const pos = getRandomPlayableCell();
+      const bot = { x: pos.x, y: pos.y, owner: "bot_" + i };
+      bots.push(bot);
+      grid[bot.y][bot.x].owner = bot.owner;
+    }
+
+    /***** Canvas Setup *****/
     const canvas = document.getElementById("gameCanvas");
     const ctx = canvas.getContext("2d");
 
-    // Grid specs
-    const GRID_WIDTH = 20;
-    const GRID_HEIGHT = 20;
-    const CELL_SIZE = 30; // 20 * 30 = 600px canvas
-
-    // Colors for various cell types and UI elements.
-    const COLOR_BG = "#202020";
-    const COLOR_GRID = "#323232";
-    const COLOR_NEUTRAL = "#C8C8C8";
-    const COLOR_PLAYER = "#00FF00";
-    const COLOR_BOT = "#FF0000";
-    const COLOR_OBSTACLE = "#555555";
-    const COLOR_POWERUP = "#FFD700";
-
-    // Game update interval (in milliseconds)
-    const TICK_INTERVAL = 200;
-
-    // Power-up configuration
-    const MAX_POWERUPS = 3;
-    const POWERUP_SPAWN_CHANCE = 0.2; // chance every tick if below MAX_POWERUPS
-    const FREEZE_DURATION_TICKS = 15; // freeze bots for this many ticks
-
-    // Obstacle probability (for each cell)
-    const OBSTACLE_PROBABILITY = 0.1;
-
-    // Game grid: each cell is an object { owner, obstacle, powerUp }
-    let grid = [];
-
-    // Game state variables
-    let freezeTimer = 0; // when > 0, bots skip their moves
-    let gameOver = false; 
-
-    // Timing variables for main loop
-    let lastFrameTime = performance.now();
-    let accumulator = 0;
-
-    /***** Initialize Grid *****/
-    function initGrid() {
-      grid = [];
-      for (let y = 0; y < GRID_HEIGHT; y++) {
-        grid[y] = [];
-        for (let x = 0; x < GRID_WIDTH; x++) {
-          grid[y][x] = { owner: null, obstacle: false, powerUp: false };
-        }
-      }
-      // Randomly mark some cells as obstacles.
-      for (let y = 0; y < GRID_HEIGHT; y++) {
-        for (let x = 0; x < GRID_WIDTH; x++) {
-          // We'll decide later to reserve cells for the player and bots.
-          if (Math.random() < OBSTACLE_PROBABILITY) {
-            grid[y][x].obstacle = true;
-          }
-        }
-      }
-    }
-
-    initGrid();
-
-    /***** Entities: Player and Bots *****/
-    // Helper function to check if a position is within bounds.
-    function isValidPosition(x, y) {
-      return x >= 0 && x < GRID_WIDTH && y >= 0 && y < GRID_HEIGHT;
-    }
-
-    // Create the player in the center. Clear obstacles at that cell.
-    const player = {
-      x: Math.floor(GRID_WIDTH / 2),
-      y: Math.floor(GRID_HEIGHT / 2),
-      owner: "player",
-    };
-    grid[player.y][player.x].obstacle = false;
-    grid[player.y][player.x].owner = player.owner;
-
-    // Create bots. For simplicity, we create three bots.
-    const numBots = 3;
-    const bots = [];
-    for (let i = 0; i < numBots; i++) {
-      let pos;
-      do {
-        pos = {
-          x: Math.floor(Math.random() * GRID_WIDTH),
-          y: Math.floor(Math.random() * GRID_HEIGHT),
-        };
-      } while (
-        grid[pos.y][pos.x].obstacle ||
-        grid[pos.y][pos.x].owner !== null
-      );
-      const bot = { x: pos.x, y: pos.y, owner: "bot_" + i };
-      bots.push(bot);
-      grid[pos.y][pos.x].owner = bot.owner;
-    }
-
     /***** Movement Functions *****/
-    // Player movement: check boundaries and obstacles.
-    function playerMove(dx, dy) {
+    // Check if the new position is in bounds and playable.
+    function canMoveTo(x, y) {
+      return x >= 0 && x < GRID_WIDTH &&
+             y >= 0 && y < GRID_HEIGHT &&
+             grid[y][x].playable;
+    }
+
+    // Handle player movement.
+    function movePlayer(dx, dy) {
       const newX = player.x + dx;
       const newY = player.y + dy;
-      if (!isValidPosition(newX, newY)) return;
-      if (grid[newY][newX].obstacle) return; // cannot move into obstacles
-      // Move the player.
-      player.x = newX;
-      player.y = newY;
-      // If there's a power-up, collect it and trigger freeze effect.
-      if (grid[newY][newX].powerUp) {
-        grid[newY][newX].powerUp = false;
-        freezeTimer = FREEZE_DURATION_TICKS;
+      if (canMoveTo(newX, newY)) {
+        player.x = newX;
+        player.y = newY;
+        grid[newY][newX].owner = player.owner;
       }
-      grid[newY][newX].owner = player.owner;
     }
 
-    // Bot movement: prefer adjacent unclaimed (or power-up) cells.
-    function botMove(bot) {
-      const moves = [
-        { dx: 0, dy: 1 },
-        { dx: 0, dy: -1 },
-        { dx: 1, dy: 0 },
-        { dx: -1, dy: 0 },
-      ];
-      // Filter out moves that are out of bounds or into obstacles.
-      const validMoves = moves.filter(({ dx, dy }) => {
+    // Handle bot movement: choose a random adjacent cell that is playable.
+    function moveBot(bot) {
+      const validMoves = directions.filter(({dx, dy}) => {
         const nx = bot.x + dx;
         const ny = bot.y + dy;
-        return isValidPosition(nx, ny) && !grid[ny][nx].obstacle;
+        return canMoveTo(nx, ny);
       });
       if (validMoves.length === 0) return;
-
-      // Prefer moves where the cell is unclaimed or holds a power-up.
-      const preferred = validMoves.filter(({ dx, dy }) => {
-        const nx = bot.x + dx;
-        const ny = bot.y + dy;
-        return grid[ny][nx].owner === null || grid[ny][nx].powerUp;
-      });
-      let chosenMove;
-      if (preferred.length > 0) {
-        chosenMove =
-          preferred[Math.floor(Math.random() * preferred.length)];
-      } else {
-        chosenMove = validMoves[Math.floor(Math.random() * validMoves.length)];
-      }
-      const newX = bot.x + chosenMove.dx;
-      const newY = bot.y + chosenMove.dy;
-      // In case bot steps on a power-up, simply claim it.
-      grid[newY][newX].powerUp = false;
-      bot.x = newX;
-      bot.y = newY;
-      grid[newY][newX].owner = bot.owner;
+      const move = validMoves[Math.floor(Math.random() * validMoves.length)];
+      bot.x += move.dx;
+      bot.y += move.dy;
+      grid[bot.y][bot.x].owner = bot.owner;
     }
 
-    /***** Power-Up Spawning *****/
-    function spawnPowerUp() {
-      // Count current power-ups.
-      let count = 0;
-      for (let y = 0; y < GRID_HEIGHT; y++) {
-        for (let x = 0; x < GRID_WIDTH; x++) {
-          if (grid[y][x].powerUp) count++;
-        }
-      }
-      if (count >= MAX_POWERUPS) return;
+    /***** Game State & Logic *****/
+    let gameOver = false;
 
-      // With some chance, spawn a new power-up in a random cell that is free.
-      if (Math.random() < POWERUP_SPAWN_CHANCE) {
-        let attempts = 0;
-        while (attempts < 100) {
-          const x = Math.floor(Math.random() * GRID_WIDTH);
-          const y = Math.floor(Math.random() * GRID_HEIGHT);
-          const cell = grid[y][x];
-          if (!cell.obstacle && cell.owner === null && !cell.powerUp) {
-            cell.powerUp = true;
-            break;
-          }
-          attempts++;
-        }
-      }
-    }
-
-    /***** Drawing Functions *****/
-    // Draws each grid cell based on its state.
-    function drawGrid() {
-      for (let y = 0; y < GRID_HEIGHT; y++) {
-        for (let x = 0; x < GRID_WIDTH; x++) {
-          const cell = grid[y][x];
-          let fillColor = COLOR_NEUTRAL;
-          if (cell.obstacle) {
-            fillColor = COLOR_OBSTACLE;
-          } else if (cell.powerUp) {
-            fillColor = COLOR_POWERUP;
-          } else if (cell.owner !== null) {
-            fillColor =
-              cell.owner === "player" ? COLOR_PLAYER : COLOR_BOT;
-          }
-          ctx.fillStyle = fillColor;
-          ctx.fillRect(x * CELL_SIZE, y * CELL_SIZE, CELL_SIZE, CELL_SIZE);
-          // Draw grid borders.
-          ctx.strokeStyle = COLOR_GRID;
-          ctx.strokeRect(x * CELL_SIZE, y * CELL_SIZE, CELL_SIZE, CELL_SIZE);
-        }
-      }
-    }
-
-    // Count territory for player and bots.
+    // Count territory over all playable cells.
     function countTerritory() {
-      let playerTerr = 0,
-        botTerr = 0;
+      let playerTerr = 0;
+      let botTerr = 0;
       for (let y = 0; y < GRID_HEIGHT; y++) {
         for (let x = 0; x < GRID_WIDTH; x++) {
-          // Only count cells that are not obstacles.
-          if (!grid[y][x].obstacle) {
-            if (grid[y][x].owner === "player") playerTerr++;
-            else if (grid[y][x].owner !== null) botTerr++;
+          if (grid[y][x].playable && grid[y][x].owner !== null) {
+            if (grid[y][x].owner === "player") {
+              playerTerr++;
+            } else {
+              botTerr++;
+            }
           }
         }
       }
       return { playerTerr, botTerr };
     }
 
-    // Draw a scoreboard overlay on the canvas.
+    // The game advances in ticks.
+    function updateGame() {
+      // Move each bot.
+      bots.forEach(bot => moveBot(bot));
+      // Check if all playable cells have been claimed.
+      let allClaimed = true;
+      for (let y = 0; y < GRID_HEIGHT; y++) {
+        for (let x = 0; x < GRID_WIDTH; x++) {
+          if (grid[y][x].playable && grid[y][x].owner === null) {
+            allClaimed = false;
+            break;
+          }
+        }
+        if (!allClaimed) break;
+      }
+      if (allClaimed) {
+        gameOver = true;
+      }
+    }
+
+    /***** Drawing Functions *****/
+    // Draw the grid: each cell’s color depends on its state.
+    function drawGrid() {
+      for (let y = 0; y < GRID_HEIGHT; y++) {
+        for (let x = 0; x < GRID_WIDTH; x++) {
+          let cell = grid[y][x];
+          let fillColor;
+          if (!cell.playable) {
+            fillColor = COLOR_INACTIVE;
+          } else if (cell.owner === "player") {
+            fillColor = COLOR_PLAYER;
+          } else if (cell.owner && cell.owner.startsWith("bot")) {
+            fillColor = COLOR_BOT;
+          } else {
+            fillColor = COLOR_NEUTRAL;
+          }
+          ctx.fillStyle = fillColor;
+          ctx.fillRect(x * CELL_SIZE, y * CELL_SIZE, CELL_SIZE, CELL_SIZE);
+          // Optionally draw cell borders.
+          ctx.strokeStyle = "#333";
+          ctx.strokeRect(x * CELL_SIZE, y * CELL_SIZE, CELL_SIZE, CELL_SIZE);
+        }
+      }
+    }
+
+    // Optionally, draw the polygon outline that defines the playable area.
+    function drawPolygonOutline() {
+      ctx.strokeStyle = "#FFD700";
+      ctx.lineWidth = 3;
+      ctx.beginPath();
+      scandinaviaPolygon.forEach((pt, index) => {
+        // Convert grid coordinates to canvas pixels (center of cell)
+        const px = (pt.x + 0.5) * CELL_SIZE;
+        const py = (pt.y + 0.5) * CELL_SIZE;
+        if (index === 0) {
+          ctx.moveTo(px, py);
+        } else {
+          ctx.lineTo(px, py);
+        }
+      });
+      ctx.closePath();
+      ctx.stroke();
+      ctx.lineWidth = 1;
+    }
+
+    // Draw the scoreboard overlay.
     function drawScoreboard() {
       const { playerTerr, botTerr } = countTerritory();
       ctx.fillStyle = "rgba(0, 0, 0, 0.5)";
-      ctx.fillRect(10, 10, 170, 70);
+      ctx.fillRect(10, 10, 200, 50);
       ctx.fillStyle = "#fff";
       ctx.font = "16px Arial";
       ctx.fillText("Player: " + playerTerr, 20, 30);
       ctx.fillText("Bots: " + botTerr, 20, 50);
-      if (freezeTimer > 0) {
-        ctx.fillStyle = "#FFD700";
-        ctx.fillText(
-          "Freeze: " + Math.ceil(freezeTimer) + " ticks",
-          20,
-          70
-        );
-      }
     }
 
-    // Draw a game over message.
+    // Draw the game over overlay.
     function drawGameOver() {
-      ctx.fillStyle = "rgba(0, 0, 0, 0.7)";
-      ctx.fillRect(0, canvas.height / 2 - 60, canvas.width, 120);
+      ctx.fillStyle = "rgba(0, 0, 0, 0.8)";
+      ctx.fillRect(0, canvas.height / 2 - 50, canvas.width, 100);
       ctx.fillStyle = "#fff";
       ctx.font = "40px Arial";
       ctx.textAlign = "center";
-      ctx.fillText("Game Over", canvas.width / 2, canvas.height / 2 - 10);
       const { playerTerr, botTerr } = countTerritory();
-      ctx.font = "20px Arial";
-      ctx.fillText(
-        "Player: " + playerTerr + "  |  Bots: " + botTerr,
-        canvas.width / 2,
-        canvas.height / 2 + 20
-      );
+      let message = "Game Over!";
+      if (playerTerr > botTerr) {
+        message += " You win!";
+      } else if (playerTerr < botTerr) {
+        message += " Bots win!";
+      } else {
+        message += " It's a tie!";
+      }
+      ctx.fillText(message, canvas.width / 2, canvas.height / 2 + 15);
     }
 
-    /***** Game Loop & Update Functions *****/
-    // Update game logic on each tick.
-    function updateGame() {
-      // If freeze is active, decrement the freeze timer.
-      if (freezeTimer > 0) {
-        freezeTimer--;
-      }
-      // Only move bots if not frozen.
-      if (freezeTimer <= 0) {
-        bots.forEach(bot => botMove(bot));
-      }
-      // Attempt to spawn a new power-up.
-      spawnPowerUp();
-      // Check for game over: every non-obstacle cell must be claimed.
-      let allClaimed = true;
-      outer: for (let y = 0; y < GRID_HEIGHT; y++) {
-        for (let x = 0; x < GRID_WIDTH; x++) {
-          if (!grid[y][x].obstacle && grid[y][x].owner === null) {
-            allClaimed = false;
-            break outer;
-          }
-        }
-      }
-      if (allClaimed) gameOver = true;
-    }
-
-    // Render the current game state.
-    function render() {
-      ctx.fillStyle = COLOR_BG;
-      ctx.fillRect(0, 0, canvas.width, canvas.height);
-      drawGrid();
-      drawScoreboard();
-    }
-
-    // Main game loop using requestAnimationFrame.
+    /***** The Game Loop *****/
+    let lastTick = performance.now();
     function gameLoop(timestamp) {
-      const deltaTime = timestamp - lastFrameTime;
-      lastFrameTime = timestamp;
-      accumulator += deltaTime;
-      while (accumulator >= TICK_INTERVAL && !gameOver) {
+      // Update logic at fixed intervals.
+      if (timestamp - lastTick >= TICK_INTERVAL && !gameOver) {
         updateGame();
-        accumulator -= TICK_INTERVAL;
+        lastTick = timestamp;
       }
-      render();
+      // Render the current game state.
+      ctx.clearRect(0, 0, canvas.width, canvas.height);
+      drawGrid();
+      drawPolygonOutline();
+      drawScoreboard();
       if (!gameOver) {
         requestAnimationFrame(gameLoop);
       } else {
         drawGameOver();
       }
     }
-
     requestAnimationFrame(gameLoop);
 
-    /***** Player Input Event Handling *****/
-    document.addEventListener("keydown", e => {
-      switch (e.key) {
+    /***** Player Input *****/
+    document.addEventListener("keydown", (e) => {
+      if (gameOver) return;
+      switch(e.key) {
         case "ArrowUp":
-          playerMove(0, -1);
+          movePlayer(0, -1);
           break;
         case "ArrowDown":
-          playerMove(0, 1);
+          movePlayer(0, 1);
           break;
         case "ArrowLeft":
-          playerMove(-1, 0);
+          movePlayer(-1, 0);
           break;
         case "ArrowRight":
-          playerMove(1, 0);
+          movePlayer(1, 0);
           break;
       }
     });
