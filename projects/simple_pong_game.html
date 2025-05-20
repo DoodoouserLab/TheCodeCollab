@@ -1,106 +1,211 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Simple Pong Game</title>
-    <style>
-        body {
-            text-align: center;
-            background-color: black;
-            color: white;
-        }
-        canvas {
-            background: #222;
-            display: block;
-            margin: auto;
-            border: 2px solid white;
-        }
-    </style>
+  <meta charset="UTF-8">
+  <title>Territorial.io - JS Demo vs Bots</title>
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      text-align: center;
+      margin: 0;
+      padding: 20px;
+      background: #f4f4f4;
+    }
+    #gameCanvas {
+      border: 1px solid #000;
+      background: #fff;
+    }
+    #controls {
+      margin-top: 10px;
+    }
+    #scoreboard {
+      margin-top: 20px;
+    }
+    button {
+      padding: 8px 16px;
+      margin: 5px;
+      font-size: 16px;
+      cursor: pointer;
+    }
+  </style>
 </head>
 <body>
-    <h1>Simple Pong Game</h1>
-    <canvas id="gameCanvas" width="600" height="400"></canvas>
-    <script>
-        const canvas = document.getElementById("gameCanvas");
-        const ctx = canvas.getContext("2d");
-
-        let ballX = canvas.width / 2;
-        let ballY = canvas.height / 2;
-        let ballSpeedX = 3;
-        let ballSpeedY = 3;
-        const ballSize = 10;
-
-        let paddleX = (canvas.width - 100) / 2;
-        const paddleY = canvas.height - 20;
-        const paddleWidth = 100;
-        const paddleHeight = 10;
-        const paddleSpeed = 6;
-
-
-        function updateGame() {
-            ballX += ballSpeedX;
-            ballY += ballSpeedY;
-
-            if (ballX < 0 || ballX > canvas.width - ballSize) {
-                ballSpeedX *= -1;
-            }
-
-            if (ballY < 0) {
-                ballSpeedY *= -1;
-            }
-
-            if (
-                ballY + ballSize > paddleY &&
-                ballX > paddleX &&
-                ballX < paddleX + paddleWidth
-            ) {
-                ballSpeedY *= -1;
-            }
-
-            if (ballY > canvas.height) {
-                ballX = canvas.width / 2;
-                ballY = canvas.height / 2;
-                ballSpeedX = 3;
-                ballSpeedY = 3;
-            }
-
-        }
-
-                
-
-
-        function drawGame() {
-            ctx.clearRect(0, 0, canvas.width, canvas.height);
-
-            ctx.fillStyle = "white";
-            ctx.fillRect(paddleX, paddleY, paddleWidth, paddleHeight);
-
-            ctx.beginPath();
-            ctx.arc(ballX, ballY, ballSize, 0, Math.PI * 2);
-            ctx.fillStyle = "white";
-            ctx.fill();
-            ctx.closePath();
-        }
-        
-        function gameLoop() {
-            updateGame();
-            drawGame();
-            requestAnimationFrame(gameLoop);
-        }
-
-        document.addEventListener("mousemove", (event) => {
-            let rect = canvas.getBoundingClientRect();
-            paddleX = event.clientX - rect.left - paddleWidth / 2;
-       }
-
-
-
- 
+  <h1>Territorial.io - Play vs Bots</h1>
+  <canvas id="gameCanvas" width="600" height="600"></canvas>
+  <div id="controls">
+    <button id="botTurnBtn">Bot Turn</button>
+    <button id="newGameBtn">New Game</button>
+  </div>
+  <div id="scoreboard">
+    <h2>Scoreboard</h2>
+    <div id="scores"></div>
+  </div>
   
-        });
+  <script>
+    // Game settings
+    const GRID_ROWS = 30;
+    const GRID_COLS = 30;
+    const CELL_SIZE = 20; // Each cell is 20px x 20px so canvas is 600x600
 
-        gameLoop();
-    </script>
+    // Grid data: 0 means neutral, 1 = Human, 2-4 = Bots
+    let grid = [];
+
+    // Color mapping for players
+    const colors = {
+      0: "#ffffff",     // neutral: white
+      1: "#007bff",     // human: blue
+      2: "#dc3545",     // bot: red
+      3: "#28a745",     // bot: green
+      4: "#6f42c1"      // bot: purple
+    };
+
+    // Global canvas and drawing context
+    let canvas, ctx;
+
+    // Initialize the game board and starting positions
+    function initGame() {
+      // Create an empty grid filled with zeros
+      grid = [];
+      for (let r = 0; r < GRID_ROWS; r++) {
+        const row = [];
+        for (let c = 0; c < GRID_COLS; c++) {
+          row.push(0);
+        }
+        grid.push(row);
+      }
+      
+      // Set starting corners:
+      // Top-left: Human (id 1)
+      grid[0][0] = 1; 
+      // Top-right: Bot (id 2)
+      grid[0][GRID_COLS - 1] = 2;
+      // Bottom-left: Bot (id 3)
+      grid[GRID_ROWS - 1][0] = 3;
+      // Bottom-right: Bot (id 4)
+      grid[GRID_ROWS - 1][GRID_COLS - 1] = 4;
+      
+      drawGrid();
+      updateScoreboard();
+    }
+
+    // Draw the board on the canvas
+    function drawGrid() {
+      ctx.clearRect(0, 0, canvas.width, canvas.height);
+      for (let r = 0; r < GRID_ROWS; r++) {
+        for (let c = 0; c < GRID_COLS; c++) {
+          // Fill each cell with the color of its owner
+          ctx.fillStyle = colors[ grid[r][c] ];
+          ctx.fillRect(c * CELL_SIZE, r * CELL_SIZE, CELL_SIZE, CELL_SIZE);
+          // Optional: draw borders for clarity
+          ctx.strokeStyle = "#ccc";
+          ctx.strokeRect(c * CELL_SIZE, r * CELL_SIZE, CELL_SIZE, CELL_SIZE);
+        }
+      }
+    }
+
+    // Update the scoreboard with the current territory counts
+    function updateScoreboard() {
+      // Count cells for each player
+      const counts = {1: 0, 2: 0, 3: 0, 4: 0};
+      for (let r = 0; r < GRID_ROWS; r++) {
+        for (let c = 0; c < GRID_COLS; c++) {
+          const owner = grid[r][c];
+          if (owner !== 0) counts[owner]++;
+        }
+      }
+      const scoreHTML = `
+        <p><strong>You (Blue):</strong> ${counts[1]}</p>
+        <p><strong>Bot Red:</strong> ${counts[2]}</p>
+        <p><strong>Bot Green:</strong> ${counts[3]}</p>
+        <p><strong>Bot Purple:</strong> ${counts[4]}</p>
+      `;
+      document.getElementById("scores").innerHTML = scoreHTML;
+    }
+
+    // Helper: Return valid neighbors (up, down, left, right) for a given cell
+    function getNeighbors(r, c) {
+      const neighbors = [];
+      const directions = [
+        [-1, 0], // up
+        [1, 0],  // down
+        [0, -1], // left
+        [0, 1]   // right
+      ];
+      for (const [dr, dc] of directions) {
+        const nr = r + dr, nc = c + dc;
+        if (nr >= 0 && nr < GRID_ROWS && nc >= 0 && nc < GRID_COLS) {
+          neighbors.push({ r: nr, c: nc });
+        }
+      }
+      return neighbors;
+    }
+
+    // Human move: When the canvas is clicked, try to capture a neutral cell
+    // but only if it is adjacent to an already owned (human) cell.
+    function handleCanvasClick(e) {
+      const rect = canvas.getBoundingClientRect();
+      const x = e.clientX - rect.left;
+      const y = e.clientY - rect.top;
+      const c = Math.floor(x / CELL_SIZE);
+      const r = Math.floor(y / CELL_SIZE);
+      
+      // Allow capture only if the clicked cell is neutral
+      if (grid[r][c] !== 0) {
+        alert("This cell is already claimed.");
+        return;
+      }
+      
+      // Check neighbors—at least one must belong to the human (id 1)
+      const neighbors = getNeighbors(r, c);
+      const valid = neighbors.some(n => grid[n.r][n.c] === 1);
+      
+      if (!valid) {
+        alert("You can only capture cells adjacent to your territory.");
+        return;
+      }
+      
+      // Claim the cell for the human player
+      grid[r][c] = 1;
+      drawGrid();
+      updateScoreboard();
+    }
+
+    // Bot turn: For each bot (ids 2, 3, 4), find frontier cells (neutral cells
+    // adjacent to any cell they own) and randomly capture one.
+    function botTurn() {
+      for (const botId of [2, 3, 4]) {
+        const frontier = [];
+        for (let r = 0; r < GRID_ROWS; r++) {
+          for (let c = 0; c < GRID_COLS; c++) {
+            if (grid[r][c] === botId) {
+              const neighbors = getNeighbors(r, c);
+              for (const n of neighbors) {
+                if (grid[n.r][n.c] === 0) {
+                  frontier.push({ r: n.r, c: n.c });
+                }
+              }
+            }
+          }
+        }
+        if (frontier.length > 0) {
+          // Select a random neutral cell from the frontier
+          const choice = frontier[Math.floor(Math.random() * frontier.length)];
+          grid[choice.r][choice.c] = botId;
+        }
+      }
+      drawGrid();
+      updateScoreboard();
+    }
+
+    // Set up the canvas and event listeners once the page loads.
+    window.onload = function() {
+      canvas = document.getElementById("gameCanvas");
+      ctx = canvas.getContext("2d");
+      initGame();
+      canvas.addEventListener("click", handleCanvasClick);
+      document.getElementById("botTurnBtn").addEventListener("click", botTurn);
+      document.getElementById("newGameBtn").addEventListener("click", initGame);
+    }
+  </script>
 </body>
 </html>
