@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8">
-  <title>Mini Terraria – Tools & Crafting</title>
+  <title>Mini Terraria – Tools, Crafting & Mining</title>
   <style>
     html, body {
       margin: 0;
@@ -10,8 +10,11 @@
       overflow: hidden;
       background: #000;
     }
+    /* Ensure pixel art scaling */
     canvas {
       display: block;
+      image-rendering: pixelated;
+      background: #000;
     }
   </style>
 </head>
@@ -38,7 +41,7 @@
     const world = [];
     for (let x = 0; x < worldWidth; x++) {
       world[x] = [];
-      // Use a sine formula plus randomness to determine the ground height.
+      // Use a sine formula plus randomness to determine ground height.
       let groundHeight = Math.floor(30 + 10 * Math.sin(x * 0.2) + (Math.random() * 5 - 2.5));
       for (let y = 0; y < worldHeight; y++) {
         if (y > groundHeight) {
@@ -84,7 +87,7 @@
     };
 
     /***** Block Durability & Health *****/
-    // Each block type requires several hits (miningDamage per tick) to break.
+    // Each block type takes several hits (miningDamage per tick) to break.
     const blockDurability = {
       1: 2, // Dirt
       2: 3, // Stone
@@ -92,7 +95,7 @@
       4: 3, // Wood
       5: 1  // Leaves
     };
-    // Create a parallel 2D array to track the current health of each block.
+    // Create a 2D array to track the current health of each block.
     const blockHealth = [];
     for (let x = 0; x < worldWidth; x++) {
       blockHealth[x] = [];
@@ -103,7 +106,7 @@
                               : 0;
       }
     }
-    // Helper: resets a block’s health when it is (re)placed.
+    // Helper: resets a block’s health when it is set.
     function setBlock(x, y, block) {
       if (x < 0 || x >= worldWidth || y < 0 || y >= worldHeight) return;
       world[x][y] = block;
@@ -116,7 +119,7 @@
 
     /***** Player Setup *****/
     const player = {
-      x: 50, // In world coordinates.
+      x: 50, // World coordinate.
       y: 20,
       width: tileSize,
       height: tileSize * 1.8,
@@ -126,13 +129,15 @@
       jumpStrength: 8,
       grounded: false,
       health: 100,
-      // Inventory includes gathered materials AND crafted tools.
+      // Inventory includes gathered materials and crafted tools.
+      // (For testing, pre-populate with some materials.)
       inventory: {
         dirt: 0,
-        stone: 0,
+        stone: 20,
         grass: 0,
-        wood: 0,
+        wood: 20,
         leaves: 0,
+        gel: 10,
         wooden_pickaxe: 0,
         wooden_sword: 0,
         torch: 0
@@ -169,27 +174,27 @@
     }
 
     /***** Crafting Setup *****/
-    // Recipes (tools must be crafted from gathered materials)
+    // Updated recipes based on real Terraria recipes.
     const recipes = [
       {
+        name: "Torch",
+        ingredients: { wood: 1, gel: 1 },
+        result: { key: "torch", amount: 3 }
+      },
+      {
         name: "Wooden Pickaxe",
-        ingredients: { wood: 10, stone: 5 },
+        ingredients: { wood: 10, stone: 3 },
         result: { key: "wooden_pickaxe", amount: 1 }
       },
       {
         name: "Wooden Sword",
-        ingredients: { wood: 8, stone: 3 },
+        ingredients: { wood: 7 },
         result: { key: "wooden_sword", amount: 1 }
-      },
-      {
-        name: "Torch",
-        ingredients: { wood: 1, leaves: 1 },
-        result: { key: "torch", amount: 4 }
       }
     ];
-    // Toggle the crafting menu with the "c" key.
+    // Toggle the crafting menu using the "C" key.
     let craftingMenuActive = false;
-    // Will hold recipe box positions when drawing the crafting menu.
+    // Will store on-screen recipe box positions.
     let recipeMenuBoxes = [];
 
     function canCraft(recipe) {
@@ -202,9 +207,11 @@
 
     function craftItem(recipe) {
       if (canCraft(recipe)) {
+        // Deduct ingredients.
         for (let ingr in recipe.ingredients) {
           player.inventory[ingr] -= recipe.ingredients[ingr];
         }
+        // Add the crafted item.
         let resKey = recipe.result.key;
         player.inventory[resKey] = (player.inventory[resKey] || 0) + recipe.result.amount;
       }
@@ -213,6 +220,7 @@
     /***** Input Handling *****/
     const keys = {};
     window.addEventListener("keydown", e => {
+      // Toggle crafting menu with "C"
       if (e.key === "c" || e.key === "C") {
         craftingMenuActive = !craftingMenuActive;
       } else if (!craftingMenuActive) {
@@ -224,8 +232,7 @@
         keys[e.key] = false;
       }
     });
-
-    // Mouse handling for mining & crafting
+    // Mouse handling for mining & crafting.
     let isMining = false;
     let currentMiningTarget = null; // {x, y} tile coordinates being mined.
     let lastMousePos = { x: 0, y: 0 };
@@ -256,10 +263,8 @@
       let mouseY = e.clientY - rect.top;
       // Check if the mouse is within any recipe box.
       for (let box of recipeMenuBoxes) {
-        if (
-          mouseX >= box.x && mouseX <= box.x + box.width &&
-          mouseY >= box.y && mouseY <= box.y + box.height
-        ) {
+        if (mouseX >= box.x && mouseX <= box.x + box.width &&
+            mouseY >= box.y && mouseY <= box.y + box.height) {
           craftItem(box.recipe);
           console.log("Crafted: " + box.recipe.result.key);
         }
@@ -280,7 +285,7 @@
               a.y < b.y + b.height &&
               a.y + a.height > b.y);
     }
-    // Incremental movement: move in steps and check collisions.
+    // Incremental collision checking.
     function isColliding(entity) {
       let leftTile = Math.floor(entity.x / tileSize);
       let rightTile = Math.floor((entity.x + entity.width) / tileSize);
@@ -296,7 +301,7 @@
       return false;
     }
     function updateEntityPhysics(entity) {
-      // Horizontal movement in small increments.
+      // Horizontal movement.
       let steps = Math.ceil(Math.abs(entity.vx));
       let moveX = (steps === 0) ? 0 : entity.vx / steps;
       for (let i = 0; i < steps; i++) {
@@ -307,7 +312,7 @@
           break;
         }
       }
-      // Vertical movement in small increments.
+      // Vertical movement.
       steps = Math.ceil(Math.abs(entity.vy));
       let moveY = (steps === 0) ? 0 : entity.vy / steps;
       entity.grounded = false;
@@ -322,37 +327,36 @@
       }
     }
 
-    // Mining tool multiplier: mining is faster with a Wooden Pickaxe.
+    // Mining tool multiplier – mining goes faster when you have a wooden pickaxe.
     function getMiningMultiplier() {
       if (player.inventory.wooden_pickaxe > 0) return 2;
       return 0.5;
     }
 
     /***** Enhanced Mining Mechanic *****/
-    // Base damage applied per tick.
+    // Base mining damage per tick.
     const miningDamage = 0.1;
     function updateMining() {
       if (!isMining) return;
-
-      // Compute camera offset (as in rendering).
+      // Compute camera offset (as used in rendering).
       let cameraX = player.x - canvas.width / 2 + player.width / 2;
       let cameraY = player.y - canvas.height / 2 + player.height / 2;
-      // Determine the world tile coordinates of the mouse.
+      // Determine the world tile coordinates under the mouse.
       let targetX = Math.floor((lastMousePos.x + cameraX) / tileSize);
       let targetY = Math.floor((lastMousePos.y + cameraY) / tileSize);
-      // Update the current mining target if it changes.
+      // Update current mining target if needed.
       if (!currentMiningTarget ||
           currentMiningTarget.x !== targetX || currentMiningTarget.y !== targetY) {
         currentMiningTarget = { x: targetX, y: targetY };
       }
-      // Check for valid block.
+      // Check valid block.
       if (targetX < 0 || targetX >= worldWidth || targetY < 0 || targetY >= worldHeight) return;
       let block = world[targetX][targetY];
       if (block === 0 || blockDurability[block] === undefined) {
         currentMiningTarget = null;
         return;
       }
-      // Check if the block is within reach.
+      // Check if block is within reach.
       const blockCenterX = (targetX + 0.5) * tileSize;
       const blockCenterY = (targetY + 0.5) * tileSize;
       const playerCenterX = player.x + player.width / 2;
@@ -362,12 +366,11 @@
       const distance = Math.sqrt(dx * dx + dy * dy);
       const miningReach = 80;
       if (distance > miningReach) return;
-
-      // Apply mining damage multiplied by tool efficiency.
+      // Apply mining damage with multiplier.
       const effectiveDamage = miningDamage * getMiningMultiplier();
       blockHealth[targetX][targetY] -= effectiveDamage;
       if (blockHealth[targetX][targetY] <= 0) {
-        // Award materials based on block type.
+        // Award gathered material based on block type.
         switch (block) {
           case 1: player.inventory.dirt++; break;
           case 2: player.inventory.stone++; break;
@@ -382,8 +385,7 @@
 
     /***** Player Update *****/
     function updatePlayer() {
-      // When the crafting menu is open, suspend movement.
-      if (craftingMenuActive) return;
+      if (craftingMenuActive) return; // Suspend movement when crafting.
       if (keys["a"] || keys["ArrowLeft"]) {
         player.vx = -player.speed;
       } else if (keys["d"] || keys["ArrowRight"]) {
@@ -423,68 +425,82 @@
     }
 
     /***** UI Rendering *****/
-    // Draw a simple inventory bar at the bottom center of the screen.
+    // Draw a Terraria-style inventory bar at the bottom center.
     function drawInventory() {
       const items = Object.keys(player.inventory);
       const invSize = 40;
-      const padding = 10;
+      const padding = 4;
       const totalWidth = items.length * (invSize + padding) - padding;
       const startX = (canvas.width - totalWidth) / 2;
       const y = canvas.height - invSize - 10;
-      ctx.font = "12px Arial";
+      ctx.font = "10px 'Courier New', monospace";
       ctx.textAlign = "center";
       ctx.textBaseline = "middle";
       for (let i = 0; i < items.length; i++) {
         const key = items[i];
         const count = player.inventory[key];
         const x = startX + i * (invSize + padding);
-        ctx.fillStyle = "rgba(0,0,0,0.5)";
+        // Draw a dark, pixelated cell.
+        ctx.fillStyle = "#333";
         ctx.fillRect(x, y, invSize, invSize);
-        ctx.strokeStyle = "white";
+        ctx.strokeStyle = "#aaa";
         ctx.strokeRect(x, y, invSize, invSize);
-        ctx.fillStyle = "white";
+        // Draw the key and count.
+        ctx.fillStyle = "#fff";
         ctx.fillText(key, x + invSize / 2, y + invSize / 2 - 8);
         ctx.fillText(count, x + invSize / 2, y + invSize / 2 + 8);
       }
     }
 
-    // Draw the crafting menu overlay with recipe boxes.
+    // Draw the crafting menu overlay in a Terraria-inspired style.
     function drawCraftingMenu() {
-      // Semi-transparent overlay.
-      ctx.fillStyle = "rgba(0, 0, 0, 0.7)";
+      // Draw a semi-transparent dark overlay.
+      ctx.fillStyle = "rgba(0, 0, 0, 0.85)";
       ctx.fillRect(0, 0, canvas.width, canvas.height);
+      // Draw a central panel.
       const panelWidth = canvas.width * 0.8;
       const panelHeight = canvas.height * 0.6;
       const panelX = (canvas.width - panelWidth) / 2;
       const panelY = (canvas.height - panelHeight) / 2;
-      // Panel background.
-      ctx.fillStyle = "#333";
+      ctx.fillStyle = "#4b3621"; // A dark wood-like color.
       ctx.fillRect(panelX, panelY, panelWidth, panelHeight);
-      ctx.fillStyle = "white";
-      ctx.font = "30px Arial";
+      ctx.strokeStyle = "#d2b48c"; // Light brown border.
+      ctx.lineWidth = 4;
+      ctx.strokeRect(panelX, panelY, panelWidth, panelHeight);
+      // Title text.
+      ctx.font = "26px 'Courier New', monospace";
       ctx.textAlign = "center";
-      ctx.fillText("Crafting Menu", canvas.width / 2, panelY + 40);
+      ctx.fillStyle = "#fff";
+      ctx.fillText("Crafting Station", canvas.width / 2, panelY + 40);
+      ctx.font = "16px 'Courier New', monospace";
+      ctx.fillText("Click a recipe box to craft. Press 'C' to exit.", canvas.width / 2, panelY + 70);
+
+      // Draw recipe boxes as a vertical list.
       const recipeBoxWidth = panelWidth * 0.9;
-      const recipeBoxHeight = 70;
-      const gap = 20;
-      recipeMenuBoxes = [];
-      ctx.font = "16px Arial";
+      const recipeBoxHeight = 60;
+      const gap = 15;
+      recipeMenuBoxes = []; // Reset for each render.
       ctx.textAlign = "left";
       for (let i = 0; i < recipes.length; i++) {
         const boxX = panelX + (panelWidth - recipeBoxWidth) / 2;
-        const boxY = panelY + 60 + i * (recipeBoxHeight + gap);
-        ctx.fillStyle = canCraft(recipes[i]) ? "#555" : "#222";
+        const boxY = panelY + 90 + i * (recipeBoxHeight + gap);
+        // Highlight available recipes.
+        ctx.fillStyle = canCraft(recipes[i]) ? "#6b8e23" : "#555";
         ctx.fillRect(boxX, boxY, recipeBoxWidth, recipeBoxHeight);
-        ctx.strokeStyle = "white";
+        ctx.strokeStyle = "#fff";
+        ctx.lineWidth = 2;
         ctx.strokeRect(boxX, boxY, recipeBoxWidth, recipeBoxHeight);
-        ctx.fillStyle = "white";
-        ctx.fillText(recipes[i].name, boxX + 10, boxY + 25);
-        let ingredText = "Ingredients: ";
+        ctx.fillStyle = "#fff";
+        ctx.font = "16px 'Courier New', monospace";
+        ctx.fillText(recipes[i].name, boxX + 10, boxY + 20);
+        // List ingredients.
+        let ingredText = "Requires: ";
         for (let ingr in recipes[i].ingredients) {
-          ingredText += ingr + " x" + recipes[i].ingredients[ingr] + " ";
+          ingredText += ingr + " x" + recipes[i].ingredients[ingr] + "  ";
         }
-        ctx.fillText(ingredText, boxX + 10, boxY + 45);
-        ctx.fillText("Result: " + recipes[i].result.key + " x" + recipes[i].result.amount, boxX + 10, boxY + 65);
+        ctx.font = "14px 'Courier New', monospace";
+        ctx.fillText(ingredText, boxX + 10, boxY + 40);
+        // Save the box for click-detection.
         recipeMenuBoxes.push({
           recipe: recipes[i],
           x: boxX,
@@ -497,21 +513,30 @@
 
     /***** Rendering *****/
     function draw() {
-      // Draw a background gradient.
+      // Draw a sky gradient.
       const grd = ctx.createLinearGradient(0, 0, 0, canvas.height);
       grd.addColorStop(0, "#87CEEB");
       grd.addColorStop(1, "#FFFFFF");
       ctx.fillStyle = grd;
       ctx.fillRect(0, 0, canvas.width, canvas.height);
 
-      // Determine camera offset.
+      // Draw a simple sun.
+      const sunRadius = 30;
+      ctx.beginPath();
+      ctx.arc(80, 80, sunRadius, 0, 2 * Math.PI);
+      ctx.fillStyle = "#FDB813";
+      ctx.fill();
+      ctx.strokeStyle = "#E59400";
+      ctx.stroke();
+
+      // Determine camera offset to center on the player.
       const cameraX = player.x - canvas.width / 2 + player.width / 2;
       const cameraY = player.y - canvas.height / 2 + player.height / 2;
       const startCol = Math.floor(cameraX / tileSize) - 1;
       const endCol = startCol + Math.ceil(canvas.width / tileSize) + 2;
       const startRow = Math.floor(cameraY / tileSize) - 1;
       const endRow = startRow + Math.ceil(canvas.height / tileSize) + 2;
-      // Render only visible tiles.
+      // Render visible tiles.
       for (let x = startCol; x <= endCol; x++) {
         for (let y = startRow; y <= endRow; y++) {
           if (x >= 0 && x < worldWidth && y >= 0 && y < worldHeight) {
@@ -523,7 +548,7 @@
           }
         }
       }
-      // Draw player.
+      // Draw the player.
       ctx.fillStyle = "red";
       ctx.fillRect(player.x - cameraX, player.y - cameraY, player.width, player.height);
       // Draw enemies.
@@ -531,12 +556,12 @@
         ctx.fillStyle = "green";
         ctx.fillRect(enemy.x - cameraX, enemy.y - cameraY, enemy.width, enemy.height);
       }
-      // Simple health display.
-      ctx.fillStyle = "black";
-      ctx.font = "16px Arial";
+      // Draw a health display.
+      ctx.fillStyle = "#000";
+      ctx.font = "16px 'Courier New', monospace";
       ctx.fillText("Health: " + Math.floor(player.health), 10, 20);
 
-      // If a block is being mined, draw a progress overlay.
+      // If mining is happening, draw a progress overlay on the target block.
       if (currentMiningTarget) {
         const tx = currentMiningTarget.x;
         const ty = currentMiningTarget.y;
@@ -550,6 +575,7 @@
             progress = Math.max(0, Math.min(1, progress));
             ctx.fillStyle = "rgba(0, 0, 0, " + (0.5 * progress) + ")";
             ctx.fillRect(bx, by, tileSize, tileSize);
+            // Progress bar above block.
             ctx.fillStyle = "gray";
             ctx.fillRect(bx, by - 6, tileSize, 4);
             ctx.fillStyle = "yellow";
