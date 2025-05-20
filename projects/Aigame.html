@@ -22,7 +22,6 @@
     }
 
     // --- Shader sources ---
-    // Vertex Shader: Transforms vertex positions and passes vertex color.
     const vsSource = `
       attribute vec3 aPosition;
       attribute vec3 aColor;
@@ -35,7 +34,6 @@
       }
     `;
 
-    // Fragment Shader: Outputs the interpolated color.
     const fsSource = `
       precision mediump float;
       varying vec3 vColor;
@@ -44,7 +42,7 @@
       }
     `;
 
-    // --- Shader compilation helper functions ---
+    // --- Shader Compilation Helpers ---
     function loadShader(type, source) {
       const shader = gl.createShader(type);
       gl.shaderSource(shader, source);
@@ -74,7 +72,7 @@
     const shaderProgram = initShaderProgram(vsSource, fsSource);
     gl.useProgram(shaderProgram);
 
-    // --- Look up attribute and uniform locations ---
+    // --- Look Up Attribute/Uniform Locations ---
     const programInfo = {
       attribLocations: {
         vertexPosition: gl.getAttribLocation(shaderProgram, 'aPosition'),
@@ -87,41 +85,39 @@
     };
 
     // --- Cube Geometry Data ---
-    // Define vertices for 6 faces (4 vertices per face).
     const positions = [
-      // Front face
+      // Front Face
       -1.0, -1.0,  1.0,
        1.0, -1.0,  1.0,
        1.0,  1.0,  1.0,
       -1.0,  1.0,  1.0,
-      // Back face
+      // Back Face
       -1.0, -1.0, -1.0,
       -1.0,  1.0, -1.0,
        1.0,  1.0, -1.0,
        1.0, -1.0, -1.0,
-      // Top face
+      // Top Face
       -1.0,  1.0, -1.0,
       -1.0,  1.0,  1.0,
        1.0,  1.0,  1.0,
        1.0,  1.0, -1.0,
-      // Bottom face
+      // Bottom Face
       -1.0, -1.0, -1.0,
        1.0, -1.0, -1.0,
        1.0, -1.0,  1.0,
       -1.0, -1.0,  1.0,
-      // Right face
+      // Right Face
        1.0, -1.0, -1.0,
        1.0,  1.0, -1.0,
        1.0,  1.0,  1.0,
        1.0, -1.0,  1.0,
-      // Left face
+      // Left Face
       -1.0, -1.0, -1.0,
       -1.0, -1.0,  1.0,
       -1.0,  1.0,  1.0,
       -1.0,  1.0, -1.0,
     ];
 
-    // Each face has a solid color.
     const faceColors = [
       [1.0,  0.0,  0.0], // Front: red
       [0.0,  1.0,  0.0], // Back: green
@@ -134,13 +130,11 @@
     let colors = [];
     for (let i = 0; i < faceColors.length; i++) {
       const c = faceColors[i];
-      // Repeat for each of the 4 vertices of the face.
       for (let j = 0; j < 4; j++) {
         colors = colors.concat(c);
       }
     }
 
-    // Index array: two triangles per face.
     const indices = [
       0, 1, 2,    0, 2, 3,      // Front face
       4, 5, 6,    4, 6, 7,      // Back face
@@ -151,46 +145,33 @@
     ];
 
     // --- Create and Bind Buffers ---
-    // Position buffer.
     const positionBuffer = gl.createBuffer();
     gl.bindBuffer(gl.ARRAY_BUFFER, positionBuffer);
     gl.bufferData(gl.ARRAY_BUFFER, new Float32Array(positions), gl.STATIC_DRAW);
 
-    // Color buffer.
     const colorBuffer = gl.createBuffer();
     gl.bindBuffer(gl.ARRAY_BUFFER, colorBuffer);
     gl.bufferData(gl.ARRAY_BUFFER, new Float32Array(colors), gl.STATIC_DRAW);
 
-    // Index buffer.
     const indexBuffer = gl.createBuffer();
     gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, indexBuffer);
     gl.bufferData(gl.ELEMENT_ARRAY_BUFFER, new Uint16Array(indices), gl.STATIC_DRAW);
 
-    // Set up attribute pointers.
     gl.bindBuffer(gl.ARRAY_BUFFER, positionBuffer);
     gl.vertexAttribPointer(
       programInfo.attribLocations.vertexPosition,
-      3,        // components per vertex (x, y, z)
-      gl.FLOAT,
-      false,
-      0,
-      0
+      3, gl.FLOAT, false, 0, 0
     );
     gl.enableVertexAttribArray(programInfo.attribLocations.vertexPosition);
 
     gl.bindBuffer(gl.ARRAY_BUFFER, colorBuffer);
     gl.vertexAttribPointer(
       programInfo.attribLocations.vertexColor,
-      3,       // r, g, b
-      gl.FLOAT,
-      false,
-      0,
-      0
+      3, gl.FLOAT, false, 0, 0
     );
     gl.enableVertexAttribArray(programInfo.attribLocations.vertexColor);
 
     // --- Minimal Matrix Utility Functions ---
-    // 4x4 Identity matrix.
     function identity() {
       return [
          1, 0, 0, 0,
@@ -200,7 +181,6 @@
       ];
     }
 
-    // Return a perspective projection matrix.
     function perspective(fov, aspect, near, far) {
       const f = 1.0 / Math.tan(fov / 2);
       const rangeInv = 1 / (near - far);
@@ -212,7 +192,6 @@
       ];
     }
 
-    // Multiply two 4x4 matrices.
     function multiply(a, b) {
       const out = new Array(16);
       for (let i = 0; i < 4; ++i) {
@@ -227,7 +206,6 @@
       return out;
     }
 
-    // Rotate matrix around the Y axis.
     function rotateY(m, angle) {
       const c = Math.cos(angle);
       const s = Math.sin(angle);
@@ -240,7 +218,6 @@
       return multiply(m, rotation);
     }
 
-    // Rotate matrix around the X axis.
     function rotateX(m, angle) {
       const c = Math.cos(angle);
       const s = Math.sin(angle);
@@ -253,8 +230,6 @@
       return multiply(m, rotation);
     }
 
-    // Create a translation matrix.
-    // Here we make a quick 4x4 translation matrix and multiply.
     function translate(m, tx, ty, tz) {
       const translation = [
          1, 0, 0, 0,
@@ -269,37 +244,41 @@
     let previousTime = 0;
     let angle = 0;
     function render(currentTime) {
-      currentTime *= 0.001; // convert to seconds
+      currentTime *= 0.001;
       const deltaTime = currentTime - previousTime;
       previousTime = currentTime;
       angle += deltaTime;
 
-      // Set viewport and clear buffers.
       gl.viewport(0, 0, canvas.width, canvas.height);
+      gl.clearDepth(1.0);
       gl.clearColor(0.0, 0.0, 0.0, 1.0);
       gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT);
       gl.enable(gl.DEPTH_TEST);
 
-      // Create the projection matrix.
-      const fieldOfView = 60 * Math.PI / 180; // 60° field of view
+      // Create projection matrix.
+      const fieldOfView = 60 * Math.PI / 180;
       const aspect = canvas.clientWidth / canvas.clientHeight;
       const projectionMatrix = perspective(fieldOfView, aspect, 0.1, 100.0);
 
-      // Build the model-view matrix.
+      // Build model-view matrix.
       let modelViewMatrix = identity();
-      // Translate the scene away from the camera.
       modelViewMatrix = translate(modelViewMatrix, 0, 0, -6);
-      // Rotate around the Y and X axes.
       modelViewMatrix = rotateY(modelViewMatrix, angle);
       modelViewMatrix = rotateX(modelViewMatrix, angle * 0.7);
 
-      // Pass the matrices to the shader.
-      gl.uniformMatrix4fv(programInfo.uniformLocations.projectionMatrix,
-                          false, new Float32Array(projectionMatrix));
-      gl.uniformMatrix4fv(programInfo.uniformLocations.modelViewMatrix,
-                          false, new Float32Array(modelViewMatrix));
+      // IMPORTANT: Because our matrices are in row-major order,
+      // we pass true as the transpose parameter so WebGL interprets
+      // them correctly as column-major.
+      gl.uniformMatrix4fv(
+        programInfo.uniformLocations.projectionMatrix,
+        true, new Float32Array(projectionMatrix)
+      );
+      gl.uniformMatrix4fv(
+        programInfo.uniformLocations.modelViewMatrix,
+        true, new Float32Array(modelViewMatrix)
+      );
 
-      // Draw the cube using the index buffer.
+      // Draw the cube.
       gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, indexBuffer);
       gl.drawElements(gl.TRIANGLES, indices.length, gl.UNSIGNED_SHORT, 0);
 
