@@ -1,100 +1,288 @@
 <!DOCTYPE html>
 <html lang="en">
-<head>
-  <meta charset="UTF-8">
-  <title>3D Minecraft-Like World</title>
-  <style>
-    body { margin: 0; overflow: hidden; }
-    canvas { display: block; }
-  </style>
-</head>
-<body>
-  <!-- Three.js library -->
-  <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
-  <!-- OrbitControls for camera manipulation -->
-  <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/controls/OrbitControls.js"></script>
-  <script>
-    // SETUP: Create the scene, camera, and renderer
-    const scene = new THREE.Scene();
-    // Use a sky-blue background to mimic a bright daytime sky
-    scene.background = new THREE.Color(0x87ceeb);
+  <head>
+    <meta charset="UTF-8">
+    <title>Advanced 3D Minecraft-Like World</title>
+    <style>
+      body { margin: 0; overflow: hidden; }
+      canvas { display: block; }
+      /* Overlay for pointer lock instructions */
+      #blocker {
+        position: absolute;
+        top: 0;
+        bottom: 0;
+        width: 100%;
+        background-color: rgba(0,0,0,0.5);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        z-index: 100;
+      }
+      #instructions {
+        font-family: Arial, sans-serif;
+        font-size: 36px;
+        color: white;
+        text-align: center;
+        cursor: pointer;
+      }
+      /* Crosshair in the center of the screen */
+      #crosshair {
+        position: absolute;
+        top: 50%;
+        left: 50%;
+        width: 20px;
+        height: 20px;
+        margin-left: -10px;
+        margin-top: -10px;
+        z-index: 1;
+        pointer-events: none;
+        color: red;
+        font-size: 20px;
+        line-height: 20px;
+        text-align: center;
+        font-weight: bold;
+      }
+    </style>
+  </head>
+  <body>
+    <div id="blocker">
+      <div id="instructions">Click to Play</div>
+    </div>
+    <div id="crosshair">+</div>
+    
+    <!-- Three.js library -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+    <!-- PointerLockControls for FPS style movement -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/controls/PointerLockControls.js"></script>
+    <!-- ImprovedNoise for procedural terrain generation -->
+    <script src="https://threejs.org/examples/js/objects/ImprovedNoise.js"></script>
+    
+    <script>
+      // SCENE SETUP
+      const scene = new THREE.Scene();
+      scene.background = new THREE.Color(0x87ceeb); // sky blue
 
-    const camera = new THREE.PerspectiveCamera(
-      75, 
-      window.innerWidth / window.innerHeight, 
-      0.1, 
-      1000
-    );
-    camera.position.set(20, 20, 20);
-    camera.lookAt(0, 0, 0);
+      const camera = new THREE.PerspectiveCamera(
+        75,
+        window.innerWidth / window.innerHeight,
+        1,
+        1000
+      );
+      camera.position.set(0, 10, 0); // start a bit above ground
 
-    const renderer = new THREE.WebGLRenderer({ antialias: true });
-    renderer.setSize(window.innerWidth, window.innerHeight);
-    document.body.appendChild(renderer.domElement);
+      const renderer = new THREE.WebGLRenderer({ antialias: true });
+      renderer.setSize(window.innerWidth, window.innerHeight);
+      document.body.appendChild(renderer.domElement);
 
-    // LIGHTING: Ambient light plus directional "sunlight"
-    const ambientLight = new THREE.AmbientLight(0xffffff, 0.7);
-    scene.add(ambientLight);
+      // FIRST-PERSON CONTROLS (PointerLock)
+      const controls = new THREE.PointerLockControls(camera, document.body);
+      scene.add(controls.getObject());
 
-    const sunLight = new THREE.DirectionalLight(0xffffff, 0.8);
-    sunLight.position.set(50, 50, 50);
-    scene.add(sunLight);
+      const blocker = document.getElementById("blocker");
+      const instructions = document.getElementById("instructions");
 
-    // GROUND: Create a simple green plane as the ground
-    const groundGeo = new THREE.PlaneGeometry(100, 100);
-    const groundMat = new THREE.MeshLambertMaterial({ color: 0x55aa55 });
-    const ground = new THREE.Mesh(groundGeo, groundMat);
-    ground.rotation.x = -Math.PI / 2;
-    scene.add(ground);
+      instructions.addEventListener("click", function () {
+        controls.lock();
+      }, false);
 
-    // TEXTURE: Load a block texture. (This sample texture mimics a grass block.)
-    const loader = new THREE.TextureLoader();
-    // The URL here is a placeholder; you can replace it with a texture similar to Minecraft's.
-    const blockTexture = loader.load('https://i.imgur.com/1c6Z1qv.png');
+      controls.addEventListener("lock", function () {
+        blocker.style.display = "none";
+      });
+      controls.addEventListener("unlock", function () {
+        blocker.style.display = "flex";
+      });
 
-    // FUNCTION: Create a cubic block with the given coordinates
-    function createBlock(x, y, z) {
-      const geometry = new THREE.BoxGeometry(1, 1, 1);
-      const material = new THREE.MeshLambertMaterial({ map: blockTexture });
-      const cube = new THREE.Mesh(geometry, material);
-      cube.position.set(x, y, z);
-      scene.add(cube);
-    }
+      // MOVEMENT VARIABLES
+      let moveForward = false,
+          moveBackward = false,
+          moveLeft = false,
+          moveRight = false,
+          canJump = false;
+      const velocity = new THREE.Vector3();
+      const direction = new THREE.Vector3();
+      let prevTime = performance.now();
 
-    // TERRAIN: Generate a simple grid of blocks with minor height variation
-    const worldWidth = 16;
-    const worldDepth = 16;
-    for (let i = -worldWidth / 2; i < worldWidth / 2; i++) {
-      for (let j = -worldDepth / 2; j < worldDepth / 2; j++) {
-        // Using a simple probability to set a block at height 0 or 1 creates slight variation
-        const height = Math.random() < 0.8 ? 0 : 1;
-        createBlock(i, height, j);
-        // If a raised block is placed, fill the space beneath it—similar to natural terrain slopes
-        if (height === 1) {
-          createBlock(i, 0, j);
+      // KEYBOARD EVENT LISTENERS
+      document.addEventListener("keydown", function (event) {
+        switch (event.code) {
+          case "ArrowUp":
+          case "KeyW":
+            moveForward = true;
+            break;
+          case "ArrowLeft":
+          case "KeyA":
+            moveLeft = true;
+            break;
+          case "ArrowDown":
+          case "KeyS":
+            moveBackward = true;
+            break;
+          case "ArrowRight":
+          case "KeyD":
+            moveRight = true;
+            break;
+          case "Space":
+            if (canJump === true) velocity.y += 10;
+            canJump = false;
+            break;
+        }
+      }, false);
+
+      document.addEventListener("keyup", function (event) {
+        switch (event.code) {
+          case "ArrowUp":
+          case "KeyW":
+            moveForward = false;
+            break;
+          case "ArrowLeft":
+          case "KeyA":
+            moveLeft = false;
+            break;
+          case "ArrowDown":
+          case "KeyS":
+            moveBackward = false;
+            break;
+          case "ArrowRight":
+          case "KeyD":
+            moveRight = false;
+            break;
+        }
+      }, false);
+
+      // LIGHTING
+      const ambientLight = new THREE.AmbientLight(0xffffff, 0.4);
+      scene.add(ambientLight);
+
+      const directionalLight = new THREE.DirectionalLight(0xffffff, 0.8);
+      directionalLight.position.set(100, 200, 100);
+      scene.add(directionalLight);
+
+      // TEXTURES & MATERIALS
+      const textureLoader = new THREE.TextureLoader();
+      const grassTexture = textureLoader.load("https://i.imgur.com/1c6Z1qv.png");
+      grassTexture.magFilter = THREE.NearestFilter;
+      grassTexture.minFilter = THREE.NearestFilter;
+      
+      const grassMaterial = new THREE.MeshLambertMaterial({ map: grassTexture });
+      const dirtMaterial = new THREE.MeshLambertMaterial({ color: 0x8B4513 });
+      const stoneMaterial = new THREE.MeshLambertMaterial({ color: 0x808080 });
+
+      // ARRAY TO HOLD BLOCK OBJECTS (for raycasting)
+      const objects = [];
+
+      // FUNCTION TO CREATE A BLOCK AT (x,y,z) WITH A SPECIFIED MATERIAL
+      function createBlock(x, y, z, material) {
+        const geometry = new THREE.BoxGeometry(1, 1, 1);
+        const cube = new THREE.Mesh(geometry, material);
+        cube.position.set(x, y, z);
+        scene.add(cube);
+        objects.push(cube);
+        return cube;
+      }
+
+      // PROCEDURAL TERRAIN GENERATION USING IMPROVED NOISE
+      const worldWidth = 32, worldDepth = 32;
+      const noiseScale = 10, amplitude = 4; // control terrain variation
+      const noise = new ImprovedNoise();
+      const seed = Math.random() * 100;
+
+      // For each column, determine a height based on noise and build a stack of blocks.
+      for (let i = 0; i < worldWidth; i++) {
+        for (let j = 0; j < worldDepth; j++) {
+          // Center the coordinates in the world
+          const worldX = i - worldWidth / 2;
+          const worldZ = j - worldDepth / 2;
+          // Compute a noise-based height
+          const noiseValue = noise.noise(worldX / noiseScale, seed, worldZ / noiseScale);
+          const height = Math.floor((noiseValue + 1) * (amplitude / 2)); // range: 0 up to roughly amplitude
+
+          for (let y = 0; y <= height; y++) {
+            // Use grass on the very top, two layers of dirt, then stone for deeper layers.
+            let mat = stoneMaterial;
+            if (y === height && y > 0) {
+              mat = grassMaterial;
+            } else if (y >= height - 2) {
+              mat = dirtMaterial;
+            }
+            createBlock(worldX, y, worldZ, mat);
+          }
         }
       }
-    }
 
-    // CONTROLS: Add OrbitControls so the camera can be rotated interactively
-    const controls = new THREE.OrbitControls(camera, renderer.domElement);
-    controls.target.set(0, 0, 0);
-    controls.update();
+      // A large ground plane beneath the generated terrain (safety for falling)
+      const groundGeo = new THREE.PlaneGeometry(200, 200);
+      const groundMat = new THREE.MeshLambertMaterial({ color: 0x55aa55 });
+      const ground = new THREE.Mesh(groundGeo, groundMat);
+      ground.rotation.x = -Math.PI / 2;
+      ground.position.y = -0.5;
+      scene.add(ground);
 
-    // Handle window resizing
-    window.addEventListener('resize', () => {
-      camera.aspect = window.innerWidth / window.innerHeight;
-      camera.updateProjectionMatrix();
-      renderer.setSize(window.innerWidth, window.innerHeight);
-    }, false);
+      // RAYCASTER SETUP FOR INTERACTIVE BLOCK REMOVAL
+      const raycaster = new THREE.Raycaster();
+      // Use the center of the screen for block picking (like Minecraft’s crosshair)
+      document.addEventListener("mousedown", function (event) {
+        // Only interact if the pointer is locked.
+        if (!controls.isLocked) return;
+        // Left-click (button 0) to remove a block.
+        if (event.button === 0) {
+          raycaster.setFromCamera(new THREE.Vector2(0, 0), camera);
+          const intersects = raycaster.intersectObjects(objects);
+          if (intersects.length > 0) {
+            const selected = intersects[0].object;
+            scene.remove(selected);
+            const index = objects.indexOf(selected);
+            if (index > -1) objects.splice(index, 1);
+          }
+        }
+      }, false);
 
-    // RENDER LOOP: Continuously render the scene
-    function animate() {
-      requestAnimationFrame(animate);
-      controls.update();
-      renderer.render(scene, camera);
-    }
-    animate();
-  </script>
-</body>
+      // ANIMATION (GAME LOOP)
+      function animate() {
+        requestAnimationFrame(animate);
+
+        if (controls.isLocked === true) {
+          const time = performance.now();
+          const delta = (time - prevTime) / 1000;
+
+          // Apply damping to horizontal velocity
+          velocity.x -= velocity.x * 10.0 * delta;
+          velocity.z -= velocity.z * 10.0 * delta;
+          // Apply gravity
+          velocity.y -= 9.8 * 10.0 * delta;
+
+          // Movement based on key press
+          direction.z = Number(moveForward) - Number(moveBackward);
+          direction.x = Number(moveRight) - Number(moveLeft);
+          direction.normalize(); // ensure consistent movements in all directions
+
+          if (moveForward || moveBackward)
+            velocity.z -= direction.z * 400.0 * delta;
+          if (moveLeft || moveRight)
+            velocity.x -= direction.x * 400.0 * delta;
+
+          // Move the camera using the controls
+          controls.moveRight(-velocity.x * delta);
+          controls.moveForward(-velocity.z * delta);
+          controls.getObject().position.y += velocity.y * delta;
+
+          // Prevent falling below a fixed height (simulate ground collision)
+          if (controls.getObject().position.y < 2) {
+            velocity.y = 0;
+            controls.getObject().position.y = 2;
+            canJump = true;
+          }
+          prevTime = time;
+        }
+        renderer.render(scene, camera);
+      }
+      animate();
+
+      // HANDLE WINDOW RESIZE EVENTS
+      window.addEventListener("resize", function () {
+        camera.aspect = window.innerWidth / window.innerHeight;
+        camera.updateProjectionMatrix();
+        renderer.setSize(window.innerWidth, window.innerHeight);
+      }, false);
+    </script>
+  </body>
 </html>
