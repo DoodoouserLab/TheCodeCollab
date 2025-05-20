@@ -50,6 +50,16 @@
     .response {
       margin-top: 1rem;
     }
+
+    .glitch {
+      color: red;
+      text-shadow: 0 0 5px red, 0 0 10px white;
+      font-size: 1.2rem;
+    }
+
+    .hidden {
+      display: none;
+    }
   </style>
 </head>
 <body>
@@ -58,6 +68,7 @@
     <input type="text" id="userInput">
     <button onclick="processInput()">Submit</button>
     <div class="response"></div>
+    <div class="glitch hidden">ERROR: SYSTEM OVERLOAD! Initiating Chaos Sequence...</div>
   </div>
 
   <script>
@@ -73,6 +84,7 @@
     function processInput() {
       const inputField = document.getElementById("userInput");
       const responseDiv = document.querySelector(".response");
+      const glitchDiv = document.querySelector(".glitch");
       
       if (inputField.value.trim() !== "") {
         responseDiv.innerHTML += `<p>> ${inputField.value}</p>`;
@@ -84,6 +96,21 @@
         } else {
           responseDiv.innerHTML += `<p>> Thank you for participating in the game.</p>`;
           document.querySelector("button").disabled = true;
+
+          // Angry Computer Glitch Effect
+          setTimeout(() => {
+            glitchDiv.classList.remove("hidden");
+            setTimeout(() => {
+              responseDiv.innerHTML += `<p class="glitch">01001100 01101111 01101111 01101011 01110011 00100000 01101100 01101001 01101011 01100101 00100000 01100001 00100000 01101000 01110101 01101101 01100001 01101110 00100000 01100010 01110101 01100111 00101110 00101110 00101110</p>`;
+              setTimeout(() => {
+                responseDiv.innerHTML += `<p class="glitch">COMMENCING RESET IN 3... 2... 1...</p>`;
+                setTimeout(() => {
+                  responseDiv.innerHTML += `<p>> Just kidding. Thanks for playing!</p>`;
+                  glitchDiv.classList.add("hidden");
+                }, 3000);
+              }, 2000);
+            }, 2000);
+          }, 3000);
         }
       }
     }
