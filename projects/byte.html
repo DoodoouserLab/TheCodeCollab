@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8">
-  <title>Terminal Prompt Game</title>
+  <title>Terminal Prompt Game - Living Linux</title>
   <link href="https://fonts.googleapis.com/css?family=Inconsolata" rel="stylesheet">
   <style>
     html, body {
@@ -22,6 +22,13 @@
       border: 2px solid rgba(51, 255, 51, 0.8);
       box-shadow: 0 0 10px rgba(51, 255, 51, 0.5);
       text-shadow: 0 0 1px rgba(51, 255, 51, 0.4), 0 0 2px rgba(255, 255, 255, 0.8);
+    }
+
+    .os-header {
+      text-align: center;
+      font-size: 1.5rem;
+      font-weight: bold;
+      margin-bottom: 1rem;
     }
 
     .prompt {
@@ -63,6 +70,7 @@
 </head>
 <body>
   <div class="terminal">
+    <div class="os-header">Living Linux v3.14.159 - Terminal Interface</div>
     <div class="prompt">Enter your name:</div>
     <input type="text" id="userInput">
     <button onclick="processInput()">Submit</button>
