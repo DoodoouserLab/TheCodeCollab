@@ -4,13 +4,20 @@
     <meta charset="UTF-8">
     <title>Minecraft-like World with Villages, Biomes & Mountains</title>
     <style>
-      body { margin: 0; overflow: hidden; }
-      canvas { display: block; }
+      body {
+        margin: 0;
+        overflow: hidden;
+      }
+      canvas {
+        display: block;
+      }
       /* Overlay for pointer lock instructions */
       #blocker {
         position: absolute;
-        top: 0; left: 0;
-        width: 100%; height: 100%;
+        top: 0;
+        left: 0;
+        width: 100%;
+        height: 100%;
         background-color: rgba(0, 0, 0, 0.5);
         display: flex;
         align-items: center;
@@ -47,10 +54,12 @@
     </div>
     <div id="crosshair">+</div>
     
-    <!-- Three.js, PointerLockControls, and ImprovedNoise -->
+    <!-- Load Three.js from CDN -->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+    <!-- Load PointerLockControls from CDN -->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/controls/PointerLockControls.js"></script>
-    <script src="https://threejs.org/examples/js/objects/ImprovedNoise.js"></script>
+    <!-- Load ImprovedNoise from Three.js examples (note the updated path) -->
+    <script src="https://threejs.org/examples/js/math/ImprovedNoise.js"></script>
     
     <script>
       // SCENE SETUP
@@ -58,7 +67,10 @@
       scene.background = new THREE.Color(0x87CEEB); // Sky-blue
       
       const camera = new THREE.PerspectiveCamera(
-        75, window.innerWidth / window.innerHeight, 0.1, 1000
+        75,
+        window.innerWidth / window.innerHeight,
+        0.1,
+        1000
       );
       camera.position.set(0, 15, 25);
       
@@ -83,7 +95,11 @@
       });
       
       // MOVEMENT VARIABLES
-      let moveForward = false, moveBackward = false, moveLeft = false, moveRight = false, canJump = false;
+      let moveForward = false,
+          moveBackward = false,
+          moveLeft = false,
+          moveRight = false,
+          canJump = false;
       const velocity = new THREE.Vector3();
       const direction = new THREE.Vector3();
       let prevTime = performance.now();
@@ -92,19 +108,24 @@
         switch (event.code) {
           case "ArrowUp":
           case "KeyW":
-            moveForward = true; break;
+            moveForward = true;
+            break;
           case "ArrowLeft":
           case "KeyA":
-            moveLeft = true; break;
+            moveLeft = true;
+            break;
           case "ArrowDown":
           case "KeyS":
-            moveBackward = true; break;
+            moveBackward = true;
+            break;
           case "ArrowRight":
           case "KeyD":
-            moveRight = true; break;
+            moveRight = true;
+            break;
           case "Space":
-            if (canJump) velocity.y += 10;
-            canJump = false; break;
+            if (canJump === true) velocity.y += 10;
+            canJump = false;
+            break;
         }
       }, false);
       
@@ -130,6 +151,7 @@
       
       // TEXTURES & MATERIALS
       const textureLoader = new THREE.TextureLoader();
+      // Replace this URL with a working texture URL if necessary
       const grassTexture = textureLoader.load("https://i.imgur.com/1c6Z1qv.png");
       grassTexture.magFilter = THREE.NearestFilter;
       grassTexture.minFilter = THREE.NearestFilter;
@@ -146,7 +168,7 @@
       const woodMaterialFloor = new THREE.MeshLambertMaterial({ color: 0xCD853F });
       const roofMaterial = new THREE.MeshLambertMaterial({ color: 0xA52A2A });
       
-      // Global array for interactive blocks (used for raycasting)
+      // Global array for interactive blocks (for raycasting)
       const objects = [];
       
       // Helper: create a block at (x, y, z) with chosen material
@@ -165,8 +187,7 @@
       const noiseScale = 10;
       const amplitude = 4;
       
-      // This function calculates the terrain height and assigns a biome type
-      // based on a secondary noise function.
+      // Returns terrain height and biome type based on noise values
       function calculateTerrainHeight(worldX, worldZ) {
         let noiseValue = noise.noise(worldX / noiseScale, seed, worldZ / noiseScale);
         let biomeValue = noise.noise(worldX / 15, seed + 100, worldZ / 15);
@@ -210,7 +231,7 @@
         }
       }
       
-      // Add a large ground plane beneath for safety
+      // Add a large ground plane underneath (for safety)
       const groundGeo = new THREE.PlaneGeometry(200, 200);
       const groundMat = new THREE.MeshLambertMaterial({ color: 0x55aa55 });
       const ground = new THREE.Mesh(groundGeo, groundMat);
@@ -220,22 +241,22 @@
       
       // VILLAGE GENERATION
       
-      // This function builds a simple house using a 5×5 footprint with walls, a door gap, and a flat roof.
+      // Builds a simple house with a 5×5 footprint
       function createHouse(baseX, baseZ) {
-        // Determine the ground level at the house location.
+        // Get the ground height at the house base coordinate.
         const { height: groundHeight } = calculateTerrainHeight(baseX, baseZ);
         const baseY = groundHeight + 1;
-        // Floor for the house
+        // Build the floor.
         for (let x = 0; x < 5; x++) {
           for (let z = 0; z < 5; z++) {
             createBlock(baseX + x, baseY - 1, baseZ + z, woodMaterialFloor);
           }
         }
-        // Walls: build a hollow cube of wood with a gap for the door
+        // Build the walls (with a gap for a door).
         for (let x = 0; x < 5; x++) {
           for (let y = 0; y < 4; y++) {
             for (let z = 0; z < 5; z++) {
-              // Leave a door gap at the center of the front wall (z === 0, x === 2)
+              // Leave a gap for the door at the front center.
               if (z === 0 && x === 2 && (y === 0 || y === 1)) continue;
               if (x === 0 || x === 4 || z === 0 || z === 4) {
                 createBlock(baseX + x, baseY + y, baseZ + z, woodMaterial);
@@ -243,7 +264,7 @@
             }
           }
         }
-        // A flat roof with a slight overhang
+        // Build a flat roof with an overhang.
         for (let x = -1; x < 6; x++) {
           for (let z = -1; z < 6; z++) {
             createBlock(baseX + x, baseY + 4, baseZ + z, roofMaterial);
@@ -251,13 +272,13 @@
         }
       }
       
-      // This function spawns a cluster of houses in a grid formation.
+      // Spawns a grid of houses to form a simple village.
       function generateVillage(centerX, centerZ) {
-        const gridSize = 5; // 5×5 grid of houses
-        const spacing = 10;  // Space between houses
+        const gridSize = 5; // 5x5 grid of houses.
+        const spacing = 10; // Spacing between houses.
         for (let i = -Math.floor(gridSize / 2); i <= Math.floor(gridSize / 2); i++) {
           for (let j = -Math.floor(gridSize / 2); j <= Math.floor(gridSize / 2); j++) {
-            // Random chance to leave gaps between houses
+            // Use a chance to leave gaps between houses.
             if (Math.random() < 0.7) {
               createHouse(centerX + i * spacing, centerZ + j * spacing);
             }
@@ -265,14 +286,15 @@
         }
       }
       
-      // Spawn one village (you can call generateVillage more times at different spots)
+      // Spawn a village (you can call generateVillage at different coordinates).
       generateVillage(0, 0);
       
-      // RAYCASTER for interactive "digging" (block removal with left-click)
+      // RAYCASTER for interactive "digging" (left-click to remove a block)
       const raycaster = new THREE.Raycaster();
       document.addEventListener("mousedown", (event) => {
         if (!controls.isLocked) return;
         if (event.button === 0) {
+          // Use the center-screen (0,0) for raycasting.
           raycaster.setFromCamera(new THREE.Vector2(0, 0), camera);
           const intersects = raycaster.intersectObjects(objects);
           if (intersects.length > 0) {
@@ -284,14 +306,14 @@
         }
       }, false);
       
-      // ANIMATION / GAME LOOP
+      // GAME LOOP / ANIMATION
       function animate() {
         requestAnimationFrame(animate);
         const time = performance.now();
         const delta = (time - prevTime) / 1000;
       
         if (controls.isLocked) {
-          // Apply friction and gravity
+          // Apply friction and gravity.
           velocity.x -= velocity.x * 10.0 * delta;
           velocity.z -= velocity.z * 10.0 * delta;
           velocity.y -= 9.8 * 10.0 * delta;
@@ -300,8 +322,10 @@
           direction.x = Number(moveRight) - Number(moveLeft);
           direction.normalize();
       
-          if (moveForward || moveBackward) velocity.z -= direction.z * 400.0 * delta;
-          if (moveLeft || moveRight) velocity.x -= direction.x * 400.0 * delta;
+          if (moveForward || moveBackward)
+            velocity.z -= direction.z * 400.0 * delta;
+          if (moveLeft || moveRight)
+            velocity.x -= direction.x * 400.0 * delta;
       
           controls.moveRight(-velocity.x * delta);
           controls.moveForward(-velocity.z * delta);
@@ -321,7 +345,7 @@
       
       animate();
       
-      // Handle window resize events.
+      // Adjust canvas size on window resize.
       window.addEventListener("resize", () => {
         camera.aspect = window.innerWidth / window.innerHeight;
         camera.updateProjectionMatrix();
