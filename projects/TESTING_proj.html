@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8">
-  <title>Mini Terraria – Touch Friendly & Pixel Art UI</title>
+  <title>Mini Terraria – Place Blocks, Big & Varied World</title>
   <style>
     html, body {
       margin: 0;
@@ -10,7 +10,7 @@
       overflow: hidden;
       background: #000;
     }
-    /* Enforce a retro, pixelated look */
+    /* Ensure a retro, pixelated look */
     canvas {
       display: block;
       image-rendering: pixelated;
@@ -32,25 +32,38 @@
     resizeCanvas();
 
     /***** World Generation *****/
-    const tileSize = 16;       // Each block is 16x16 pixels
-    const worldWidth = 200;    // Number of tiles horizontally
-    const worldHeight = 100;   // Number of tiles vertically
+    // Increase world size for a bigger map.
+    const worldWidth = 500;    
+    const worldHeight = 200;  
+    
+    const tileSize = 16; // each block 16x16 pixels
 
-    // Block Types:
-    // 0: Air, 1: Dirt, 2: Stone, 3: Grass, 4: Wood, 5: Leaves
+    // We'll use our block types:
+    // 0: Air; 1: Dirt; 2: Stone; 3: Grass; 4: Wood; 5: Leaves
     const world = [];
+    // Generate ground heights with a random walk.
+    let minGround = 20, maxGround = 80;
+    let groundHeights = [];
+    let currentGround = 50; // starting height for x=0
+    for (let x = 0; x < worldWidth; x++) {
+      // Random step between -2 and 2.
+      currentGround += Math.floor(Math.random() * 5) - 2;
+      if (currentGround < minGround) currentGround = minGround;
+      if (currentGround > maxGround) currentGround = maxGround;
+      groundHeights[x] = currentGround;
+    }
+    // Fill world array:
     for (let x = 0; x < worldWidth; x++) {
       world[x] = [];
-      // Create some natural variation for the ground.
-      let groundHeight = Math.floor(30 + 10 * Math.sin(x * 0.2) + (Math.random() * 5 - 2.5));
+      let groundHeight = groundHeights[x];
       for (let y = 0; y < worldHeight; y++) {
         if (y > groundHeight) {
-          // Underground: Random mix of dirt & stone.
+          // Underground: randomly choose dirt or stone.
           world[x][y] = (Math.random() < 0.2) ? 1 : 2;
         } else if (y === groundHeight) {
-          world[x][y] = 3; // Grass
+          world[x][y] = 3; // Surface: grass.
         } else {
-          world[x][y] = 0; // Air
+          world[x][y] = 0; // Air above ground.
         }
       }
     }
@@ -78,7 +91,7 @@
       }
     }
     const blockColors = {
-      0: "#87CEEB", // (Not drawn, but kept for reference)
+      0: "#87CEEB", // Air (not drawn)
       1: "#8B4513", // Dirt
       2: "#808080", // Stone
       3: "#228B22", // Grass
@@ -88,18 +101,18 @@
 
     /***** Block Durability & Health *****/
     const blockDurability = {
-      1: 2, // Dirt
-      2: 3, // Stone
-      3: 2, // Grass
-      4: 3, // Wood
-      5: 1  // Leaves
+      1: 2,
+      2: 3,
+      3: 2,
+      4: 3,
+      5: 1
     };
     const blockHealth = [];
     for (let x = 0; x < worldWidth; x++) {
       blockHealth[x] = [];
       for (let y = 0; y < worldHeight; y++) {
-        let block = world[x][y];
-        blockHealth[x][y] = (block !== 0 && blockDurability[block] !== undefined) ? blockDurability[block] : 0;
+        let b = world[x][y];
+        blockHealth[x][y] = (b !== 0 && blockDurability[b] !== undefined) ? blockDurability[b] : 0;
       }
     }
     function setBlock(x, y, block) {
@@ -124,7 +137,8 @@
       jumpStrength: 8,
       grounded: false,
       health: 100,
-      // Inventory with materials and tools (pre-populated for testing)
+      // Inventory now has materials and tools.
+      // Pre-populated for testing.
       inventory: {
         wood: 20,
         stone: 20,
@@ -136,9 +150,9 @@
         wooden_sword: 0,
         torch: 0
       },
-      selectedSlot: 0 // Index into the hotbar (inventoryOrder)
+      selectedSlot: 0 // refers to hotbar slot (index into inventoryOrder)
     };
-    // Determines the order/slot of items in our hotbar.
+    // Inventory order determines the hotbar layout.
     const inventoryOrder = ["wood", "stone", "gel", "dirt", "grass", "leaves", "wooden_pickaxe", "wooden_sword", "torch"];
 
     /***** Enemy Setup *****/
@@ -205,28 +219,77 @@
       }
     }
 
+    /***** Block Placement *****/
+    // Mapping from inventory key to block type.
+    const placeableMapping = {
+      "dirt": 1,
+      "stone": 2,
+      "grass": 3,
+      "wood": 4,
+      "leaves": 5
+      // (Other items like gel, tools, or torch are not treated as simple blocks here.)
+    };
+    // Check that a block may be placed at (x, y):
+    function canPlaceBlockAt(x, y) {
+      if (getBlock(x, y) !== 0) return false; // tile must be empty.
+      // Allow placement if tile is at world bottom or if at least one neighbor is non-air.
+      if (y === worldHeight - 1) return true;
+      const deltas = [
+        {dx: -1, dy: 0},
+        {dx: 1, dy: 0},
+        {dx: 0, dy: -1},
+        {dx: 0, dy: 1}
+      ];
+      for (let d of deltas) {
+        if (getBlock(x + d.dx, y + d.dy) !== 0) return true;
+      }
+      return false;
+    }
+    function handleBlockPlacement(event) {
+      // Use the event (mouse or touch) to compute target tile.
+      const rect = canvas.getBoundingClientRect();
+      let clientX = event.clientX || event.touches[0].clientX;
+      let clientY = event.clientY || event.touches[0].clientY;
+      const mx = clientX - rect.left;
+      const my = clientY - rect.top;
+      // Compute camera offset.
+      const cameraX = player.x - canvas.width / 2 + player.width / 2;
+      const cameraY = player.y - canvas.height / 2 + player.height / 2;
+      let targetX = Math.floor((mx + cameraX) / tileSize);
+      let targetY = Math.floor((my + cameraY) / tileSize);
+      // Get currently selected hotbar item.
+      let selectedItem = inventoryOrder[player.selectedSlot];
+      if (!(selectedItem in placeableMapping)) return; // not a placeable block.
+      if (player.inventory[selectedItem] <= 0) return;
+      if (!canPlaceBlockAt(targetX, targetY)) return;
+      // Place the block:
+      setBlock(targetX, targetY, placeableMapping[selectedItem]);
+      player.inventory[selectedItem]--; // reduce inventory count.
+    }
+    // Listen for right-click (contextmenu) to place blocks.
+    canvas.addEventListener("contextmenu", function(e) {
+      e.preventDefault();
+      handleBlockPlacement(e);
+      return false;
+    });
+
     /***** Input Handling *****/
     const keys = {};
     window.addEventListener("keydown", e => {
       if (e.key === "c" || e.key === "C") {
         craftingMenuActive = !craftingMenuActive;
       }
-      // Use number keys 1–9 to change the selected hotbar slot.
+      // Number keys 1-9 change selected hotbar slot.
       if (!isNaN(e.key) && e.key !== "0") {
         let slot = parseInt(e.key) - 1;
         if (slot < inventoryOrder.length) { player.selectedSlot = slot; }
       }
-      if (!craftingMenuActive) {
-        keys[e.key] = true;
-      }
+      if (!craftingMenuActive) { keys[e.key] = true; }
     });
     window.addEventListener("keyup", e => {
-      if (!craftingMenuActive) {
-        keys[e.key] = false;
-      }
+      if (!craftingMenuActive) { keys[e.key] = false; }
     });
-
-    // Mouse events for desktop.
+    // Mouse handling (for mining and crafting).
     let isMining = false;
     let currentMiningTarget = null; // {x, y} tile coordinates
     let lastMousePos = { x: 0, y: 0 };
@@ -251,7 +314,6 @@
         currentMiningTarget = null;
       }
     });
-
     // Touch events for touchscreen support.
     canvas.addEventListener("touchstart", e => {
       e.preventDefault();
@@ -279,14 +341,13 @@
         currentMiningTarget = null;
       }
     }, { passive: false });
-
     function handleCraftingMenuClick(e) {
       const rect = canvas.getBoundingClientRect();
-      let mouseX = e.clientX - rect.left;
-      let mouseY = e.clientY - rect.top;
+      let mx = e.clientX - rect.left;
+      let my = e.clientY - rect.top;
       for (let box of recipeMenuBoxes) {
-        if (mouseX >= box.x && mouseX <= box.x + box.width &&
-            mouseY >= box.y && mouseY <= box.y + box.height) {
+        if (mx >= box.x && mx <= box.x + box.width &&
+            my >= box.y && my <= box.y + box.height) {
           craftItem(box.recipe);
         }
       }
@@ -342,8 +403,7 @@
         }
       }
     }
-
-    // Increase mining efficiency if you have a wooden pickaxe.
+    // If you have a wooden pickaxe in your inventory, mining goes faster.
     function getMiningMultiplier() {
       return player.inventory.wooden_pickaxe > 0 ? 2 : 0.5;
     }
@@ -353,8 +413,8 @@
     function updateMining() {
       if (!isMining) return;
       // Calculate camera offset.
-      let cameraX = player.x - canvas.width / 2 + player.width / 2;
-      let cameraY = player.y - canvas.height / 2 + player.height / 2;
+      const cameraX = player.x - canvas.width / 2 + player.width / 2;
+      const cameraY = player.y - canvas.height / 2 + player.height / 2;
       let targetX = Math.floor((lastMousePos.x + cameraX) / tileSize);
       let targetY = Math.floor((lastMousePos.y + cameraY) / tileSize);
       if (!currentMiningTarget || currentMiningTarget.x !== targetX || currentMiningTarget.y !== targetY) {
@@ -377,6 +437,7 @@
       const effectiveDamage = miningDamage * getMiningMultiplier();
       blockHealth[targetX][targetY] -= effectiveDamage;
       if (blockHealth[targetX][targetY] <= 0) {
+        // Award materials based on the block type.
         switch (block) {
           case 1: player.inventory.dirt++; break;
           case 2: player.inventory.stone++; break;
@@ -524,7 +585,7 @@
 
     /***** Rendering *****/
     function draw() {
-      // Sky background gradient.
+      // Sky gradient background.
       const grd = ctx.createLinearGradient(0, 0, 0, canvas.height);
       grd.addColorStop(0, "#00BFFF");
       grd.addColorStop(1, "#87CEEB");
@@ -538,14 +599,14 @@
       ctx.strokeStyle = "#E59400";
       ctx.stroke();
 
-      // Camera offset so that the player is (roughly) centered.
+      // Camera offset computed so that the player is roughly centered.
       const cameraX = player.x - canvas.width / 2 + player.width / 2;
       const cameraY = player.y - canvas.height / 2 + player.height / 2;
       const startCol = Math.floor(cameraX / tileSize) - 1;
       const endCol = startCol + Math.ceil(canvas.width / tileSize) + 2;
       const startRow = Math.floor(cameraY / tileSize) - 1;
       const endRow = startRow + Math.ceil(canvas.height / tileSize) + 2;
-      // Draw visible world tiles with a thin dark outline.
+      // Draw visible world tiles with a light outline.
       for (let x = startCol; x <= endCol; x++) {
         for (let y = startRow; y <= endRow; y++) {
           if (x >= 0 && x < worldWidth && y >= 0 && y < worldHeight) {
@@ -567,7 +628,8 @@
       ctx.fillRect(player.x - cameraX, player.y - cameraY, player.width, player.height);
       // Draw held tool/weapon if applicable.
       const selectedItem = inventoryOrder[player.selectedSlot];
-      if (player.inventory[selectedItem] > 0 && (selectedItem === "wooden_pickaxe" || selectedItem === "wooden_sword" || selectedItem === "torch")) {
+      if (player.inventory[selectedItem] > 0 && 
+         (selectedItem === "wooden_pickaxe" || selectedItem === "wooden_sword" || selectedItem === "torch")) {
         const handX = player.x + player.width;
         const handY = player.y + player.height * 0.5;
         drawIcon(selectedItem, handX - cameraX, handY - cameraY, tileSize);
@@ -581,7 +643,7 @@
       ctx.fillStyle = "#000";
       ctx.font = "16px Courier New";
       ctx.fillText("Health: " + Math.floor(player.health), 10, 20);
-      // If mining is active, draw mining progress on the targeted block.
+      // If mining, draw a progress overlay on the targeted block.
       if (currentMiningTarget) {
         const tx = currentMiningTarget.x;
         const ty = currentMiningTarget.y;
@@ -590,8 +652,8 @@
           if (block !== 0 && blockDurability[block] !== undefined) {
             const bx = tx * tileSize - cameraX;
             const by = ty * tileSize - cameraY;
-            const originalDurability = blockDurability[block];
-            let progress = 1 - (blockHealth[tx][ty] / originalDurability);
+            const origDur = blockDurability[block];
+            let progress = 1 - (blockHealth[tx][ty] / origDur);
             progress = Math.max(0, Math.min(1, progress));
             ctx.fillStyle = "rgba(0, 0, 0, " + (0.5 * progress) + ")";
             ctx.fillRect(bx, by, tileSize, tileSize);
@@ -604,9 +666,9 @@
           }
         }
       }
-      // Draw the inventory/hotbar.
+      // Draw the inventory hotbar.
       drawInventory();
-      // If the crafting menu is active, draw it.
+      // If the crafting menu is active, overlay it.
       if (craftingMenuActive) {
         drawCraftingMenu();
       }
