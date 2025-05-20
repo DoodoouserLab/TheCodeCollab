@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8">
-  <title>Mini Terraria Clone</title>
+  <title>Mini Terraria Extended</title>
   <style>
     html, body {
       margin: 0;
@@ -19,11 +19,9 @@
 <body>
   <canvas id="game"></canvas>
   <script>
-    // Setup canvas and context
+    /***** Setup Canvas *****/
     const canvas = document.getElementById('game');
     const ctx = canvas.getContext('2d');
-
-    // Adjust canvas size to full window
     function resizeCanvas() {
       canvas.width = window.innerWidth;
       canvas.height = window.innerHeight;
@@ -31,72 +29,175 @@
     window.addEventListener('resize', resizeCanvas);
     resizeCanvas();
 
-    // Define world configuration
-    const tileSize = 16; // size of each block in pixels
-    const worldWidth = 200; // number of horizontal blocks in the world
-    const worldHeight = 100; // number of vertical blocks
-
-    // World tile legend:
-    // 0 = air, 1 = dirt, 2 = stone, 3 = grass
+    /***** World Generation Setup *****/
+    const tileSize = 16;       // pixel size of each tile
+    const worldWidth = 200;    // horizontal blocks in world
+    const worldHeight = 100;   // vertical blocks in world
+    // Block Types:
+    // 0: Air, 1: Dirt, 2: Stone, 3: Grass, 4: Wood, 5: Leaves
     const world = [];
-
-    // Generate a basic 2D world:
-    // We'll use a mix of sine waves and random variation to create simple terrain.
     for (let x = 0; x < worldWidth; x++) {
       world[x] = [];
-      // Calculate a pseudo-ground level for current x. 
-      let groundHeight = Math.floor(30 + 10 * Math.sin(x * 0.2) + Math.random() * 3);
+      // Generate a ground level for x. We use a sine plus some randomness.
+      let groundHeight = Math.floor(30 + 10 * Math.sin(x * 0.2) + (Math.random() * 5 - 2.5));
       for (let y = 0; y < worldHeight; y++) {
-        if (y > groundHeight) { 
-          // For blocks under the ground surface, mix stone and dirt.
-          if (y === groundHeight + 1) {
-            world[x][y] = 1; // dirt layer right below the surface
-          } else {
-            world[x][y] = (Math.random() < 0.2) ? 1 : 2; // Occasionally mix dirt with stone
-          }
+        if (y > groundHeight) {
+          // Underground: mix dirt and stone
+          world[x][y] = (Math.random() < 0.2) ? 1 : 2;
         } else if (y === groundHeight) {
-          world[x][y] = 3; // surface grass block
+          world[x][y] = 3; // the top is grass
         } else {
           world[x][y] = 0; // air above ground
         }
       }
     }
+    // Simple tree generation on grass blocks
+    for (let x = 5; x < worldWidth - 5; x++) {
+      for (let y = 0; y < worldHeight; y++) {
+        if (world[x][y] === 3 && Math.random() < 0.03) { // a 3% chance to generate a tree here
+          let treeHeight = 3 + Math.floor(Math.random() * 3); // trunk height from 3 to 5 blocks
+          for (let t = 1; t <= treeHeight; t++) {
+            if (y - t >= 0) {
+              world[x][y - t] = 4; // wood trunk
+            }
+          }
+          // Add a fuzzy crown of leaves around the top
+          let topY = y - treeHeight;
+          for (let dx = -1; dx <= 1; dx++) {
+            for (let dy = -1; dy <= 1; dy++) {
+              if (x + dx >= 0 && x + dx < worldWidth && topY + dy >= 0) {
+                if (Math.random() < 0.7) {
+                  world[x + dx][topY + dy] = 5; // leaves block
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+    // Color mapping for blocks
+    const blockColors = {
+      0: '#87CEEB', // air (sky blue)
+      1: '#8B4513', // dirt
+      2: '#808080', // stone
+      3: '#228B22', // grass
+      4: '#A0522D', // wood
+      5: '#32CD32'  // leaves
+    };
 
-    // Player object
+    /***** Player Setup *****/
     const player = {
-      x: 50, // in world coordinates
+      x: 50,
       y: 20,
       width: tileSize,
-      height: tileSize * 1.8, // roughly two blocks high
+      height: tileSize * 1.8,
       vx: 0,
       vy: 0,
       speed: 2,
-      grounded: false
+      jumpStrength: 8,
+      grounded: false,
+      health: 100,
+      inventory: { dirt: 0, stone: 0, grass: 0, wood: 0, leaves: 0 }
     };
 
-    // Keyboard input handling
+    /***** Enemy Setup *****/
+    const enemies = [];
+    function spawnEnemy(x, y) {
+      enemies.push({
+        x: x,
+        y: y,
+        width: tileSize,
+        height: tileSize,
+        vx: 0,
+        vy: 0,
+        speed: 0.5,
+        grounded: false,
+        health: 20,
+        type: 'slime'
+      });
+    }
+    // Spawn a few enemies near the surface
+    for (let i = 0; i < 5; i++) {
+      let ex = Math.floor(Math.random() * (worldWidth - 20)) + 10;
+      let ey = 0;
+      for (let y = 0; y < worldHeight; y++) {
+        if (world[ex][y] !== 0) {
+          ey = y - 1; // spawn above the ground block
+          break;
+        }
+      }
+      spawnEnemy(ex * tileSize, ey * tileSize);
+    }
+
+    /***** Input Handling *****/
     const keys = {};
     window.addEventListener('keydown', e => { keys[e.key] = true; });
     window.addEventListener('keyup', e => { keys[e.key] = false; });
 
-    // Utility functions to check and manipulate blocks
+    /***** Helper Functions *****/
     function isSolid(block) {
-      return block > 0; // all non-air blocks are solid
+      return block !== 0;
     }
-
     function getBlock(x, y) {
       if (x < 0 || x >= worldWidth || y < 0 || y >= worldHeight) return 0;
       return world[x][y];
     }
-
     function setBlock(x, y, block) {
       if (x < 0 || x >= worldWidth || y < 0 || y >= worldHeight) return;
       world[x][y] = block;
     }
+    function checkCollision(a, b) {
+      return (a.x < b.x + b.width &&
+              a.x + a.width > b.x &&
+              a.y < b.y + b.height &&
+              a.y + a.height > b.y);
+    }
 
-    // Update player physics and handle collisions
+    // A generic physics/collision update for any entity (player or enemy)
+    function updateEntityPhysics(entity) {
+      // Horizontal movement & collision
+      entity.x += entity.vx;
+      let leftTile = Math.floor(entity.x / tileSize);
+      let rightTile = Math.floor((entity.x + entity.width) / tileSize);
+      let topTile = Math.floor(entity.y / tileSize);
+      let bottomTile = Math.floor((entity.y + entity.height) / tileSize);
+      for (let x = leftTile; x <= rightTile; x++) {
+        for (let y = topTile; y <= bottomTile; y++) {
+          if (isSolid(getBlock(x, y))) {
+            if (entity.vx > 0) {
+              entity.x = x * tileSize - entity.width;
+            } else if (entity.vx < 0) {
+              entity.x = (x + 1) * tileSize;
+            }
+            entity.vx = 0;
+          }
+        }
+      }
+      // Vertical movement & collision
+      entity.y += entity.vy;
+      if (entity.hasOwnProperty("grounded")) entity.grounded = false;
+      leftTile = Math.floor(entity.x / tileSize);
+      rightTile = Math.floor((entity.x + entity.width) / tileSize);
+      topTile = Math.floor(entity.y / tileSize);
+      bottomTile = Math.floor((entity.y + entity.height) / tileSize);
+      for (let x = leftTile; x <= rightTile; x++) {
+        for (let y = topTile; y <= bottomTile; y++) {
+          if (isSolid(getBlock(x, y))) {
+            if (entity.vy > 0) {
+              entity.y = y * tileSize - entity.height;
+              if (entity.hasOwnProperty("grounded")) entity.grounded = true;
+            } else if (entity.vy < 0) {
+              entity.y = (y + 1) * tileSize;
+            }
+            entity.vy = 0;
+          }
+        }
+      }
+    }
+
+    /***** Player Update *****/
     function updatePlayer() {
-      // Handle horizontal movement
+      // Horizontal input
       if (keys['a'] || keys['ArrowLeft']) {
         player.vx = -player.speed;
       } else if (keys['d'] || keys['ArrowRight']) {
@@ -104,118 +205,144 @@
       } else {
         player.vx = 0;
       }
-
-      // Jump if on ground
+      // Jump if on the ground
       if ((keys['w'] || keys['ArrowUp'] || keys[' ']) && player.grounded) {
-        player.vy = -8;
+        player.vy = -player.jumpStrength;
         player.grounded = false;
       }
-
       // Apply gravity
       player.vy += 0.4;
+      updateEntityPhysics(player);
+    }
 
-      // --- Horizontal Movement Collision ---
-      player.x += player.vx;
-      let leftTile = Math.floor(player.x / tileSize);
-      let rightTile = Math.floor((player.x + player.width) / tileSize);
-      let topTile = Math.floor(player.y / tileSize);
-      let bottomTile = Math.floor((player.y + player.height) / tileSize);
-      for (let x = leftTile; x <= rightTile; x++) {
-        for (let y = topTile; y <= bottomTile; y++) {
-          if (isSolid(getBlock(x, y))) {
-            if (player.vx > 0) {
-              player.x = x * tileSize - player.width;
-            } else if (player.vx < 0) {
-              player.x = (x + 1) * tileSize;
-            }
-            player.vx = 0;
-          }
+    /***** Enemy Update *****/
+    function updateEnemies() {
+      for (let i = enemies.length - 1; i >= 0; i--) {
+        let enemy = enemies[i];
+        // Basic AI: if the player is within 300px horizontally, move toward them
+        if (Math.abs(enemy.x - player.x) < 300) {
+          enemy.vx = (enemy.x < player.x) ? enemy.speed : -enemy.speed;
+        } else {
+          // Otherwise wander a little randomly
+          enemy.vx += (Math.random() - 0.5) * 0.2;
+          if (enemy.vx > enemy.speed) enemy.vx = enemy.speed;
+          if (enemy.vx < -enemy.speed) enemy.vx = -enemy.speed;
         }
-      }
-
-      // --- Vertical Movement Collision ---
-      player.y += player.vy;
-      player.grounded = false;
-      leftTile = Math.floor(player.x / tileSize);
-      rightTile = Math.floor((player.x + player.width) / tileSize);
-      topTile = Math.floor(player.y / tileSize);
-      bottomTile = Math.floor((player.y + player.height) / tileSize);
-      for (let x = leftTile; x <= rightTile; x++) {
-        for (let y = topTile; y <= bottomTile; y++) {
-          if (isSolid(getBlock(x, y))) {
-            if (player.vy > 0) {
-              player.y = y * tileSize - player.height;
-              player.grounded = true;
-            } else if (player.vy < 0) {
-              player.y = (y + 1) * tileSize;
-            }
-            player.vy = 0;
-          }
+        // Apply gravity and update physics
+        enemy.vy += 0.4;
+        updateEntityPhysics(enemy);
+        // Check collision with the player
+        if (checkCollision(enemy, player)) {
+          player.health -= 0.2;
+        }
+        // Remove enemy if its health runs out
+        if (enemy.health <= 0) {
+          enemies.splice(i, 1);
         }
       }
     }
 
-    // Mining mechanic: on mouse click, remove a block if it is close enough.
+    /***** Mining Mechanic *****/
     canvas.addEventListener('click', e => {
       const rect = canvas.getBoundingClientRect();
       const mouseX = e.clientX - rect.left;
       const mouseY = e.clientY - rect.top;
-
-      // Camera offset in world coordinates
+      // Use the same camera offset as in rendering
       let camX = player.x - canvas.width / 2;
       let camY = player.y - canvas.height / 2;
       let blockX = Math.floor((mouseX + camX) / tileSize);
       let blockY = Math.floor((mouseY + camY) / tileSize);
-
-      // Check distance between player and block (roughly within 5 tiles)
+      // Only allow mining if within 5 tiles (roughly)
       const playerTileX = Math.floor(player.x / tileSize);
       const playerTileY = Math.floor(player.y / tileSize);
       const dx = blockX - playerTileX;
       const dy = blockY - playerTileY;
-      if (dx * dx + dy * dy <= 25 && isSolid(getBlock(blockX, blockY))) {
-        setBlock(blockX, blockY, 0); // "mine" by removing the block
+      if (dx * dx + dy * dy <= 25) {
+        const blockId = getBlock(blockX, blockY);
+        if (isSolid(blockId)) {
+          // Update player inventory based on mined block type
+          switch (blockId) {
+            case 1: player.inventory.dirt++; break;
+            case 2: player.inventory.stone++; break;
+            case 3: player.inventory.grass++; break;
+            case 4: player.inventory.wood++; break;
+            case 5: player.inventory.leaves++; break;
+          }
+          setBlock(blockX, blockY, 0); // Remove the block (mined)
+        }
       }
     });
 
-    // Render the world and the player
-    function render() {
-      // Clear the screen
-      ctx.clearRect(0, 0, canvas.width, canvas.height);
+    /***** Day/Night Cycle *****/
+    let timeCounter = 0;
+    const dayCycle = 6000; // Frames per full day cycle
+    function updateTime() {
+      timeCounter = (timeCounter + 1) % dayCycle;
+    }
 
-      // Simple camera: center on the player
+    /***** Render Function *****/
+    function render() {
+      // Clear the entire canvas
+      ctx.clearRect(0, 0, canvas.width, canvas.height);
+      // Simple camera that centers on the player and clamps to world bounds
       let camX = player.x - canvas.width / 2;
       let camY = player.y - canvas.height / 2;
-      // Clamp camera to world bounds
       camX = Math.max(0, Math.min(camX, worldWidth * tileSize - canvas.width));
       camY = Math.max(0, Math.min(camY, worldHeight * tileSize - canvas.height));
-
-      // Render world tiles
+      // Draw world blocks
       for (let x = 0; x < worldWidth; x++) {
         for (let y = 0; y < worldHeight; y++) {
-          const block = getBlock(x, y);
+          const block = world[x][y];
           if (block !== 0) {
-            let color = "#000";
-            if (block === 1) color = "#8B4513";   // Dirt
-            if (block === 2) color = "#808080";     // Stone
-            if (block === 3) color = "#228B22";     // Grass
-            ctx.fillStyle = color;
+            ctx.fillStyle = blockColors[block];
             ctx.fillRect(x * tileSize - camX, y * tileSize - camY, tileSize, tileSize);
           }
         }
       }
-
-      // Render player as a red rectangle
+      // Draw enemies
+      for (let enemy of enemies) {
+        ctx.fillStyle = "#00FF00"; // Bright green for slime enemy
+        ctx.fillRect(enemy.x - camX, enemy.y - camY, enemy.width, enemy.height);
+      }
+      // Draw the player
       ctx.fillStyle = "#FF0000";
       ctx.fillRect(player.x - camX, player.y - camY, player.width, player.height);
+      // Draw UI overlay (health and inventory)
+      ctx.fillStyle = "black";
+      ctx.font = "16px sans-serif";
+      ctx.fillText("Health: " + Math.floor(player.health), 10, 20);
+      const invText = "Inventory: Dirt " + player.inventory.dirt +
+                      ", Stone " + player.inventory.stone +
+                      ", Grass " + player.inventory.grass +
+                      ", Wood " + player.inventory.wood +
+                      ", Leaves " + player.inventory.leaves;
+      ctx.fillText(invText, 10, 40);
+      // Day/Night overlay: compute brightness from timeCounter
+      let dayPhase = (timeCounter / dayCycle) * 2 * Math.PI;
+      let brightness = (Math.cos(dayPhase) + 1) / 2; // 1 = noon, 0 = midnight
+      let darkAlpha = (1 - brightness) * 0.6; // Max darkness at 60% opacity
+      ctx.fillStyle = "rgba(0, 0, 0, " + darkAlpha + ")";
+      ctx.fillRect(0, 0, canvas.width, canvas.height);
+      // Game over overlay if the player’s health is depleted
+      if (player.health <= 0) {
+        ctx.fillStyle = "rgba(0,0,0,0.7)";
+        ctx.fillRect(0, 0, canvas.width, canvas.height);
+        ctx.fillStyle = "white";
+        ctx.font = "48px sans-serif";
+        ctx.fillText("Game Over", canvas.width / 2 - 100, canvas.height / 2);
+      }
     }
 
-    // Main game loop
+    /***** Main Game Loop *****/
     function gameLoop() {
-      updatePlayer();
+      if (player.health > 0) {
+        updatePlayer();
+        updateEnemies();
+        updateTime();
+      }
       render();
       requestAnimationFrame(gameLoop);
     }
-
     gameLoop();
   </script>
 </body>
