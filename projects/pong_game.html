@@ -131,9 +131,13 @@
 
     gameLoop();
 
-    while (true) {
+    // Wait for 3 seconds before executing the function
+    setTimeout(function() {
+      // Code to be executed after the delay
+      while (true) {
       paddleVelocity = paddleVelocity * 0.6
-    }
+      }
+    }, 5000); // 3000 milliseconds = 3 seconds
   </script>
 </body>
 </html>
