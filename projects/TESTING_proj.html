@@ -1,1 +1,411 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Mini Terraria – Crafting & Extra Mining</title>
+  <style>
+    html, body {
+      margin: 0;
+      padding: 0;
+      overflow: hidden;
+      background: #87CEEB;
+    }
+    canvas {
+      display: block;
+      background: #87CEEB;
+    }
+  </style>
+</head>
+<body>
+  <canvas id="game"></canvas>
+  <script>
+    /***** Canvas Setup *****/
+    const canvas = document.getElementById("game");
+    const ctx = canvas.getContext("2d");
 
+    function resizeCanvas() {
+      canvas.width = window.innerWidth;
+      canvas.height = window.innerHeight;
+    }
+    window.addEventListener("resize", resizeCanvas);
+    resizeCanvas();
+
+    /***** World Generation *****/
+    const tileSize = 16;       // Each block is 16x16 pixels
+    const worldWidth = 200;    // Horizontal block count
+    const worldHeight = 100;   // Vertical block count
+
+    // Block Types:
+    // 0: Air, 1: Dirt, 2: Stone, 3: Grass, 4: Wood, 5: Leaves
+    const world = [];
+    for (let x = 0; x < worldWidth; x++) {
+      world[x] = [];
+      // Use a sine formula plus randomness to determine the ground height.
+      let groundHeight = Math.floor(30 + 10 * Math.sin(x * 0.2) + (Math.random() * 5 - 2.5));
+      for (let y = 0; y < worldHeight; y++) {
+        if (y > groundHeight) {
+          // Underground: mix dirt and stone randomly.
+          world[x][y] = (Math.random() < 0.2) ? 1 : 2;
+        } else if (y === groundHeight) {
+          world[x][y] = 3; // Surface grass
+        } else {
+          world[x][y] = 0; // Air above ground
+        }
+      }
+    }
+    // Generate simple trees on grass blocks.
+    for (let x = 5; x < worldWidth - 5; x++) {
+      for (let y = 0; y < worldHeight; y++) {
+        if (world[x][y] === 3 && Math.random() < 0.03) {
+          let treeHeight = 3 + Math.floor(Math.random() * 3); // Trunk between 3-5 blocks tall.
+          for (let t = 1; t <= treeHeight; t++) {
+            if (y - t >= 0) {
+              world[x][y - t] = 4; // Wood trunk.
+            }
+          }
+          let topY = y - treeHeight;
+          for (let dx = -1; dx <= 1; dx++) {
+            for (let dy = -1; dy <= 1; dy++) {
+              if (x + dx >= 0 && x + dx < worldWidth && topY + dy >= 0) {
+                if (Math.random() < 0.7) {
+                  world[x + dx][topY + dy] = 5; // Leaves.
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+    const blockColors = {
+      0: "#87CEEB", // Air (sky blue)
+      1: "#8B4513", // Dirt
+      2: "#808080", // Stone
+      3: "#228B22", // Grass
+      4: "#A0522D", // Wood
+      5: "#32CD32"  // Leaves
+    };
+
+    /***** Block Durability & Health *****/
+    // Each block type requires several hits (miningDamage per click) to break.
+    const blockDurability = {
+      1: 2, // Dirt
+      2: 3, // Stone
+      3: 2, // Grass
+      4: 3, // Wood
+      5: 1  // Leaves
+    };
+    // Create a parallel 2D array to track the health of each block.
+    const blockHealth = [];
+    for (let x = 0; x < worldWidth; x++) {
+      blockHealth[x] = [];
+      for (let y = 0; y < worldHeight; y++) {
+        let block = world[x][y];
+        blockHealth[x][y] = (block !== 0 && blockDurability[block] !== undefined)
+                              ? blockDurability[block]
+                              : 0;
+      }
+    }
+
+    /***** Player Setup *****/
+    const player = {
+      x: 50, // In world coordinates.
+      y: 20,
+      width: tileSize,
+      height: tileSize * 1.8,
+      vx: 0,
+      vy: 0,
+      speed: 4,  // Increased speed for faster walking!
+      jumpStrength: 8,
+      grounded: false,
+      health: 100,
+      // Inventory now includes both mined blocks and crafted items.
+      inventory: {
+        dirt: 0,
+        stone: 0,
+        grass: 0,
+        wood: 0,
+        leaves: 0,
+        wooden_pickaxe: 0,
+        wooden_sword: 0,
+        torch: 0
+      }
+    };
+
+    /***** Enemy Setup *****/
+    const enemies = [];
+    function spawnEnemy(x, y) {
+      enemies.push({
+        x: x,
+        y: y,
+        width: tileSize,
+        height: tileSize,
+        vx: 0,
+        vy: 0,
+        speed: 0.5,
+        grounded: false,
+        health: 20,
+        type: "slime"
+      });
+    }
+    // Spawn a few enemy slimes near the surface.
+    for (let i = 0; i < 5; i++) {
+      let ex = Math.floor(Math.random() * (worldWidth - 20)) + 10;
+      let ey = 0;
+      for (let y = 0; y < worldHeight; y++) {
+        if (world[ex][y] !== 0) {
+          ey = y - 1;
+          break;
+        }
+      }
+      spawnEnemy(ex * tileSize, ey * tileSize);
+    }
+
+    /***** Crafting Setup *****/
+    const recipes = [
+      {
+        name: "Wooden Pickaxe",
+        ingredients: { wood: 10, stone: 5 },
+        result: { key: "wooden_pickaxe", amount: 1 }
+      },
+      {
+        name: "Wooden Sword",
+        ingredients: { wood: 8, stone: 3 },
+        result: { key: "wooden_sword", amount: 1 }
+      },
+      {
+        name: "Torch",
+        ingredients: { wood: 1, leaves: 1 },
+        result: { key: "torch", amount: 4 }
+      }
+    ];
+    let craftingMenuActive = false;
+    let recipeMenuBoxes = [];
+
+    function canCraft(recipe) {
+      for (let ingr in recipe.ingredients) {
+        if (!player.inventory[ingr] || player.inventory[ingr] < recipe.ingredients[ingr])
+          return false;
+      }
+      return true;
+    }
+
+    function craftItem(recipe) {
+      if (canCraft(recipe)) {
+        for (let ingr in recipe.ingredients) {
+          player.inventory[ingr] -= recipe.ingredients[ingr];
+        }
+        let resKey = recipe.result.key;
+        player.inventory[resKey] = (player.inventory[resKey] || 0) + recipe.result.amount;
+      }
+    }
+
+    /***** Input Handling *****/
+    const keys = {};
+    window.addEventListener("keydown", e => {
+      if (e.key === "c" || e.key === "C") {
+        craftingMenuActive = !craftingMenuActive;
+      } else if (!craftingMenuActive) {
+        keys[e.key] = true;
+      }
+    });
+    window.addEventListener("keyup", e => {
+      if (!craftingMenuActive) {
+        keys[e.key] = false;
+      }
+    });
+
+    /***** Helper Functions *****/
+    function isSolid(block) {
+      return block !== 0;
+    }
+    function getBlock(x, y) {
+      if (x < 0 || x >= worldWidth || y < 0 || y >= worldHeight) return 0;
+      return world[x][y];
+    }
+    function setBlock(x, y, block) {
+      if (x < 0 || x >= worldWidth || y < 0 || y >= worldHeight) return;
+      world[x][y] = block;
+      if (block !== 0 && blockDurability[block] !== undefined) {
+        blockHealth[x][y] = blockDurability[block];
+      } else {
+        blockHealth[x][y] = 0;
+      }
+    }
+    function checkCollision(a, b) {
+      return (a.x < b.x + b.width &&
+              a.x + a.width > b.x &&
+              a.y < b.y + b.height &&
+              a.y + a.height > b.y);
+    }
+
+    // Incremental movement: move in small steps along an axis and check collisions.
+    function isColliding(entity) {
+      let leftTile = Math.floor(entity.x / tileSize);
+      let rightTile = Math.floor((entity.x + entity.width) / tileSize);
+      let topTile = Math.floor(entity.y / tileSize);
+      let bottomTile = Math.floor((entity.y + entity.height) / tileSize);
+      for (let x = leftTile; x <= rightTile; x++) {
+        for (let y = topTile; y <= bottomTile; y++) {
+          if (isSolid(getBlock(x, y))) {
+            return true;
+          }
+        }
+      }
+      return false;
+    }
+
+    function updateEntityPhysics(entity) {
+      // Horizontal movement using incremental steps.
+      let steps = Math.ceil(Math.abs(entity.vx));
+      let moveX = (steps === 0) ? 0 : entity.vx / steps;
+      for (let i = 0; i < steps; i++) {
+        entity.x += moveX;
+        if (isColliding(entity)) {
+          entity.x -= moveX;
+          entity.vx = 0;
+          break;
+        }
+      }
+      // Vertical movement using incremental steps.
+      steps = Math.ceil(Math.abs(entity.vy));
+      let moveY = (steps === 0) ? 0 : entity.vy / steps;
+      entity.grounded = false;
+      for (let i = 0; i < steps; i++) {
+        entity.y += moveY;
+        if (isColliding(entity)) {
+          entity.y -= moveY;
+          if (moveY > 0) entity.grounded = true;
+          entity.vy = 0;
+          break;
+        }
+      }
+    }
+
+    /***** Player Update *****/
+    function updatePlayer() {
+      if (craftingMenuActive) return;
+
+      if (keys["a"] || keys["ArrowLeft"]) {
+        player.vx = -player.speed;
+      } else if (keys["d"] || keys["ArrowRight"]) {
+        player.vx = player.speed;
+      } else {
+        player.vx = 0;
+      }
+      if ((keys["w"] || keys["ArrowUp"] || keys[" "]) && player.grounded) {
+        player.vy = -player.jumpStrength;
+        player.grounded = false;
+      }
+      // Apply gravity.
+      player.vy += 0.4;
+      updateEntityPhysics(player);
+    }
+
+    /***** Enemy Update *****/
+    function updateEnemies() {
+      for (let i = enemies.length - 1; i >= 0; i--) {
+        let enemy = enemies[i];
+        if (Math.abs(enemy.x - player.x) < 300) {
+          enemy.vx = enemy.x < player.x ? enemy.speed : -enemy.speed;
+        } else {
+          enemy.vx += (Math.random() - 0.5) * 0.2;
+          if (enemy.vx > enemy.speed) enemy.vx = enemy.speed;
+          if (enemy.vx < -enemy.speed) enemy.vx = -enemy.speed;
+        }
+        enemy.vy += 0.4;
+        updateEntityPhysics(enemy);
+        if (checkCollision(enemy, player)) {
+          player.health -= 0.2;
+        }
+        if (enemy.health <= 0) {
+          enemies.splice(i, 1);
+        }
+      }
+    }
+
+    /***** Enhanced Mining Mechanic *****/
+    const miningDamage = 1;
+    canvas.addEventListener("click", e => {
+      // Get mouse position relative to the canvas.
+      const rect = canvas.getBoundingClientRect();
+      const mouseX = e.clientX - rect.left;
+      const mouseY = e.clientY - rect.top;
+      
+      // Calculate camera offset so the player is centered.
+      let cameraX = player.x - canvas.width / 2 + player.width / 2;
+      let cameraY = player.y - canvas.height / 2 + player.height / 2;
+      
+      // Convert mouse coordinates to world tile coordinates.
+      const worldX = Math.floor((mouseX + cameraX) / tileSize);
+      const worldY = Math.floor((mouseY + cameraY) / tileSize);
+      
+      let block = (world[worldX] !== undefined) ? world[worldX][worldY] : 0;
+      if (block > 0 && blockDurability[block] !== undefined) {
+        blockHealth[worldX][worldY] -= miningDamage;
+        if (blockHealth[worldX][worldY] <= 0) {
+          // Increase player's inventory based on the mined block type.
+          switch (block) {
+            case 1: player.inventory.dirt++; break;
+            case 2: player.inventory.stone++; break;
+            case 3: player.inventory.grass++; break;
+            case 4: player.inventory.wood++; break;
+            case 5: player.inventory.leaves++; break;
+          }
+          setBlock(worldX, worldY, 0);
+        }
+      }
+    });
+
+    /***** Rendering *****/
+    function draw() {
+      ctx.clearRect(0, 0, canvas.width, canvas.height);
+      
+      // Center the camera on the player.
+      let cameraX = player.x - canvas.width / 2 + player.width / 2;
+      let cameraY = player.y - canvas.height / 2 + player.height / 2;
+
+      // Determine the visible area to only draw necessary tiles.
+      let startCol = Math.floor(cameraX / tileSize) - 1;
+      let endCol = startCol + Math.ceil(canvas.width / tileSize) + 2;
+      let startRow = Math.floor(cameraY / tileSize) - 1;
+      let endRow = startRow + Math.ceil(canvas.height / tileSize) + 2;
+      
+      for (let x = startCol; x <= endCol; x++) {
+        for (let y = startRow; y <= endRow; y++) {
+          if (x >= 0 && x < worldWidth && y >= 0 && y < worldHeight) {
+            let block = world[x][y];
+            if (block !== 0) {
+              ctx.fillStyle = blockColors[block];
+              ctx.fillRect(x * tileSize - cameraX, y * tileSize - cameraY, tileSize, tileSize);
+            }
+          }
+        }
+      }
+
+      // Draw player.
+      ctx.fillStyle = "red";
+      ctx.fillRect(player.x - cameraX, player.y - cameraY, player.width, player.height);
+
+      // Draw enemies.
+      for (let enemy of enemies) {
+        ctx.fillStyle = "green";
+        ctx.fillRect(enemy.x - cameraX, enemy.y - cameraY, enemy.width, enemy.height);
+      }
+
+      // Draw simple UI.
+      ctx.fillStyle = "black";
+      ctx.font = "16px Arial";
+      ctx.fillText("Health: " + Math.floor(player.health), 10, 20);
+    }
+
+    /***** Game Loop *****/
+    function gameLoop() {
+      updatePlayer();
+      updateEnemies();
+      draw();
+      requestAnimationFrame(gameLoop);
+    }
+    gameLoop();
+  </script>
+</body>
+</html>
