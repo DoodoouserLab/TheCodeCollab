@@ -1,256 +1,306 @@
 <!DOCTYPE html>
-<html>
-  <head>
-    <meta charset="UTF-8">
-    <title>Mario 64 – Fully (Simplified) in HTML</title>
-    <style>
-      body { margin: 0; overflow: hidden; }
-      canvas { display: block; }
-    </style>
-    <!-- Include Three.js from a CDN -->
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
-  </head>
-  <body>
-    <script>
-      /*********************************************
-       * Setup Three.js Scene, Camera, and Renderer
-       *********************************************/
-      const scene = new THREE.Scene();
-      scene.background = new THREE.Color(0x87CEEB); // Sky blue background
-      
-      const camera = new THREE.PerspectiveCamera(
-        75,
-        window.innerWidth / window.innerHeight,
-        0.1,
-        1000
-      );
-      
-      const renderer = new THREE.WebGLRenderer({ antialias: true });
-      renderer.setSize(window.innerWidth, window.innerHeight);
-      document.body.appendChild(renderer.domElement);
-      
-      // Add some lights
-      const directionalLight = new THREE.DirectionalLight(0xffffff, 1);
-      directionalLight.position.set(100, 100, 50);
-      scene.add(directionalLight);
-      
-      const ambientLight = new THREE.AmbientLight(0xffffff, 0.5);
-      scene.add(ambientLight);
-      
-      /*********************************************
-       * Level Geometry: Ground and Platforms
-       *********************************************/
-      // Create a grassy ground (a large green box)
-      const groundGeometry = new THREE.BoxGeometry(200, 2, 200);
-      const groundMaterial = new THREE.MeshPhongMaterial({ color: 0x228B22 });
-      const ground = new THREE.Mesh(groundGeometry, groundMaterial);
-      ground.position.set(0, -1, 0);
-      ground.receiveShadow = true;
-      scene.add(ground);
-      
-      // Array to hold platform meshes for collision detection.
-      const platforms = [];
-      
-      // Helper: create a platform at a given position.
-      function createPlatform(x, y, z, width, depth, height, color) {
-        const geometry = new THREE.BoxGeometry(width, height, depth);
-        const material = new THREE.MeshPhongMaterial({ color: color });
-        const platform = new THREE.Mesh(geometry, material);
-        platform.position.set(x, y, z);
-        platform.castShadow = true;
-        platform.receiveShadow = true;
-        scene.add(platform);
-        platforms.push(platform);
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Classic Mario–Style Platformer</title>
+  <style>
+    body {
+      margin: 0;
+      overflow: hidden;
+      background: #5c94fc; /* a blue-ish backdrop outside the canvas */
+    }
+    canvas {
+      display: block;
+      margin: 0 auto;
+      background: #87CEEB; /* sky-blue background */
+    }
+  </style>
+</head>
+<body>
+  <canvas id="gameCanvas" width="800" height="600"></canvas>
+  <script>
+    /********************************************
+     * Global Constants, Variables, and Setup
+     ********************************************/
+    const canvas = document.getElementById("gameCanvas");
+    const ctx = canvas.getContext("2d");
+
+    // Level dimensions – for a long level (in pixels)
+    const levelWidth = 3000; // the entire level is 3000px wide
+    const levelHeight = 600; // same as canvas height
+
+    // Physics constants
+    const GRAVITY = 2000; // pixels per second^2
+    const PLAYER_SPEED = 250;
+    const JUMP_VELOCITY = -800;
+
+    // Input state
+    const keys = {};
+    window.addEventListener("keydown", e => keys[e.code] = true);
+    window.addEventListener("keyup", e => keys[e.code] = false);
+
+    // Camera offset in X (cameraY is fixed since our level is flat vertically)
+    let cameraX = 0;
+
+    // Game state: "play" or "win"
+    let gameState = "play";
+
+    // Time tracking
+    let lastTime = performance.now();
+
+    /********************************************
+     * Player Object – A Retro Mario‐Inspired Look
+     ********************************************/
+    const player = {
+      x: 50,
+      y: 0,       // will fall onto platforms
+      width: 40,
+      height: 60,
+      vx: 0,
+      vy: 0,
+      onGround: false,
+      reset() {
+        this.x = 50;
+        this.y = 0;
+        this.vx = 0;
+        this.vy = 0;
+        this.onGround = false;
       }
-      
-      // Create some platforms to simulate level geometry.
-      createPlatform(0, 5, -30, 20, 20, 2, 0x808080);
-      createPlatform(30, 10, -60, 15, 15, 2, 0x808080);
-      createPlatform(-25, 15, -90, 20, 20, 2, 0x808080);
-      createPlatform(40, 20, -120, 25, 25, 2, 0x808080);
-      
-      /*********************************************
-       * Player Setup – A Mario‑like Character
-       *********************************************/
-      // We construct the player as a THREE.Group.
-      const player = new THREE.Group();
-      
-      // Torso: red box (represents Mario’s shirt)
-      const torsoGeometry = new THREE.BoxGeometry(1, 1.5, 0.5);
-      const torsoMaterial = new THREE.MeshPhongMaterial({ color: 0xff0000 });
-      const torso = new THREE.Mesh(torsoGeometry, torsoMaterial);
-      torso.position.y = 0.75; // raise so torso sits above the “legs”
-      player.add(torso);
-      
-      // Legs (blue overalls) – two small boxes
-      const legGeometry = new THREE.BoxGeometry(0.4, 0.6, 0.4);
-      const legMaterial = new THREE.MeshPhongMaterial({ color: 0x0000ff });
-      const leftLeg = new THREE.Mesh(legGeometry, legMaterial);
-      leftLeg.position.set(-0.3, -0.3, 0);
-      const rightLeg = new THREE.Mesh(legGeometry, legMaterial);
-      rightLeg.position.set(0.3, -0.3, 0);
-      player.add(leftLeg);
-      player.add(rightLeg);
-      
-      // Head: a sphere (skin-toned)
-      const headGeometry = new THREE.SphereGeometry(0.5, 16, 16);
-      const headMaterial = new THREE.MeshPhongMaterial({ color: 0xfdb99b });
-      const head = new THREE.Mesh(headGeometry, headMaterial);
-      head.position.y = 1.5;
-      player.add(head);
-      
-      // Cap: a red half‑sphere (using a partial sphere geometry)
-      const capGeometry = new THREE.SphereGeometry(0.55, 16, 16, 0, Math.PI * 2, 0, Math.PI / 2);
-      const capMaterial = new THREE.MeshPhongMaterial({ color: 0xff0000 });
-      const cap = new THREE.Mesh(capGeometry, capMaterial);
-      cap.position.y = 1.7;
-      player.add(cap);
-      
-      // Set the player's initial position.
-      player.position.set(0, 0, 0);
-      scene.add(player);
-      
-      // Player physics variables.
-      const playerVelocity = new THREE.Vector3(0, 0, 0);
-      const PLAYER_SPEED = 10;    // horizontal speed
-      const JUMP_VELOCITY = 15;   // initial jump velocity
-      let playerOnGround = false;
-      
-      /*********************************************
-       * Enemy Setup – A Simple Roaming Foe
-       *********************************************/
-      // Create an enemy as a brown cube.
-      const enemyGeometry = new THREE.BoxGeometry(1, 1, 1);
-      const enemyMaterial = new THREE.MeshPhongMaterial({ color: 0x8B4513 });
-      const enemy = new THREE.Mesh(enemyGeometry, enemyMaterial);
-      enemy.position.set(5, 0, -20);
-      scene.add(enemy);
-      
-      let enemyDirection = 1; // moves along +X then reverses.
-      const ENEMY_SPEED = 2;
-      
-      /*********************************************
-       * Input Handling
-       *********************************************/
-      const keysPressed = {};
-      document.addEventListener('keydown', (e) => {
-        keysPressed[e.code] = true;
-      });
-      document.addEventListener('keyup', (e) => {
-        keysPressed[e.code] = false;
-      });
-      
-      /*********************************************
-       * Camera Configuration – Third-Person Follow
-       *********************************************/
-      // Set an initial camera position.
-      camera.position.set(0, 5, 10);
-      camera.lookAt(player.position);
-      
-      /*********************************************
-       * Simple Collision Detection Utility
-       *********************************************/
-      // Uses Three.js Box3 to compute axis-aligned bounding boxes.
-      function checkCollision(object1, object2) {
-        const box1 = new THREE.Box3().setFromObject(object1);
-        const box2 = new THREE.Box3().setFromObject(object2);
-        return box1.intersectsBox(box2);
+    };
+
+    /********************************************
+     * Platforms – Ground and Floating Platforms
+     ********************************************/
+    // Each platform is an object: { x, y, w, h }
+    const platforms = [];
+    // Ground platform extends the entire level.
+    platforms.push({ x: 0, y: 500, w: levelWidth, h: 100 });
+    // Floating platforms at various positions:
+    platforms.push({ x: 300,  y: 400, w: 150, h: 20 });
+    platforms.push({ x: 600,  y: 350, w: 150, h: 20 });
+    platforms.push({ x: 900,  y: 300, w: 150, h: 20 });
+    platforms.push({ x: 1200, y: 400, w: 200, h: 20 });
+    platforms.push({ x: 1600, y: 350, w: 150, h: 20 });
+    platforms.push({ x: 1900, y: 300, w: 150, h: 20 });
+    platforms.push({ x: 2200, y: 350, w: 150, h: 20 });
+    platforms.push({ x: 2500, y: 400, w: 150, h: 20 });
+    platforms.push({ x: 2800, y: 300, w: 150, h: 20 });
+
+    /********************************************
+     * Enemies – Simple Roaming Foes
+     ********************************************/
+    // Each enemy is represented as an object: { x, y, width, height, vx, vy }
+    const enemies = [];
+    enemies.push({ x: 500,  y: 440, width: 40, height: 40, vx: 50, vy: 0 });
+    enemies.push({ x: 1300, y: 360, width: 40, height: 40, vx: -50, vy: 0 });
+    enemies.push({ x: 2100, y: 260, width: 40, height: 40, vx: 60, vy: 0 });
+    enemies.push({ x: 2600, y: 360, width: 40, height: 40, vx: -60, vy: 0 });
+
+    /********************************************
+     * Flag – Reaching the End Wins the Game!
+     ********************************************/
+    const flag = {
+      x: levelWidth - 100,
+      y: 200,
+      width: 20,
+      height: 300
+    };
+
+    /********************************************
+     * Collision Detection Helper Function
+     ********************************************/
+    function rectIntersect(r1, r2) {
+      return !(r2.x > r1.x + r1.w ||
+               r2.x + r2.w < r1.x ||
+               r2.y > r1.y + r1.h ||
+               r2.y + r2.h < r1.y);
+    }
+
+    /********************************************
+     * Update Function (Physics, Movement, etc.)
+     ********************************************/
+    function update(dt) {
+      // --- Player movement (controls) ---
+      if (keys["ArrowLeft"] || keys["KeyA"]) {
+        player.vx = -PLAYER_SPEED;
+      } else if (keys["ArrowRight"] || keys["KeyD"]) {
+        player.vx = PLAYER_SPEED;
+      } else {
+        player.vx = 0;
       }
-      
-      /*********************************************
-       * Game Loop and Physics Update
-       *********************************************/
-      const GRAVITY = 30; // gravity acceleration constant
-      
-      const clock = new THREE.Clock();
-      function animate() {
-        const dt = clock.getDelta(); // seconds elapsed since last frame
-        
-        // --- Handle Player Input & Movement ---
-        let moveDirection = new THREE.Vector3(0, 0, 0);
-        if (keysPressed['KeyW']) moveDirection.z -= 1;
-        if (keysPressed['KeyS']) moveDirection.z += 1;
-        if (keysPressed['KeyA']) moveDirection.x -= 1;
-        if (keysPressed['KeyD']) moveDirection.x += 1;
-        moveDirection.normalize(); // in case of diagonal movement
-        
-        // Update horizontal components of velocity.
-        playerVelocity.x = moveDirection.x * PLAYER_SPEED;
-        playerVelocity.z = moveDirection.z * PLAYER_SPEED;
-        
-        // Jumping: if space is pressed and the player is on the ground.
-        if (keysPressed['Space'] && playerOnGround) {
-          playerVelocity.y = JUMP_VELOCITY;
-          playerOnGround = false;
-        }
-        
-        // Apply gravity.
-        playerVelocity.y -= GRAVITY * dt;
-        
-        // Update player position.
-        player.position.addScaledVector(playerVelocity, dt);
-        
-        // --- Collision with the Ground ---
-        if (player.position.y < 0) {
-          player.position.y = 0;
-          playerVelocity.y = 0;
-          playerOnGround = true;
-        }
-        
-        // --- Collision with Platforms ---
-        platforms.forEach(function (plat) {
-          // Compute bounding boxes.
-          const playerBox = new THREE.Box3().setFromObject(player);
-          const platBox = new THREE.Box3().setFromObject(plat);
-          // If colliding, and if the player is falling onto the platform, adjust position.
-          if (playerBox.intersectsBox(platBox)) {
-            // Simple resolution: assume collision from above.
-            if (player.position.y > plat.position.y) {
-              player.position.y = plat.position.y + (plat.geometry.parameters.height / 2) + 1;
-              playerVelocity.y = 0;
-              playerOnGround = true;
+
+      if ((keys["Space"] || keys["ArrowUp"] || keys["KeyW"]) && player.onGround) {
+        player.vy = JUMP_VELOCITY;
+        player.onGround = false;
+      }
+
+      // Apply gravity to player
+      player.vy += GRAVITY * dt;
+
+      // Update player position
+      player.x += player.vx * dt;
+      player.y += player.vy * dt;
+
+      // --- Platform Collision for the Player ---
+      // We use a simple AABB collision check
+      player.onGround = false;
+      const playerRect = { x: player.x, y: player.y, w: player.width, h: player.height };
+      for (const plat of platforms) {
+        const platRect = { x: plat.x, y: plat.y, w: plat.w, h: plat.h };
+        if (rectIntersect(playerRect, platRect)) {
+          // If falling down and the previous bottom was above the platform, land on it.
+          if (player.vy > 0 && (player.y + player.height - player.vy * dt) <= plat.y + 5) {
+            player.y = plat.y - player.height;
+            player.vy = 0;
+            player.onGround = true;
+          } else {
+            // Collisions from the side (push player away)
+            if (player.x < plat.x) {
+              player.x = plat.x - player.width;
+            } else if (player.x > plat.x + plat.w) {
+              player.x = plat.x + plat.w;
             }
           }
-        });
-        
-        // --- Enemy Movement (Simple Patrol) ---
-        enemy.position.x += ENEMY_SPEED * enemyDirection * dt;
-        if (enemy.position.x > 10) {
-          enemyDirection = -1;
-        } else if (enemy.position.x < 0) {
-          enemyDirection = 1;
         }
-        
-        // --- Check Collision with Enemy ---
-        if (checkCollision(player, enemy)) {
-          // If collision, reset player to the level start.
-          player.position.set(0, 0, 0);
-          playerVelocity.set(0, 0, 0);
-        }
-        
-        // --- Update Camera to Follow Player ---
-        // Smoothly move the camera toward a position behind and above the player.
-        const desiredCameraPos = new THREE.Vector3(
-          player.position.x,
-          player.position.y + 5,
-          player.position.z + 10
-        );
-        camera.position.lerp(desiredCameraPos, 0.1);
-        camera.lookAt(player.position);
-        
-        renderer.render(scene, camera);
-        requestAnimationFrame(animate);
       }
-      animate();
+
+      // Reset player if they fall off the level.
+      if (player.y > canvas.height) {
+        player.reset();
+      }
+
+      // --- Update Enemies ---
+      for (const enemy of enemies) {
+        // Move enemy horizontally.
+        enemy.x += enemy.vx * dt;
+        // Apply a little gravity.
+        enemy.vy = (enemy.vy || 0) + GRAVITY * dt;
+        enemy.y += enemy.vy * dt;
+
+        // Check collision with platforms for enemy.
+        const enemyRect = { x: enemy.x, y: enemy.y, w: enemy.width, h: enemy.height };
+        for (const plat of platforms) {
+          const platRect = { x: plat.x, y: plat.y, w: plat.w, h: plat.h };
+          if (rectIntersect(enemyRect, platRect)) {
+            if (enemy.vy > 0 && (enemy.y + enemy.height - enemy.vy * dt) <= plat.y + 5) {
+              enemy.y = plat.y - enemy.height;
+              enemy.vy = 0;
+            }
+          }
+        }
+        // Reverse direction if enemy hits level boundaries.
+        if (enemy.x < 0 || enemy.x > levelWidth - enemy.width) {
+          enemy.vx = -enemy.vx;
+        }
+      }
+
+      // --- Enemy and Player Collision ---
+      for (const enemy of enemies) {
+        const enemyRect = { x: enemy.x, y: enemy.y, w: enemy.width, h: enemy.height };
+        if (rectIntersect(playerRect, enemyRect)) {
+          // If the player is falling on the enemy, stomp it.
+          if (player.vy > 0 && (player.y + player.height - player.vy * dt) <= enemy.y + 10) {
+            // "Stomp" – remove enemy by moving it out of play.
+            enemy.x = -1000;
+            player.vy = JUMP_VELOCITY * 0.5;
+          } else {
+            // Otherwise, reset the player.
+            player.reset();
+          }
+        }
+      }
+
+      // --- Check the Flag for Win Condition ---
+      const flagRect = { x: flag.x, y: flag.y, w: flag.width, h: flag.height };
+      if (rectIntersect(playerRect, flagRect)) {
+        gameState = "win";
+      }
+
+      // --- Update Camera (Horizontal Scroll) ---
+      cameraX = player.x - canvas.width / 2;
+      if (cameraX < 0) cameraX = 0;
+      if (cameraX > levelWidth - canvas.width) cameraX = levelWidth - canvas.width;
+    }
+
+    /********************************************
+     * Draw Function – Render the Scene
+     ********************************************/
+    function draw() {
+      ctx.clearRect(0, 0, canvas.width, canvas.height);
       
-      /*********************************************
-       * Handle Window Resize
-       *********************************************/
-      window.addEventListener('resize', () => {
-        camera.aspect = window.innerWidth / window.innerHeight;
-        camera.updateProjectionMatrix();
-        renderer.setSize(window.innerWidth, window.innerHeight);
-      });
-    </script>
-  </body>
+      if (gameState === "play") {
+        // Draw background
+        ctx.fillStyle = "#87CEEB";
+        ctx.fillRect(0, 0, canvas.width, canvas.height);
+  
+        ctx.save();
+        // Translate drawing by the camera offset.
+        ctx.translate(-cameraX, 0);
+  
+        // Draw ground and platforms
+        for (const plat of platforms) {
+          // Ground is green; floating platforms are brown.
+          if (plat.y === 500 && plat.w === levelWidth)
+            ctx.fillStyle = "#228B22"; // ground
+          else
+            ctx.fillStyle = "#654321"; // platform
+          ctx.fillRect(plat.x, plat.y, plat.w, plat.h);
+        }
+  
+        // Draw the flag (a white pole and red flag)
+        ctx.fillStyle = "#FF0000";
+        ctx.fillRect(flag.x - 10, flag.y, 10, flag.height);
+        ctx.fillStyle = "#FFFFFF";
+        ctx.fillRect(flag.x, flag.y, flag.width, flag.height);
+  
+        // Draw the player with a Mario–inspired look.
+        // Base rectangle for the body.
+        ctx.fillStyle = "#FF0000"; // red torso
+        ctx.fillRect(player.x, player.y, player.width, player.height);
+        // Cap: a red arc on top of the player's head.
+        ctx.fillStyle = "#FF0000";
+        ctx.beginPath();
+        ctx.arc(player.x + player.width/2, player.y + 10, 20, Math.PI, 2*Math.PI);
+        ctx.fill();
+        // Overalls: a blue rectangle on the lower half.
+        ctx.fillStyle = "#0000FF";
+        ctx.fillRect(player.x, player.y + player.height/2, player.width, player.height/2);
+  
+        // Draw enemies
+        for (const enemy of enemies) {
+          ctx.fillStyle = "#8B4513";
+          ctx.fillRect(enemy.x, enemy.y, enemy.width, enemy.height);
+        }
+  
+        ctx.restore();
+      } else if (gameState === "win") {
+        // Display win screen.
+        ctx.fillStyle = "#000";
+        ctx.fillRect(0, 0, canvas.width, canvas.height);
+        ctx.fillStyle = "#FFF";
+        ctx.font = "40px Arial";
+        ctx.textAlign = "center";
+        ctx.fillText("You Win!", canvas.width / 2, canvas.height / 2);
+        ctx.font = "20px Arial";
+        ctx.fillText("Refresh the page to play again.", canvas.width / 2, canvas.height / 2 + 40);
+      }
+    }
+
+    /********************************************
+     * Main Game Loop
+     ********************************************/
+    function gameLoop(currentTime) {
+      const dt = (currentTime - lastTime) / 1000;
+      lastTime = currentTime;
+  
+      if (gameState === "play") {
+        update(dt);
+      }
+      draw();
+      requestAnimationFrame(gameLoop);
+    }
+  
+    requestAnimationFrame(gameLoop);
+  </script>
+</body>
 </html>
