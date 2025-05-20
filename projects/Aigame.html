@@ -1,9 +1,10 @@
 <!DOCTYPE html>
 <html lang="en">
   <head>
-    <meta charset="UTF-8">
-    <title>Minecraft-like World with Villages, Biomes & Mountains</title>
+    <meta charset="UTF-8" />
+    <title>Minecraft‑Like Offline World</title>
     <style>
+      /* Basic styles for full‑screen canvas and overlay */
       body {
         margin: 0;
         overflow: hidden;
@@ -11,7 +12,7 @@
       canvas {
         display: block;
       }
-      /* Overlay for pointer lock instructions */
+      /* Overlay for Pointer Lock instructions */
       #blocker {
         position: absolute;
         top: 0;
@@ -30,7 +31,7 @@
         font-size: 36px;
         cursor: pointer;
       }
-      /* Centered crosshair */
+      /* Simple red crosshair */
       #crosshair {
         position: absolute;
         top: 50%;
@@ -49,23 +50,199 @@
     </style>
   </head>
   <body>
+    <!-- Overlay elements -->
     <div id="blocker">
       <div id="instructions">Click to Play</div>
     </div>
     <div id="crosshair">+</div>
-    
-    <!-- Load Three.js from CDN -->
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
-    <!-- Load PointerLockControls from CDN -->
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/controls/PointerLockControls.js"></script>
-    <!-- Load ImprovedNoise from Three.js examples (note the updated path) -->
-    <script src="https://threejs.org/examples/js/math/ImprovedNoise.js"></script>
-    
+
+    <!-- Include Three.js locally (download and save three.min.js in the same folder) -->
+    <script src="three.min.js"></script>
+
+    <!-- INLINE: PointerLockControls (a minimal version) -->
+    <script>
+      /**
+       * Minimal PointerLockControls based on Three.js’s implementation.
+       * This version adds mouse movement to yaw (horizontal) and pitch (vertical).
+       */
+      THREE.PointerLockControls = function (camera, domElement) {
+        this.domElement = domElement || document.body;
+        this.isLocked = false;
+
+        // Ensure the camera has no initial rotation.
+        camera.rotation.set(0, 0, 0);
+
+        // Create two Object3D containers: one for pitch and one for yaw.
+        var pitchObject = new THREE.Object3D();
+        pitchObject.add(camera);
+
+        var yawObject = new THREE.Object3D();
+        yawObject.position.y = 10;
+        yawObject.add(pitchObject);
+
+        this.getObject = function () {
+          return yawObject;
+        };
+
+        // Limit vertical rotation (in radians)
+        var PI_2 = Math.PI / 2;
+
+        var onMouseMove = function (event) {
+          if (!this.isLocked) return;
+
+          var movementX =
+            event.movementX ||
+            event.mozMovementX ||
+            event.webkitMovementX ||
+            0;
+          var movementY =
+            event.movementY ||
+            event.mozMovementY ||
+            event.webkitMovementY ||
+            0;
+
+          yawObject.rotation.y -= movementX * 0.002;
+          pitchObject.rotation.x -= movementY * 0.002;
+          pitchObject.rotation.x = Math.max(
+            -PI_2,
+            Math.min(PI_2, pitchObject.rotation.x)
+          );
+        }.bind(this);
+
+        var onPointerlockChange = function () {
+          if (
+            document.pointerLockElement === this.domElement ||
+            document.mozPointerLockElement === this.domElement
+          ) {
+            this.dispatchEvent({ type: "lock" });
+            this.isLocked = true;
+          } else {
+            this.dispatchEvent({ type: "unlock" });
+            this.isLocked = false;
+          }
+        }.bind(this);
+
+        var onPointerlockError = function () {
+          console.error("PointerLockControls: Unable to use Pointer Lock API");
+        };
+
+        document.addEventListener("mousemove", onMouseMove, false);
+        document.addEventListener("pointerlockchange", onPointerlockChange, false);
+        document.addEventListener("mozpointerlockchange", onPointerlockChange, false);
+        document.addEventListener("pointerlockerror", onPointerlockError, false);
+        document.addEventListener("mozpointerlockerror", onPointerlockError, false);
+      };
+
+      THREE.PointerLockControls.prototype = Object.create(
+        THREE.EventDispatcher.prototype
+      );
+      THREE.PointerLockControls.prototype.constructor =
+        THREE.PointerLockControls;
+      THREE.PointerLockControls.prototype.lock = function () {
+        this.domElement.requestPointerLock =
+          this.domElement.requestPointerLock || this.domElement.mozRequestPointerLock;
+        this.domElement.requestPointerLock();
+      };
+      THREE.PointerLockControls.prototype.unlock = function () {
+        document.exitPointerLock =
+          document.exitPointerLock || document.mozExitPointerLock;
+        document.exitPointerLock();
+      };
+    </script>
+
+    <!-- INLINE: ImprovedNoise (Perlin noise based on the Three.js example) -->
+    <script>
+      /**
+       * ImprovedNoise: a simple Perlin noise implementation.
+       */
+      var ImprovedNoise = function () {
+        var p = [
+          151, 160, 137, 91, 90, 15,
+          131, 13, 201, 95, 96, 53, 194, 233, 7, 225,
+          140, 36, 103, 30, 69, 142, 8, 99, 37, 240,
+          21, 10, 23, 190, 6, 148, 247, 120, 234, 75,
+          0, 26, 197, 62, 94, 252, 219, 203, 117, 35,
+          11, 32, 57, 177, 33, 88, 237, 149, 56, 87,
+          174, 20, 125, 136, 171, 168, 68, 175, 74, 165,
+          71, 134, 139, 48, 27, 166, 77, 146, 158, 231,
+          83, 111, 229, 122, 60, 211, 133, 230, 220, 105,
+          92, 41, 55, 46, 245, 40, 244, 102, 143, 54,
+          65, 25, 63, 161, 1, 216, 80, 73, 209, 76,
+          132, 187, 208, 89, 18, 169, 200, 196, 135, 130,
+          116, 188, 159, 86, 164, 100, 109, 198, 173, 186,
+          3, 64, 52, 217, 226, 250, 124, 123, 5, 202,
+          38, 147, 118, 126, 255, 82, 85, 212, 207, 206,
+          59, 227, 47, 16, 58, 17, 182, 189, 28, 42,
+          223, 183, 170, 213, 119, 248, 152, 2, 44, 154,
+          163, 70, 221, 153, 101, 155, 167, 43, 172, 9,
+          129, 22, 39, 253, 19, 98, 108, 110, 79, 113,
+          224, 232, 178, 185, 112, 104, 218, 246, 97, 228,
+          251, 34, 242, 193, 238, 210, 144, 12, 191, 179,
+          162, 241, 81, 51, 145, 235, 249, 14, 239, 107,
+          49, 192, 214, 31, 181, 199, 106, 157, 184, 84,
+          204, 176, 115, 121, 50, 45, 127, 4, 150, 254,
+          138, 236, 205, 93, 222, 114, 67, 29, 24, 72,
+          243, 141, 128, 195, 78, 66, 215, 61, 156, 180
+        ];
+        var perm = new Array(512);
+        for (var i = 0; i < 512; i++) {
+          perm[i] = p[i & 255];
+        }
+        function fade(t) {
+          return t * t * t * (t * (t * 6 - 15) + 10);
+        }
+        function lerp(t, a, b) {
+          return a + t * (b - a);
+        }
+        function grad(hash, x, y, z) {
+          var h = hash & 15;
+          var u = h < 8 ? x : y;
+          var v = h < 4 ? y : h === 12 || h === 14 ? x : z;
+          return ((h & 1) === 0 ? u : -u) + ((h & 2) === 0 ? v : -v);
+        }
+        this.noise = function (x, y, z) {
+          var floorX = Math.floor(x),
+            floorY = Math.floor(y),
+            floorZ = Math.floor(z);
+          var X = floorX & 255,
+            Y = floorY & 255,
+            Z = floorZ & 255;
+          x -= floorX;
+          y -= floorY;
+          z -= floorZ;
+          var u = fade(x),
+            v = fade(y),
+            w = fade(z);
+          var A = perm[X] + Y,
+            AA = perm[A] + Z,
+            AB = perm[A + 1] + Z,
+            B = perm[X + 1] + Y,
+            BA = perm[B] + Z,
+            BB = perm[B + 1] + Z;
+
+          return lerp(
+            w,
+            lerp(
+              v,
+              lerp(u, grad(perm[AA], x, y, z), grad(perm[BA], x - 1, y, z)),
+              lerp(u, grad(perm[AB], x, y - 1, z), grad(perm[BB], x - 1, y - 1, z))
+            ),
+            lerp(
+              v,
+              lerp(u, grad(perm[AA + 1], x, y, z - 1), grad(perm[BA + 1], x - 1, y, z - 1)),
+              lerp(u, grad(perm[AB + 1], x, y - 1, z - 1), grad(perm[BB + 1], x - 1, y - 1, z - 1))
+            )
+          );
+        };
+      };
+    </script>
+
+    <!-- MAIN SCRIPT: Scene, terrain, village, and controls -->
     <script>
       // SCENE SETUP
       const scene = new THREE.Scene();
-      scene.background = new THREE.Color(0x87CEEB); // Sky-blue
-      
+      scene.background = new THREE.Color(0x87ceeb); // Sky-blue background
+
       const camera = new THREE.PerspectiveCamera(
         75,
         window.innerWidth / window.innerHeight,
@@ -73,105 +250,125 @@
         1000
       );
       camera.position.set(0, 15, 25);
-      
+
       const renderer = new THREE.WebGLRenderer({ antialias: true });
       renderer.setSize(window.innerWidth, window.innerHeight);
       document.body.appendChild(renderer.domElement);
-      
-      // FIRST-PERSON CONTROLS (PointerLockControls)
+
+      // First-Person Controls via our inline PointerLockControls
       const controls = new THREE.PointerLockControls(camera, document.body);
       scene.add(controls.getObject());
-      
+
       const blocker = document.getElementById("blocker");
       const instructions = document.getElementById("instructions");
       instructions.addEventListener("click", () => {
         controls.lock();
-      }, false);
+      });
       controls.addEventListener("lock", () => {
         blocker.style.display = "none";
       });
       controls.addEventListener("unlock", () => {
         blocker.style.display = "flex";
       });
-      
-      // MOVEMENT VARIABLES
+
+      // Movement variables
       let moveForward = false,
-          moveBackward = false,
-          moveLeft = false,
-          moveRight = false,
-          canJump = false;
+        moveBackward = false,
+        moveLeft = false,
+        moveRight = false,
+        canJump = false;
       const velocity = new THREE.Vector3();
       const direction = new THREE.Vector3();
       let prevTime = performance.now();
-      
-      document.addEventListener("keydown", (event) => {
-        switch (event.code) {
-          case "ArrowUp":
-          case "KeyW":
-            moveForward = true;
-            break;
-          case "ArrowLeft":
-          case "KeyA":
-            moveLeft = true;
-            break;
-          case "ArrowDown":
-          case "KeyS":
-            moveBackward = true;
-            break;
-          case "ArrowRight":
-          case "KeyD":
-            moveRight = true;
-            break;
-          case "Space":
-            if (canJump === true) velocity.y += 10;
-            canJump = false;
-            break;
-        }
-      }, false);
-      
-      document.addEventListener("keyup", (event) => {
-        switch(event.code) {
-          case "ArrowUp":
-          case "KeyW": moveForward = false; break;
-          case "ArrowLeft":
-          case "KeyA": moveLeft = false; break;
-          case "ArrowDown":
-          case "KeyS": moveBackward = false; break;
-          case "ArrowRight":
-          case "KeyD": moveRight = false; break;
-        }
-      }, false);
-      
-      // LIGHTING
+
+      document.addEventListener(
+        "keydown",
+        (event) => {
+          switch (event.code) {
+            case "ArrowUp":
+            case "KeyW":
+              moveForward = true;
+              break;
+            case "ArrowLeft":
+            case "KeyA":
+              moveLeft = true;
+              break;
+            case "ArrowDown":
+            case "KeyS":
+              moveBackward = true;
+              break;
+            case "ArrowRight":
+            case "KeyD":
+              moveRight = true;
+              break;
+            case "Space":
+              if (canJump) velocity.y += 10;
+              canJump = false;
+              break;
+          }
+        },
+        false
+      );
+      document.addEventListener(
+        "keyup",
+        (event) => {
+          switch (event.code) {
+            case "ArrowUp":
+            case "KeyW":
+              moveForward = false;
+              break;
+            case "ArrowLeft":
+            case "KeyA":
+              moveLeft = false;
+              break;
+            case "ArrowDown":
+            case "KeyS":
+              moveBackward = false;
+              break;
+            case "ArrowRight":
+            case "KeyD":
+              moveRight = false;
+              break;
+          }
+        },
+        false
+      );
+
+      // Lighting
       const ambientLight = new THREE.AmbientLight(0xffffff, 0.4);
       scene.add(ambientLight);
       const directionalLight = new THREE.DirectionalLight(0xffffff, 0.8);
       directionalLight.position.set(100, 200, 100);
       scene.add(directionalLight);
-      
-      // TEXTURES & MATERIALS
+
+      // Textures & Materials
       const textureLoader = new THREE.TextureLoader();
-      // Replace this URL with a working texture URL if necessary
-      const grassTexture = textureLoader.load("https://i.imgur.com/1c6Z1qv.png");
+      /*  
+         To work offline, use a local image or embed a base64-encoded image.
+         For this example, we use a placeholder base64 string.
+         Replace "data:image/png;base64,..." with your own base64 texture
+         or reference a file that’s stored locally.
+      */
+      const grassTexture = textureLoader.load("data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAADAAAAAwCAIAAAC5GkCuAAAABGdBTUEAALGPC/xhBQAAACBjSFJNAAAB6AAAAegAAAdcBhMkAAAB9SURBVHgB7cExAQAwEAOh+jedhqAQQAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAADwB4AS6AABN8JbwAAAABJRU5ErkJggg==");
       grassTexture.magFilter = THREE.NearestFilter;
       grassTexture.minFilter = THREE.NearestFilter;
-      
+
       const grassMaterial = new THREE.MeshLambertMaterial({ map: grassTexture });
-      const dirtMaterial = new THREE.MeshLambertMaterial({ color: 0x8B4513 });
+      const dirtMaterial = new THREE.MeshLambertMaterial({ color: 0x8b4513 });
       const stoneMaterial = new THREE.MeshLambertMaterial({ color: 0x808080 });
-      const sandMaterial = new THREE.MeshLambertMaterial({ color: 0xE4D96F });
-      const sandstoneMaterial = new THREE.MeshLambertMaterial({ color: 0xC2B280 });
-      const snowMaterial = new THREE.MeshLambertMaterial({ color: 0xFFFFFF });
-      
-      // Materials used for village houses
-      const woodMaterial = new THREE.MeshLambertMaterial({ color: 0x8B4513 });
-      const woodMaterialFloor = new THREE.MeshLambertMaterial({ color: 0xCD853F });
-      const roofMaterial = new THREE.MeshLambertMaterial({ color: 0xA52A2A });
-      
-      // Global array for interactive blocks (for raycasting)
+      const sandMaterial = new THREE.MeshLambertMaterial({ color: 0xe4d96f });
+      const sandstoneMaterial = new THREE.MeshLambertMaterial({ color: 0xc2b280 });
+      const snowMaterial = new THREE.MeshLambertMaterial({ color: 0xffffff });
+
+      // Materials for village houses
+      const woodMaterial = new THREE.MeshLambertMaterial({ color: 0x8b4513 });
+      const woodMaterialFloor = new THREE.MeshLambertMaterial({ color: 0xcd853f });
+      const roofMaterial = new THREE.MeshLambertMaterial({ color: 0xa52a2a });
+
+      // Global array for blocks (for raycasting/digging)
       const objects = [];
-      
-      // Helper: create a block at (x, y, z) with chosen material
+
+      // Helper function to create a block at (x, y, z)
       function createBlock(x, y, z, material) {
         const geometry = new THREE.BoxGeometry(1, 1, 1);
         const cube = new THREE.Mesh(geometry, material);
@@ -180,32 +377,32 @@
         objects.push(cube);
         return cube;
       }
-      
-      // NOISE & TERRAIN PARAMETERS
+
+      // Noise & Terrain Parameters
       const noise = new ImprovedNoise();
       const seed = Math.random() * 100;
       const noiseScale = 10;
       const amplitude = 4;
-      
-      // Returns terrain height and biome type based on noise values
+
+      // Calculate terrain height and determine biome
       function calculateTerrainHeight(worldX, worldZ) {
         let noiseValue = noise.noise(worldX / noiseScale, seed, worldZ / noiseScale);
         let biomeValue = noise.noise(worldX / 15, seed + 100, worldZ / 15);
         let biomeType, baseHeight;
         if (biomeValue < -0.3) {
-          biomeType = 'desert';
+          biomeType = "desert";
           baseHeight = Math.floor((noiseValue + 1) * (amplitude / 3));
         } else if (biomeValue > 0.5) {
-          biomeType = 'mountain';
+          biomeType = "mountain";
           baseHeight = Math.floor((noiseValue + 1) * (amplitude * 1.5));
         } else {
-          biomeType = 'grassland';
+          biomeType = "grassland";
           baseHeight = Math.floor((noiseValue + 1) * (amplitude / 2));
         }
         return { height: baseHeight, biome: biomeType };
       }
-      
-      // MAIN TERRAIN GENERATION
+
+      // MAIN TERRAIN GENERATION: A grid of blocks with varying heights and biomes
       const worldWidth = 64;
       const worldDepth = 64;
       for (let i = -worldWidth / 2; i < worldWidth / 2; i++) {
@@ -213,12 +410,12 @@
           const { height: h, biome: biomeType } = calculateTerrainHeight(i, j);
           for (let y = 0; y <= h; y++) {
             let mat;
-            if (biomeType === 'desert') {
-              mat = (y === h) ? sandMaterial : sandstoneMaterial;
+            if (biomeType === "desert") {
+              mat = y === h ? sandMaterial : sandstoneMaterial;
             } else {
-              if (biomeType === 'mountain' && h >= 8 && y === h) {
+              if (biomeType === "mountain" && h >= 8 && y === h) {
                 mat = snowMaterial;
-              } else if (y === h && (biomeType === 'grassland' || biomeType === 'mountain')) {
+              } else if (y === h && (biomeType === "grassland" || biomeType === "mountain")) {
                 mat = grassMaterial;
               } else if (y >= h - 2) {
                 mat = dirtMaterial;
@@ -230,33 +427,29 @@
           }
         }
       }
-      
-      // Add a large ground plane underneath (for safety)
+
+      // Large ground plane for safety
       const groundGeo = new THREE.PlaneGeometry(200, 200);
       const groundMat = new THREE.MeshLambertMaterial({ color: 0x55aa55 });
       const ground = new THREE.Mesh(groundGeo, groundMat);
       ground.rotation.x = -Math.PI / 2;
       ground.position.y = -1;
       scene.add(ground);
-      
+
       // VILLAGE GENERATION
-      
-      // Builds a simple house with a 5×5 footprint
       function createHouse(baseX, baseZ) {
-        // Get the ground height at the house base coordinate.
         const { height: groundHeight } = calculateTerrainHeight(baseX, baseZ);
         const baseY = groundHeight + 1;
-        // Build the floor.
+        // Floor
         for (let x = 0; x < 5; x++) {
           for (let z = 0; z < 5; z++) {
             createBlock(baseX + x, baseY - 1, baseZ + z, woodMaterialFloor);
           }
         }
-        // Build the walls (with a gap for a door).
+        // Walls (with a door gap at the front center)
         for (let x = 0; x < 5; x++) {
           for (let y = 0; y < 4; y++) {
             for (let z = 0; z < 5; z++) {
-              // Leave a gap for the door at the front center.
               if (z === 0 && x === 2 && (y === 0 || y === 1)) continue;
               if (x === 0 || x === 4 || z === 0 || z === 4) {
                 createBlock(baseX + x, baseY + y, baseZ + z, woodMaterial);
@@ -264,93 +457,96 @@
             }
           }
         }
-        // Build a flat roof with an overhang.
+        // Flat roof with a slight overhang
         for (let x = -1; x < 6; x++) {
           for (let z = -1; z < 6; z++) {
             createBlock(baseX + x, baseY + 4, baseZ + z, roofMaterial);
           }
         }
       }
-      
-      // Spawns a grid of houses to form a simple village.
       function generateVillage(centerX, centerZ) {
-        const gridSize = 5; // 5x5 grid of houses.
-        const spacing = 10; // Spacing between houses.
+        const gridSize = 5; // 5×5 grid of houses
+        const spacing = 10;
         for (let i = -Math.floor(gridSize / 2); i <= Math.floor(gridSize / 2); i++) {
           for (let j = -Math.floor(gridSize / 2); j <= Math.floor(gridSize / 2); j++) {
-            // Use a chance to leave gaps between houses.
             if (Math.random() < 0.7) {
               createHouse(centerX + i * spacing, centerZ + j * spacing);
             }
           }
         }
       }
-      
-      // Spawn a village (you can call generateVillage at different coordinates).
+      // Spawn one village near the center
       generateVillage(0, 0);
-      
-      // RAYCASTER for interactive "digging" (left-click to remove a block)
+
+      // RAYCASTER: Click (left-click) to remove blocks, simulating "digging"
       const raycaster = new THREE.Raycaster();
-      document.addEventListener("mousedown", (event) => {
-        if (!controls.isLocked) return;
-        if (event.button === 0) {
-          // Use the center-screen (0,0) for raycasting.
-          raycaster.setFromCamera(new THREE.Vector2(0, 0), camera);
-          const intersects = raycaster.intersectObjects(objects);
-          if (intersects.length > 0) {
-            const selected = intersects[0].object;
-            scene.remove(selected);
-            const index = objects.indexOf(selected);
-            if (index > -1) objects.splice(index, 1);
+      document.addEventListener(
+        "mousedown",
+        (event) => {
+          if (!controls.isLocked) return;
+          if (event.button === 0) {
+            // Use the center of the screen (0, 0) for raycasting
+            raycaster.setFromCamera(new THREE.Vector2(0, 0), camera);
+            const intersects = raycaster.intersectObjects(objects);
+            if (intersects.length > 0) {
+              const selected = intersects[0].object;
+              scene.remove(selected);
+              const index = objects.indexOf(selected);
+              if (index > -1) objects.splice(index, 1);
+            }
           }
-        }
-      }, false);
-      
+        },
+        false
+      );
+
       // GAME LOOP / ANIMATION
       function animate() {
         requestAnimationFrame(animate);
         const time = performance.now();
         const delta = (time - prevTime) / 1000;
-      
+
         if (controls.isLocked) {
-          // Apply friction and gravity.
+          // Apply friction and gravity
           velocity.x -= velocity.x * 10.0 * delta;
           velocity.z -= velocity.z * 10.0 * delta;
           velocity.y -= 9.8 * 10.0 * delta;
-      
+
           direction.z = Number(moveForward) - Number(moveBackward);
           direction.x = Number(moveRight) - Number(moveLeft);
           direction.normalize();
-      
+
           if (moveForward || moveBackward)
             velocity.z -= direction.z * 400.0 * delta;
           if (moveLeft || moveRight)
             velocity.x -= direction.x * 400.0 * delta;
-      
+
           controls.moveRight(-velocity.x * delta);
           controls.moveForward(-velocity.z * delta);
           controls.getObject().position.y += velocity.y * delta;
-      
-          // Prevent falling below the ground level.
+
+          // Simple collision with the ground
           if (controls.getObject().position.y < 2) {
             velocity.y = 0;
             controls.getObject().position.y = 2;
             canJump = true;
           }
         }
-      
+
         prevTime = time;
         renderer.render(scene, camera);
       }
-      
+
       animate();
-      
-      // Adjust canvas size on window resize.
-      window.addEventListener("resize", () => {
-        camera.aspect = window.innerWidth / window.innerHeight;
-        camera.updateProjectionMatrix();
-        renderer.setSize(window.innerWidth, window.innerHeight);
-      }, false);
+
+      window.addEventListener(
+        "resize",
+        () => {
+          camera.aspect = window.innerWidth / window.innerHeight;
+          camera.updateProjectionMatrix();
+          renderer.setSize(window.innerWidth, window.innerHeight);
+        },
+        false
+      );
     </script>
   </body>
 </html>
