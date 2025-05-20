@@ -2,17 +2,27 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8">
-  <title>3D Minecraft-like Demo (No Libraries)</title>
+  <title>3D Cube – No Libraries</title>
   <style>
-    /* Remove default margins and ensure the canvas fills the screen */
-    body, html { margin: 0; padding: 0; width: 100%; height: 100%; }
-    canvas { display: block; width: 100%; height: 100%; background-color: #000; }
+    /* Make sure the canvas fills the screen */
+    html, body {
+      margin: 0;
+      padding: 0;
+      width: 100%;
+      height: 100%;
+    }
+    canvas {
+      display: block;
+      width: 100%;
+      height: 100%;
+      background-color: #000;
+    }
   </style>
 </head>
 <body>
   <canvas id="glCanvas"></canvas>
   <script>
-    // Get the canvas and initialize WebGL.
+    // Get the canvas and initialize a WebGL context.
     const canvas = document.getElementById("glCanvas");
     canvas.width = window.innerWidth;
     canvas.height = window.innerHeight;
@@ -21,7 +31,7 @@
       alert("WebGL not supported in this browser.");
     }
 
-    // --- Shader sources ---
+    // --- Shader Source Code ---
     const vsSource = `
       attribute vec3 aPosition;
       attribute vec3 aColor;
@@ -42,7 +52,7 @@
       }
     `;
 
-    // --- Shader Compilation Helpers ---
+    // --- Shader Compilation Helper Functions ---
     function loadShader(type, source) {
       const shader = gl.createShader(type);
       gl.shaderSource(shader, source);
@@ -72,69 +82,72 @@
     const shaderProgram = initShaderProgram(vsSource, fsSource);
     gl.useProgram(shaderProgram);
 
-    // --- Look Up Attribute/Uniform Locations ---
+    // --- Look Up Locations ---
     const programInfo = {
       attribLocations: {
         vertexPosition: gl.getAttribLocation(shaderProgram, 'aPosition'),
-        vertexColor: gl.getAttribLocation(shaderProgram, 'aColor'),
+        vertexColor: gl.getAttribLocation(shaderProgram, 'aColor')
       },
       uniformLocations: {
         projectionMatrix: gl.getUniformLocation(shaderProgram, 'uProjectionMatrix'),
-        modelViewMatrix: gl.getUniformLocation(shaderProgram, 'uModelViewMatrix'),
-      },
+        modelViewMatrix: gl.getUniformLocation(shaderProgram, 'uModelViewMatrix')
+      }
     };
 
     // --- Cube Geometry Data ---
     const positions = [
-      // Front Face
+      // Front face
       -1.0, -1.0,  1.0,
        1.0, -1.0,  1.0,
        1.0,  1.0,  1.0,
       -1.0,  1.0,  1.0,
-      // Back Face
+      // Back face
       -1.0, -1.0, -1.0,
       -1.0,  1.0, -1.0,
        1.0,  1.0, -1.0,
        1.0, -1.0, -1.0,
-      // Top Face
+      // Top face
       -1.0,  1.0, -1.0,
       -1.0,  1.0,  1.0,
        1.0,  1.0,  1.0,
        1.0,  1.0, -1.0,
-      // Bottom Face
+      // Bottom face
       -1.0, -1.0, -1.0,
        1.0, -1.0, -1.0,
        1.0, -1.0,  1.0,
       -1.0, -1.0,  1.0,
-      // Right Face
+      // Right face
        1.0, -1.0, -1.0,
        1.0,  1.0, -1.0,
        1.0,  1.0,  1.0,
        1.0, -1.0,  1.0,
-      // Left Face
+      // Left face
       -1.0, -1.0, -1.0,
       -1.0, -1.0,  1.0,
       -1.0,  1.0,  1.0,
       -1.0,  1.0, -1.0,
     ];
 
+    // Each face gets a solid color.
     const faceColors = [
-      [1.0,  0.0,  0.0], // Front: red
-      [0.0,  1.0,  0.0], // Back: green
-      [0.0,  0.0,  1.0], // Top: blue
-      [1.0,  1.0,  0.0], // Bottom: yellow
-      [1.0,  0.0,  1.0], // Right: magenta
-      [0.0,  1.0,  1.0], // Left: cyan
+      [1.0, 0.0, 0.0], // Front: red
+      [0.0, 1.0, 0.0], // Back: green
+      [0.0, 0.0, 1.0], // Top: blue
+      [1.0, 1.0, 0.0], // Bottom: yellow
+      [1.0, 0.0, 1.0], // Right: magenta
+      [0.0, 1.0, 1.0]  // Left: cyan
     ];
 
     let colors = [];
     for (let i = 0; i < faceColors.length; i++) {
       const c = faceColors[i];
+      // Repeat once for each of the face's 4 vertices.
       for (let j = 0; j < 4; j++) {
-        colors = colors.concat(c);
+        colors.push(c[0], c[1], c[2]);
       }
     }
 
+    // Define the indices for the cube (2 triangles per face)
     const indices = [
       0, 1, 2,    0, 2, 3,      // Front face
       4, 5, 6,    4, 6, 7,      // Back face
@@ -158,20 +171,16 @@
     gl.bufferData(gl.ELEMENT_ARRAY_BUFFER, new Uint16Array(indices), gl.STATIC_DRAW);
 
     gl.bindBuffer(gl.ARRAY_BUFFER, positionBuffer);
-    gl.vertexAttribPointer(
-      programInfo.attribLocations.vertexPosition,
-      3, gl.FLOAT, false, 0, 0
-    );
+    gl.vertexAttribPointer(programInfo.attribLocations.vertexPosition,
+                           3, gl.FLOAT, false, 0, 0);
     gl.enableVertexAttribArray(programInfo.attribLocations.vertexPosition);
 
     gl.bindBuffer(gl.ARRAY_BUFFER, colorBuffer);
-    gl.vertexAttribPointer(
-      programInfo.attribLocations.vertexColor,
-      3, gl.FLOAT, false, 0, 0
-    );
+    gl.vertexAttribPointer(programInfo.attribLocations.vertexColor,
+                           3, gl.FLOAT, false, 0, 0);
     gl.enableVertexAttribArray(programInfo.attribLocations.vertexColor);
 
-    // --- Minimal Matrix Utility Functions ---
+    // --- Matrix Utility Functions (Column-Major Order) ---
     function identity() {
       return [
          1, 0, 0, 0,
@@ -181,102 +190,99 @@
       ];
     }
 
-    function perspective(fov, aspect, near, far) {
-      const f = 1.0 / Math.tan(fov / 2);
-      const rangeInv = 1 / (near - far);
-      return [
-        f / aspect, 0, 0,                             0,
-        0,          f, 0,                             0,
-        0,          0, (near + far) * rangeInv,        -1,
-        0,          0, near * far * rangeInv * 2,       0
-      ];
-    }
-
-    function multiply(a, b) {
-      const out = new Array(16);
-      for (let i = 0; i < 4; ++i) {
-        for (let j = 0; j < 4; ++j) {
-          out[i * 4 + j] =
-            a[i * 4 + 0] * b[0 * 4 + j] +
-            a[i * 4 + 1] * b[1 * 4 + j] +
-            a[i * 4 + 2] * b[2 * 4 + j] +
-            a[i * 4 + 3] * b[3 * 4 + j];
+    // Multiply two 4x4 matrices (both in column-major order)
+    function multiplyMatrix(a, b) {
+      let out = new Array(16);
+      for (let j = 0; j < 4; j++) {
+        for (let i = 0; i < 4; i++) {
+          out[i + j * 4] =
+            a[i + 0 * 4] * b[0 + j * 4] +
+            a[i + 1 * 4] * b[1 + j * 4] +
+            a[i + 2 * 4] * b[2 + j * 4] +
+            a[i + 3 * 4] * b[3 + j * 4];
         }
       }
       return out;
     }
 
-    function rotateY(m, angle) {
-      const c = Math.cos(angle);
-      const s = Math.sin(angle);
-      const rotation = [
-         c, 0, s, 0,
-         0, 1, 0, 0,
-        -s, 0, c, 0,
-         0, 0, 0, 1
+    // Perspective matrix (column-major)
+    function perspective(fov, aspect, near, far) {
+      const f = 1.0 / Math.tan(fov / 2);
+      return [
+         f / aspect, 0,                       0,  0,
+         0,          f,                       0,  0,
+         0,          0,   (far + near) / (near - far), -1,
+         0,          0, (2 * far * near) / (near - far),  0
       ];
-      return multiply(m, rotation);
     }
 
-    function rotateX(m, angle) {
-      const c = Math.cos(angle);
-      const s = Math.sin(angle);
-      const rotation = [
-        1,  0, 0, 0,
-        0,  c, s, 0,
-        0, -s, c, 0,
-        0,  0, 0, 1
-      ];
-      return multiply(m, rotation);
-    }
-
-    function translate(m, tx, ty, tz) {
-      const translation = [
+    // Translation matrix (column-major)
+    function translate(tx, ty, tz) {
+      return [
          1, 0, 0, 0,
          0, 1, 0, 0,
          0, 0, 1, 0,
          tx, ty, tz, 1
       ];
-      return multiply(m, translation);
+    }
+
+    // Rotation around the X axis.
+    function rotateX(angle) {
+      const c = Math.cos(angle);
+      const s = Math.sin(angle);
+      return [
+        1,  0,  0, 0,
+        0,  c,  s, 0,
+        0, -s,  c, 0,
+        0,  0,  0, 1
+      ];
+    }
+
+    // Rotation around the Y axis.
+    function rotateY(angle) {
+      const c = Math.cos(angle);
+      const s = Math.sin(angle);
+      return [
+         c, 0, -s, 0,
+         0, 1,  0, 0,
+         s, 0,  c, 0,
+         0, 0,  0, 1
+      ];
     }
 
     // --- Animation Loop ---
     let previousTime = 0;
     let angle = 0;
     function render(currentTime) {
-      currentTime *= 0.001;
+      currentTime *= 0.001; // convert to seconds
       const deltaTime = currentTime - previousTime;
       previousTime = currentTime;
       angle += deltaTime;
 
       gl.viewport(0, 0, canvas.width, canvas.height);
-      gl.clearDepth(1.0);
       gl.clearColor(0.0, 0.0, 0.0, 1.0);
-      gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT);
+      gl.clearDepth(1.0);
       gl.enable(gl.DEPTH_TEST);
+      gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT);
 
-      // Create projection matrix.
-      const fieldOfView = 60 * Math.PI / 180;
-      const aspect = canvas.clientWidth / canvas.clientHeight;
-      const projectionMatrix = perspective(fieldOfView, aspect, 0.1, 100.0);
+      // Build the projection matrix.
+      const fieldOfView = 60 * Math.PI / 180; // in radians
+      const aspect = canvas.width / canvas.height;
+      const projMatrix = perspective(fieldOfView, aspect, 0.1, 100.0);
 
-      // Build model-view matrix.
-      let modelViewMatrix = identity();
-      modelViewMatrix = translate(modelViewMatrix, 0, 0, -6);
-      modelViewMatrix = rotateY(modelViewMatrix, angle);
-      modelViewMatrix = rotateX(modelViewMatrix, angle * 0.7);
+      // Build the model-view matrix:
+      // 1. Translate away from the camera.
+      // 2. Apply rotations.
+      let modelMatrix = identity();
+      modelMatrix = multiplyMatrix(modelMatrix, translate(0, 0, -6));
+      modelMatrix = multiplyMatrix(modelMatrix, rotateY(angle));
+      modelMatrix = multiplyMatrix(modelMatrix, rotateX(angle * 0.7));
 
-      // IMPORTANT: Because our matrices are in row-major order,
-      // we pass true as the transpose parameter so WebGL interprets
-      // them correctly as column-major.
-      gl.uniformMatrix4fv(
-        programInfo.uniformLocations.projectionMatrix,
-        true, new Float32Array(projectionMatrix)
-      );
-      gl.uniformMatrix4fv(
-        programInfo.uniformLocations.modelViewMatrix,
-        true, new Float32Array(modelViewMatrix)
-      );
+      // Send the matrices to the shader.
+      gl.uniformMatrix4fv(programInfo.uniformLocations.projectionMatrix,
+                          false, new Float32Array(projMatrix));
+      gl.uniformMatrix4fv(programInfo.uniformLocations.modelViewMatrix,
+                          false, new Float32Array(modelMatrix));
 
       // Draw the cube.
       gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, indexBuffer);
