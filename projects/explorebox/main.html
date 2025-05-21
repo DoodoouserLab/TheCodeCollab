@@ -128,6 +128,15 @@
     generateCaves();
     // -------------------------------
 
+    function findSurfaceY(x) {
+      for (let y = 0; y < worldHeight; y++) {
+        if (world[x][y] !== 0) {
+          return y - 1;
+        }
+      }
+      return worldHeight - 2;
+    }
+    
     // Colors used for blocks.
     const blockColors = {
       0: "#87CEEB", // Air (sky blue, although air is not drawn)
@@ -213,6 +222,14 @@
       });
     }
     // Initially spawn a few slimes near the surface.
+    
+    for (let i = 0; i < 100; i++) {
+      let ex = Math.floor(Math.random() * (worldWidth - 20)) + 10;
+      let ey = findSurfaceY(ex);
+      spawnEnemy(ex * tileSize, ey * tileSize);
+    }
+    
+    /****
     for (let i = 0; i < 100; i++) {
       let ex = Math.floor(Math.random() * (worldWidth - 20)) + 10;
       let ey = 0;
@@ -221,6 +238,7 @@
       }
       spawnEnemy(ex * tileSize, ey * tileSize);
     }
+    ****/
    /****
     // Periodically spawn new slime enemies (mostly in cave depths).
     function updateSlimeSpawning() {
@@ -560,6 +578,7 @@ function tryAttackEnemy() {
     }
 
         /***** Enemy Update & Slime Drops *****/
+   /****
     function updateEnemies() {
       for (let i = enemies.length - 1; i >= 0; i--) {
         let enemy = enemies[i];
@@ -584,7 +603,42 @@ function tryAttackEnemy() {
         }
       }
     }
+****/
 
+  function updateEnemies() {
+  for (let i = enemies.length - 1; i >= 0; i--) {
+    let enemy = enemies[i];
+    // --- Slime AI: Chase player if close ---
+    let dx = player.x - enemy.x;
+    let dy = player.y - enemy.y;
+    let dist = Math.sqrt(dx * dx + dy * dy);
+    if (dist < 300) {
+      // Move toward player
+      enemy.vx = dx > 0 ? enemy.speed : -enemy.speed;
+    } else {
+      // Random wander
+      enemy.vx += (Math.random() - 0.5) * 0.2;
+      if (enemy.vx > enemy.speed) enemy.vx = enemy.speed;
+      if (enemy.vx < -enemy.speed) enemy.vx = -enemy.speed;
+    }
+    enemy.vy += 0.4; // gravity
+    updateEntityPhysics(enemy);
+
+    // --- Damage player if touching ---
+    if (checkCollision(enemy, player)) {
+      player.health -= 0.5; // increase or decrease as needed
+    }
+
+    // --- Remove dead slimes and drop gel ---
+    if (enemy.health <= 0) {
+      if (enemy.type === "slime") {
+        player.inventory.gel += Math.floor(Math.random() * 2) + 1;
+      }
+      enemies.splice(i, 1);
+    }
+  }
+}
+    
     // ----------- ONLY ONE SLIME SPAWN FUNCTION -----------
     function updateSlimeSpawning() {
       // Allow more slimes and more frequent spawning for testing
@@ -812,7 +866,19 @@ function tryAttackEnemy() {
       }
       ctx.fillStyle = "#000";
       ctx.font = "16px Courier New";
-      ctx.fillText("Health: " + Math.floor(player.health), 10, 20);
+      //ctx.fillText("Health: " + Math.floor(player.health), 10, 20);
+      // Draw player health bar
+      const barX = 20, barY = 20, barWidth = 200, barHeight = 20;
+      ctx.fillStyle = "#333";
+      ctx.fillRect(barX, barY, barWidth, barHeight);
+      ctx.fillStyle = "#e74c3c";
+      let healthFrac = Math.max(0, player.health / 100);
+      ctx.fillRect(barX, barY, barWidth * healthFrac, barHeight);
+      ctx.strokeStyle = "#fff";
+      ctx.strokeRect(barX, barY, barWidth, barHeight);
+      ctx.fillStyle = "#fff";
+      ctx.font = "16px Courier New";
+      ctx.fillText("Health: " + Math.floor(player.health), barX + barWidth / 2, barY + barHeight - 4);
       // If mining is active, draw mining progress over the targeted block.
       if (currentMiningTarget) {
         const tx = currentMiningTarget.x;
