@@ -775,10 +775,6 @@
       draw();
       requestAnimationFrame(gameLoop);
     }
-
-    playerImg.onload = () => {
-      gameLoop();
-    };
     
     function updatePlayer() {
       if (craftingMenuActive) return; // Freeze movement during crafting.
