@@ -23,7 +23,7 @@
   <script>
     /* Load Player Image */
     const playerImg = new Image();
-    playerImg.src = "../assets/player.png";
+    playerImg.src = "../assets/player.ico";
     /***** Canvas Setup *****/
     const canvas = document.getElementById("game");
     const ctx = canvas.getContext("2d");
@@ -213,7 +213,7 @@
       });
     }
     // Initially spawn a few slimes near the surface.
-    for (let i = 0; i < 20; i++) {
+    for (let i = 0; i < 100; i++) {
       let ex = Math.floor(Math.random() * (worldWidth - 20)) + 10;
       let ey = 0;
       for (let y = 0; y < worldHeight; y++) {
@@ -221,6 +221,7 @@
       }
       spawnEnemy(ex * tileSize, ey * tileSize);
     }
+   /****
     // Periodically spawn new slime enemies (mostly in cave depths).
     function updateSlimeSpawning() {
       // Limit overall slime count.
@@ -236,6 +237,8 @@
         }
       }
     }
+    ****/
+    
 
     /***** Crafting Setup *****/
     // Terraria–inspired recipes.
@@ -524,7 +527,51 @@
         }
       }
     }
+
+        /***** Enemy Update & Slime Drops *****/
+    function updateEnemies() {
+      for (let i = enemies.length - 1; i >= 0; i--) {
+        let enemy = enemies[i];
+        if (Math.abs(enemy.x - player.x) < 300) {
+          enemy.vx = enemy.x < player.x ? enemy.speed : -enemy.speed;
+        } else {
+          enemy.vx += (Math.random() - 0.5) * 0.2;
+          if (enemy.vx > enemy.speed) enemy.vx = enemy.speed;
+          if (enemy.vx < -enemy.speed) enemy.vx = -enemy.speed;
+        }
+        enemy.vy += 0.4;
+        updateEntityPhysics(enemy);
+        if (checkCollision(enemy, player)) {
+          player.health -= 0.2;
+        }
+        if (enemy.health <= 0) {
+          // If the enemy is a slime, drop 1–2 gel.
+          if (enemy.type === "slime") {
+            player.inventory.gel += Math.floor(Math.random() * 2) + 1;
+          }
+          enemies.splice(i, 1);
+        }
+      }
+    }
+
+    // ----------- ONLY ONE SLIME SPAWN FUNCTION -----------
+    function updateSlimeSpawning() {
+      // Allow more slimes and more frequent spawning for testing
+      if (enemies.length < 100) {
+        if (Math.random() < 0.05) { // 5% chance per frame (increase/decrease as you like)
+          // Spawn a slime in a cave region (y > ground height + 10)
+          const spawnX = Math.floor(Math.random() * worldWidth);
+          const spawnYStart = groundHeights[spawnX] + 10;
+          if (spawnYStart < worldHeight - 10) {
+            const spawnY = spawnYStart + Math.floor(Math.random() * (worldHeight - spawnYStart - 10));
+            spawnEnemy(spawnX * tileSize, spawnY * tileSize);
+          }
+        }
+      }
+    }
+    // ----------- END SPAWN FUNCTION -----------
     // Function to periodically spawn new slime enemies in cave areas.
+    /****
     function updateSlimeSpawning() {
       if (enemies.length < 10) {
         if (Math.random() < 0.005) {
@@ -537,7 +584,7 @@
         }
       }
     }
-
+*****/
     /***** Drawing Pixel Icons *****/
     function drawIcon(itemKey, x, y, size) {
       switch(itemKey) {
