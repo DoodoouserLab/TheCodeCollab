@@ -286,7 +286,8 @@
       "stone": 2,
       "grass": 3,
       "wood": 4,
-      "leaves": 5
+      "leaves": 5,
+      "torch": 6
     };
     // Allow placement only if the target tile is empty and at least one neighbor is non–air (or at the world’s bottom).
     function canPlaceBlockAt(x, y) {
@@ -359,6 +360,7 @@
         const rect = canvas.getBoundingClientRect();
         lastMousePos.x = e.clientX - rect.left;
         lastMousePos.y = e.clientY - rect.top;
+        tryAttackEnemy();
       }
     });
     canvas.addEventListener("mouseup", e => {
@@ -502,6 +504,35 @@
       }
     }
 
+  // (Paste after updateMining or before gameLoop)
+function tryAttackEnemy() {
+  const selectedItem = inventoryOrder[player.selectedSlot];
+  if (selectedItem !== "wooden_sword" || player.inventory.wooden_sword <= 0) return;
+
+  const playerCenterX = player.x + player.width / 2;
+  const playerCenterY = player.y + player.height / 2;
+
+  for (let i = enemies.length - 1; i >= 0; i--) {
+    const enemy = enemies[i];
+    const enemyCenterX = enemy.x + enemy.width / 2;
+    const enemyCenterY = enemy.y + enemy.height / 2;
+    const dx = enemyCenterX - playerCenterX;
+    const dy = enemyCenterY - playerCenterY;
+    const distance = Math.sqrt(dx * dx + dy * dy);
+
+    if (distance < 50) { // attack range
+      enemy.health -= 10;
+      if (enemy.health <= 0) {
+        if (enemy.type === "slime") {
+          player.inventory.gel += Math.floor(Math.random() * 2) + 1;
+        }
+        enemies.splice(i, 1);
+      }
+      break; // Only attack one enemy per click
+    }
+  }
+}
+    
     /***** Enemy Update & Slime Drops *****/
     function updateEnemies() {
       for (let i = enemies.length - 1; i >= 0; i--) {
@@ -557,7 +588,7 @@
     // ----------- ONLY ONE SLIME SPAWN FUNCTION -----------
     function updateSlimeSpawning() {
       // Allow more slimes and more frequent spawning for testing
-      if (enemies.length < 100) {
+      if (enemies.length < 1000) {
         if (Math.random() < 0.05) { // 5% chance per frame (increase/decrease as you like)
           // Spawn a slime in a cave region (y > ground height + 10)
           const spawnX = Math.floor(Math.random() * worldWidth);
