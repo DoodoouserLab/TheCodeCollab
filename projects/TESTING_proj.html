@@ -2,7 +2,7 @@
 <html lang="en">
   <head>
     <meta charset="UTF-8" />
-    <title>Mini Minecraft in HTML (Simplified Three.js Demo)</title>
+    <title>Simplified Minecraft Demo</title>
     <style>
       body {
         margin: 0;
@@ -14,16 +14,15 @@
         image-rendering: pixelated;
         background: #87CEEB;
       }
-      /* Inventory overlay styled as a simple fixed HUD */
-      #inventory {
+      #hud {
         position: absolute;
         top: 10px;
         left: 50%;
         transform: translateX(-50%);
         font-family: "Courier New", monospace;
         color: #fff;
+        background: rgba(0,0,0,0.5);
         padding: 8px 12px;
-        background: rgba(0, 0, 0, 0.5);
         border: 2px solid #555;
       }
       #instructions {
@@ -33,295 +32,275 @@
         transform: translateX(-50%);
         font-family: sans-serif;
         color: #fff;
+        background: rgba(0,0,0,0.5);
         padding: 8px 12px;
-        background: rgba(0, 0, 0, 0.5);
         border: 2px solid #555;
       }
     </style>
-    <!-- Include Three.js and PointerLockControls from a CDN -->
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r134/three.min.js"></script>
+    <!-- Load Three.js and PointerLockControls -->
+    <script src="https://cdn.jsdelivr.net/npm/three@0.134.0/build/three.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/three@0.134.0/examples/js/controls/PointerLockControls.js"></script>
   </head>
   <body>
-    <div id="inventory"></div>
-    <div id="instructions">Click to lock pointer. Use WASD to move, mouse to look. Left‑click to mine, Right‑click to place block. Number keys select block type for placement.</div>
+    <div id="hud"></div>
+    <div id="instructions">
+      Click to lock pointer. WASD to move; use mouse to look.<br>
+      Left–click to mine, right–click to place block.<br>
+      Number keys 1–3 select block type for placement:<br>
+      1 = Stone, 2 = Dirt, 3 = Grass.
+    </div>
     <script>
-      /***** GLOBALS AND WORLD DATA *****/
-      // World dimensions in blocks (a small demo world)
-      const WORLD_WIDTH = 16,
-            WORLD_DEPTH = 16,
-            WORLD_HEIGHT = 8; // vertical layers
-      
-      // We'll use a very basic 3D voxel world.
-      // Block types: 0 = air; 1 = grass; 2 = dirt; 3 = stone.
-      // (You can extend with more types later.)
-      // We'll construct the world as a 3D array: world[x][y][z] (x: east, z: south, y: vertical)
-      // For simplicity, the ground level will be at y = 0.
-      let world = [];
-      for (let x = 0; x < WORLD_WIDTH; x++) {
-        world[x] = [];
-        for (let y = 0; y < WORLD_HEIGHT; y++) {
-          world[x][y] = [];
-          for (let z = 0; z < WORLD_DEPTH; z++) {
-            if (y === 0) {
-              // Top layer is grass.
-              world[x][y][z] = 1;
-            } else if (y < 0) {
-              world[x][y][z] = 2; // below ground: dirt (if wanted)
-            } else {
-              world[x][y][z] = 0;
-            }
-          }
-        }
-      }
-      // For a little variety, add a few scattered stone blocks on top of grass.
-      world[5][0][5] = 3;
-      world[6][0][5] = 3;
-      world[5][0][6] = 3;
-
-      /***** THREE.JS SETUP *****/
+      /***** SETUP SCENE, CAMERA, RENDERER *****/
       const scene = new THREE.Scene();
       scene.background = new THREE.Color(0x87CEEB); // sky blue
+      
       const camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000);
-      // Position the camera in our world (we treat 1 block = 1 unit)
-      camera.position.set(WORLD_WIDTH / 2, 2, WORLD_DEPTH / 2);
+      // We'll let the controls handle the camera position.
       
       const renderer = new THREE.WebGLRenderer({ antialias: false });
       renderer.setSize(window.innerWidth, window.innerHeight);
       document.body.appendChild(renderer.domElement);
-
-      // Basic ambient and directional light.
-      const ambientLight = new THREE.AmbientLight(0xcccccc, 0.4);
-      scene.add(ambientLight);
-      const directionalLight = new THREE.DirectionalLight(0xffffff, 0.8);
-      directionalLight.position.set(50, 100, 50);
-      scene.add(directionalLight);
-
-      /***** PointerLockControls Setup *****/
-      const controls = new THREE.PointerLockControls( camera, renderer.domElement );
-      document.addEventListener('click', function () {
+      
+      /***** POINTER LOCK CONTROLS *****/
+      const controls = new THREE.PointerLockControls(camera, document.body);
+      scene.add( controls.getObject() );
+      
+      // When the user clicks on the canvas, lock the pointer.
+      document.addEventListener("click", () => {
         controls.lock();
-      }, false);
-
-      // Movement flags
-      const move = {
-        forward: false,
-        backward: false,
-        left: false,
-        right: false
-      };
-
-      document.addEventListener('keydown', function(event) {
-        switch(event.code) {
-          case 'KeyW': move.forward = true; break;
-          case 'KeyS': move.backward = true; break;
-          case 'KeyA': move.left = true; break;
-          case 'KeyD': move.right = true; break;
-          case 'Digit1': selectedSlot = 0; break;
-          case 'Digit2': selectedSlot = 1; break;
-          case 'Digit3': selectedSlot = 2; break;
+      });
+      
+      /***** PLAYER MOVEMENT VARIABLES *****/
+      const move = { forward: false, backward: false, left: false, right: false };
+      const velocity = new THREE.Vector3();
+      const direction = new THREE.Vector3();
+      const clock = new THREE.Clock();
+      
+      document.addEventListener("keydown", function(e) {
+        switch(e.code) {
+          case "KeyW": move.forward = true; break;
+          case "KeyS": move.backward = true; break;
+          case "KeyA": move.left = true; break;
+          case "KeyD": move.right = true; break;
+          // Use number keys 1-3 to select block type for placement.
+          case "Digit1": selectedSlot = 0; break;
+          case "Digit2": selectedSlot = 1; break;
+          case "Digit3": selectedSlot = 2; break;
         }
       });
-
-      document.addEventListener('keyup', function(event) {
-        switch(event.code) {
-          case 'KeyW': move.forward = false; break;
-          case 'KeyS': move.backward = false; break;
-          case 'KeyA': move.left = false; break;
-          case 'KeyD': move.right = false; break;
+      document.addEventListener("keyup", function(e) {
+        switch(e.code) {
+          case "KeyW": move.forward = false; break;
+          case "KeyS": move.backward = false; break;
+          case "KeyA": move.left = false; break;
+          case "KeyD": move.right = false; break;
         }
       });
-
-      /***** WORLD RENDERING: Create Voxel Meshes *****/
-      // We'll store meshes in a group for easy management.
-      const blockGroup = new THREE.Group();
-      scene.add(blockGroup);
-
-      // Materials for blocks based on type.
-      const materials = {
-        1: new THREE.MeshLambertMaterial({ color: 0x228B22 }), // grass: green
-        2: new THREE.MeshLambertMaterial({ color: 0x8B4513 }), // dirt: brown
-        3: new THREE.MeshLambertMaterial({ color: 0x808080 })  // stone: gray
-      };
-
-      // A cube geometry for blocks.
-      const cubeGeo = new THREE.BoxGeometry(1,1,1);
-
-      // Function to add a block at (x, y, z) if world[x][y][z] ≠ 0.
-      function addBlockMesh(x, y, z, type) {
-        if (!materials[type]) return;
-        const cube = new THREE.Mesh(cubeGeo, materials[type]);
-        cube.position.set( x + 0.5, y + 0.5, z + 0.5 );
-        cube.userData = { pos: { x, y, z } };
-        blockGroup.add(cube);
-      }
-
-      // Build the voxel world meshes
-      function buildWorldMeshes() {
-        // Clear any existing block meshes.
-        while(blockGroup.children.length) {
-          const obj = blockGroup.children[0];
-          blockGroup.remove(obj);
-        }
-        for (let x = 0; x < WORLD_WIDTH; x++) {
-          for (let y = 0; y < WORLD_HEIGHT; y++) {
-            for (let z = 0; z < WORLD_DEPTH; z++) {
-              let block = world[x][y][z];
-              if (block !== 0) {
-                addBlockMesh(x, y, z, block);
-              }
+      
+      /***** BUILD A SIMPLE VOXEL WORLD *****/
+      // World dimensions in blocks (a small demo chunk)
+      const WORLD_SIZE_X = 16, WORLD_SIZE_Y = 8, WORLD_SIZE_Z = 16;
+      // We'll represent the world as a dictionary keyed by "x_y_z" mapping to block type.
+      // Block types: 0 = air; 1 = stone; 2 = dirt; 3 = grass.
+      let worldData = {};
+      // Create a flat world with some variation:
+      for (let x = 0; x < WORLD_SIZE_X; x++) {
+        for (let z = 0; z < WORLD_SIZE_Z; z++) {
+          // For each (x,z), define ground height between 3 and 4:
+          const ground = 3 + Math.floor(Math.random() * 2);
+          for (let y = 0; y < WORLD_SIZE_Y; y++) {
+            const key = `${x}_${y}_${z}`;
+            if (y < ground - 1) {
+              worldData[key] = 1;  // stone layer
+            } else if (y < ground) {
+              worldData[key] = 2;  // dirt layer
+            } else if (y === ground) {
+              worldData[key] = 3;  // grass on top
+            } else {
+              worldData[key] = 0;  // air above
             }
           }
         }
       }
-      buildWorldMeshes();
-
-      /***** Inventory Setup *****/
-      // We use a simple inventory for block placing.
-      // We'll allow the player to select a block type (grass, dirt, stone).
-      const inventory = {
-        dirt: 100,
+      
+      // A THREE.Group to hold voxel cubes.
+      const worldGroup = new THREE.Group();
+      scene.add(worldGroup);
+      
+      // Materials for block types.
+      const voxelMaterials = {
+        1: new THREE.MeshLambertMaterial({ color: 0x808080 }), // stone (gray)
+        2: new THREE.MeshLambertMaterial({ color: 0x8B4513 }), // dirt (brown)
+        3: new THREE.MeshLambertMaterial({ color: 0x228B22 })  // grass (green)
+      };
+      
+      const cubeGeo = new THREE.BoxGeometry(1, 1, 1);
+      
+      function addVoxel(x, y, z, type) {
+        if (type === 0) return;
+        const mat = voxelMaterials[type];
+        if (!mat) return;
+        const cube = new THREE.Mesh(cubeGeo, mat);
+        cube.position.set(x + 0.5, y + 0.5, z + 0.5);
+        // Save its grid position for later removal.
+        cube.userData = { pos: { x: x, y: y, z: z } };
+        worldGroup.add(cube);
+      }
+      
+      // Build the world from worldData.
+      function buildWorld() {
+        worldGroup.clear();
+        for (let key in worldData) {
+          let type = worldData[key];
+          if (type !== 0) {
+            const parts = key.split("_").map(Number);
+            addVoxel(parts[0], parts[1], parts[2], type);
+          }
+        }
+      }
+      buildWorld();
+      
+      /***** LIGHTING *****/
+      const ambientLight = new THREE.AmbientLight(0xffffff, 0.5);
+      scene.add(ambientLight);
+      const directionalLight = new THREE.DirectionalLight(0xffffff, 0.8);
+      directionalLight.position.set(10, 20, 10);
+      scene.add(directionalLight);
+      
+      /***** INVENTORY SETUP *****/
+      // Our inventory corresponds to placeable block types.
+      // Inventory order: index 0 = stone, 1 = dirt, 2 = grass.
+      const inventoryData = {
         stone: 100,
+        dirt: 100,
         grass: 100,
         gel: 0
       };
-      const inventoryOrder = ["dirt", "stone", "grass"];
-      let selectedSlot = 0; // index into inventoryOrder
-
-      const inventoryDiv = document.getElementById("inventory");
-      function updateInventoryDisplay() {
-        let text = "Inventory: ";
+      const inventoryOrder = ["stone", "dirt", "grass"];
+      let selectedSlot = 0;
+      
+      const hudDiv = document.getElementById("hud");
+      function updateHUD() {
+        let hudText = "Inventory: ";
         inventoryOrder.forEach((item, i) => {
-          if(i === selectedSlot) text += "["+ item +": "+ inventory[item] +"] ";
-          else text += item +": "+ inventory[item] +" ";
+          if (i === selectedSlot)
+            hudText += `[${item}: ${inventoryData[item]}] `;
+          else
+            hudText += `${item}: ${inventoryData[item]} `;
         });
-        inventoryDiv.textContent = text;
+        hudDiv.textContent = hudText;
       }
-      updateInventoryDisplay();
-
-      /***** Raycaster Setup (for mining and placement) *****/
+      updateHUD();
+      
+      /***** RAYCASTER FOR MINING/PLACING *****/
       const raycaster = new THREE.Raycaster();
       const mouse = new THREE.Vector2();
-
-      // When left-click, try mining (removing) a block.
-      function mineBlock() {
-        // Raycast from the camera's center.
-        raycaster.setFromCamera(new THREE.Vector2(0,0), camera);
-        const intersects = raycaster.intersectObjects(blockGroup.children);
-        if(intersects.length > 0) {
-          const hit = intersects[0];
-          // Remove the block from the world and scene.
-          const pos = hit.object.userData.pos;
-          // Add mined block to inventory.
-          // For simplicity, assume the mined block type is the same as world value.
-          let type = world[pos.x][pos.y][pos.z];
-          if(type === 1) inventory.grass += 1;
-          else if(type === 2) inventory.dirt += 1;
-          else if(type === 3) inventory.stone += 1;
-          world[pos.x][pos.y][pos.z] = 0;
-          blockGroup.remove(hit.object);
-          updateInventoryDisplay();
+      // For our purposes, we will use the center of the screen, i.e. (0,0) in NDC.
+      
+      // Left-click (mine block)
+      window.addEventListener("mousedown", function(e) {
+        // If left button:
+        if (e.button === 0 && controls.isLocked) {
+          raycaster.setFromCamera(new THREE.Vector2(0,0), camera);
+          const intersects = raycaster.intersectObjects(worldGroup.children);
+          if (intersects.length > 0) {
+            const hit = intersects[0];
+            const pos = hit.object.userData.pos;
+            const key = `${pos.x}_${pos.y}_${pos.z}`;
+            // Add block to inventory (for simplicity, add 1 unit)
+            let type = worldData[key];
+            if (type === 1) inventoryData.stone += 1;
+            else if (type === 2) inventoryData.dirt += 1;
+            else if (type === 3) inventoryData.grass += 1;
+            worldData[key] = 0;
+            worldGroup.remove(hit.object);
+            updateHUD();
+          }
         }
-      }
-      // When right-click, try placing a block.
-      function placeBlock() {
+      });
+      
+      // Right-click (place block)
+      window.addEventListener("contextmenu", function(e) {
+        e.preventDefault();
+        if (!controls.isLocked) return;
         raycaster.setFromCamera(new THREE.Vector2(0,0), camera);
-        const intersects = raycaster.intersectObjects(blockGroup.children);
+        const intersects = raycaster.intersectObjects(worldGroup.children);
         let placePos = null;
         if(intersects.length > 0) {
           const hit = intersects[0];
-          // Compute the face normal and add that to the hit position.
-          const normal = hit.face.normal;
           const pos = hit.object.userData.pos;
-          // Determine adjacent block position.
+          const normal = hit.face.normal;
           placePos = {
             x: pos.x + (normal.x > 0.5 ? 1 : (normal.x < -0.5 ? -1 : 0)),
             y: pos.y + (normal.y > 0.5 ? 1 : (normal.y < -0.5 ? -1 : 0)),
-            z: pos.z + (normal.z > 0.5 ? 1 : (normal.z < -0.5 ? -1 : 0)),
+            z: pos.z + (normal.z > 0.5 ? 1 : (normal.z < -0.5 ? -1 : 0))
           };
         } else {
-          // If no block is hit, try placing directly a couple of units ahead of the camera.
+          // If no block was hit, place a block 3 units ahead of the camera.
           const dir = new THREE.Vector3();
           camera.getWorldDirection(dir);
-          const pos = camera.position.clone().add(dir.multiplyScalar(3));
-          placePos = { 
-            x: Math.floor(pos.x), 
-            y: Math.floor(pos.y), 
-            z: Math.floor(pos.z) 
+          const pos = controls.getObject().position.clone().add(dir.multiplyScalar(3));
+          placePos = {
+            x: Math.floor(pos.x),
+            y: Math.floor(pos.y),
+            z: Math.floor(pos.z)
           };
         }
-        // Ensure the position is in bounds.
-        if(placePos && placePos.x >= 0 && placePos.x < WORLD_WIDTH &&
-           placePos.y >= 0 && placePos.y < WORLD_HEIGHT &&
-           placePos.z >= 0 && placePos.z < WORLD_DEPTH) {
-          // Only place if target is empty.
-          if(world[placePos.x][placePos.y][placePos.z] === 0) {
-            // Use currently selected block type from inventoryOrder.
-            const sel = inventoryOrder[selectedSlot];
-            let blockType = null;
-            if(sel === "dirt") blockType = 2;  // place dirt (for example)
-            else if(sel === "stone") blockType = 3;
-            else if(sel === "grass") blockType = 1;
-            if(blockType !== null && inventory[sel] > 0) {
-              world[placePos.x][placePos.y][placePos.z] = blockType;
-              addBlockMesh(placePos.x, placePos.y, placePos.z, blockType);
-              inventory[sel]--;
-              updateInventoryDisplay();
-            }
+        const key = `${placePos.x}_${placePos.y}_${placePos.z}`;
+        if (worldData[key] === 0) { // only place if space empty
+          const sel = inventoryOrder[selectedSlot];
+          if (inventoryData[sel] > 0) {
+            // Map inventory selection to block type. We choose: stone->1, dirt->2, grass->3.
+            let blockType = 0;
+            if (sel === "stone") blockType = 1;
+            else if (sel === "dirt") blockType = 2;
+            else if (sel === "grass") blockType = 3;
+            worldData[key] = blockType;
+            addVoxel(placePos.x, placePos.y, placePos.z, blockType);
+            inventoryData[sel]--;
+            updateHUD();
           }
-        }
-      }
-
-      // Listen for mouse clicks.
-      window.addEventListener("mousedown", function(e) {
-        if(e.button === 0) { // left click
-          mineBlock();
         }
       });
-      window.addEventListener("contextmenu", function(e) {
-        e.preventDefault();
-        placeBlock();
-      }, false);
-
-      /***** Animation Loop *****/
-      const clock = new THREE.Clock();
+      
+      /***** ANIMATION (MOVEMENT & RENDER) *****/
+      const clockMovement = new THREE.Clock();
       function animate() {
-        requestAnimationFrame(animate);
-        const delta = clock.getDelta();
-
-        // Movement (using PointerLockControls)
+        const delta = clockMovement.getDelta();
         if (controls.isLocked === true) {
-          const velocity = new THREE.Vector3();
-          const direction = new THREE.Vector3();
+          // Update movement velocity.
+          velocity.x -= velocity.x * 10.0 * delta;
+          velocity.z -= velocity.z * 10.0 * delta;
           
-          if(move.forward) velocity.z -= 1;
-          if(move.backward) velocity.z += 1;
-          if(move.left) velocity.x -= 1;
-          if(move.right) velocity.x += 1;
+          direction.z = Number(move.forward) - Number(move.backward);
+          direction.x = Number(move.right) - Number(move.left);
+          direction.normalize();
           
-          if(velocity.length() > 0) {
-            velocity.normalize();
-            // Multiply by speed and delta time.
-            velocity.multiplyScalar(5 * delta);
-            // Move the controls (translate in local space)
-            controls.moveRight(velocity.x);
-            controls.moveForward(velocity.z);
-          }
+          if (move.forward || move.backward) velocity.z -= direction.z * 400.0 * delta;
+          if (move.left || move.right) velocity.x -= direction.x * 400.0 * delta;
+          
+          controls.moveRight(- velocity.x * delta);
+          controls.moveForward(- velocity.z * delta);
         }
-        
         renderer.render(scene, camera);
+        requestAnimationFrame(animate);
       }
       animate();
-
-      /***** Inventory Display Update *****/
-      updateInventoryDisplay();
-
-      /***** Window Resize Handling *****/
+      
+      /***** WINDOW RESIZE *****/
       window.addEventListener("resize", function() {
-        camera.aspect = window.innerWidth / window.innerHeight;
+        camera.aspect = window.innerWidth/window.innerHeight;
         camera.updateProjectionMatrix();
         renderer.setSize(window.innerWidth, window.innerHeight);
       });
+      
+      /***** NOTES *****
+      - This is a very rudimentary demo. The voxel world is tiny and fixed.
+      - Movement is handled by PointerLockControls—you must click the screen for pointer lock.
+      - Mining and block placement use raycasting from the center of the view.
+      - The block textures, world generation, physics, and inventory are extremely simplified.
+      - You can extend this by improving world generation, adding textures, and expanding inventory/crafting.
+      */
     </script>
   </body>
 </html>
