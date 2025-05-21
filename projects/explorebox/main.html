@@ -816,7 +816,12 @@
         }
       }
     }
-    gameLoop();
+    playerImg.onload = function() {
+      gameLoop();
+    };
+    playerImg.onerror = function() {
+      alert("Failed to load player.ico! Check the path and file.");
+    };
   </script>
 </body>
 </html>
