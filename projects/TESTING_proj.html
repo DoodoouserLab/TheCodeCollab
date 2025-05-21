@@ -33,9 +33,9 @@
 
     /***** World Generation *****/
     // Larger world dimensions.
-    const worldWidth = 500;    
-    const worldHeight = 200;  
-    const tileSize = 16; // Each block: 16x16 pixels
+    const worldWidth = 1000;    
+    const worldHeight = 400;  
+    const tileSize = 32; // Each block: 16x16 pixels
 
     // Block types:
     // 0: Air; 1: Dirt; 2: Stone; 3: Grass; 4: Wood; 5: Leaves
@@ -138,8 +138,8 @@
     /***** Block Durability & Health *****/
     const blockDurability = {
       1: 2, // Dirt
-      2: 3, // Stone
-      3: 2, // Grass
+      2: 4, // Stone
+      3: 1, // Grass
       4: 3, // Wood
       5: 1  // Leaves
     };
@@ -221,8 +221,8 @@
     // Periodically spawn new slime enemies (mostly in cave depths).
     function updateSlimeSpawning() {
       // Limit overall slime count.
-      if (enemies.length < 10) {
-        if (Math.random() < 0.005) {
+      if (enemies.length < 100) {
+        if (Math.random() < 0.01) {
           // Spawn a slime in a cave region (y > ground height + 10)
           const spawnX = Math.floor(Math.random() * worldWidth);
           const spawnYStart = groundHeights[spawnX] + 10;
