@@ -23,7 +23,7 @@
   <script>
     /* Load Player Image */
     const playerImg = new Image();
-    playerImg.src = "projects/explorebox/player.ico";
+    playerImg.src = "projects/explorebox/assets/player.png";
     /***** Canvas Setup *****/
     const canvas = document.getElementById("game");
     const ctx = canvas.getContext("2d");
@@ -820,7 +820,7 @@
       gameLoop();
     };
     playerImg.onerror = function() {
-      alert("Failed to load player.ico! Check the path and file.");
+      alert("Failed to load player.png! Check the path and file.");
     };
   </script>
 </body>
