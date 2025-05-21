@@ -46,7 +46,6 @@
       border: 2px solid rgba(51, 255, 51, 0.8);
       box-shadow: 0 0 10px rgba(51, 255, 51, 0.5);
       text-shadow: 0 0 1px rgba(51, 255, 51, 0.4), 0 0 2px rgba(255, 255, 255, 0.8);
-      overflow: hidden;
     }
 
     .os-header {
@@ -162,6 +161,7 @@
       const inputField = document.getElementById("userInput");
       const responseDiv = document.querySelector(".response");
       const glitchDiv = document.querySelector(".glitch");
+      document.querySelector('.terminal').scrollTop = document.querySelector('.terminal').scrollHeight;
       
       if (inputField.value.trim() !== "") {
         responseDiv.innerHTML += `<p>> ${inputField.value}</p>`;
