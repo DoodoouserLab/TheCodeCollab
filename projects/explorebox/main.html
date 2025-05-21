@@ -35,7 +35,7 @@
     // Larger world dimensions.
     const worldWidth = 1000;    
     const worldHeight = 400;  
-    const tileSize = 32; // Each block: 16x16 pixels
+    const tileSize = 16; // Each block: 16x16 pixels
 
     // Block types:
     // 0: Air; 1: Dirt; 2: Stone; 3: Grass; 4: Wood; 5: Leaves
@@ -210,7 +210,7 @@
       });
     }
     // Initially spawn a few slimes near the surface.
-    for (let i = 0; i < 5; i++) {
+    for (let i = 0; i < 20; i++) {
       let ex = Math.floor(Math.random() * (worldWidth - 20)) + 10;
       let ey = 0;
       for (let y = 0; y < worldHeight; y++) {
