@@ -177,13 +177,17 @@
           // Angry Computer Glitch Effect
           setTimeout(() => {
             glitchDiv.classList.remove("hidden");
+            document.querySelector('.terminal').scrollTop = document.querySelector('.terminal').scrollHeight;
             setTimeout(() => {
               responseDiv.innerHTML += `<p class="glitch">01001100 01101111 01101111 01101011 01110011 00100000 01101100 01101001 01101011 01100101 00100000 01100001 00100000 01101000 01110101 01101101 01100001 01101110 00100000 01100010 01110101 01100111 00101110 00101110 00101110</p>`;
+              document.querySelector('.terminal').scrollTop = document.querySelector('.terminal').scrollHeight;
               setTimeout(() => {
                 responseDiv.innerHTML += `<p class="glitch">COMMENCING RESET IN 3... 2... 1...</p>`;
+                document.querySelector('.terminal').scrollTop = document.querySelector('.terminal').scrollHeight;
                 setTimeout(() => {
                   responseDiv.innerHTML += `<p>> Just kidding. Thanks for playing!</p>`;
                   glitchDiv.classList.add("hidden");
+                  document.querySelector('.terminal').scrollTop = document.querySelector('.terminal').scrollHeight;
                 }, 3000);
               }, 2000);
             }, 2000);
