@@ -1,331 +1,327 @@
 <!DOCTYPE html>
 <html lang="en">
-<head>
-  <meta charset="UTF-8">
-  <title>Mini Minecraft in HTML (Simplified Voxel Demo)</title>
-  <style>
-    body {
-      margin: 0;
-      overflow: hidden;
-      background: #000;
-    }
-    canvas {
-      display: block;
-      image-rendering: pixelated;
-      background: #87CEEB;
-    }
-    #inventory {
-      position: absolute;
-      top: 10px;
-      left: 50%;
-      transform: translateX(-50%);
-      color: white;
-      font-family: monospace;
-      background: rgba(0, 0, 0, 0.5);
-      padding: 4px 8px;
-      border: 2px solid #555;
-    }
-  </style>
-</head>
-<body>
-  <canvas id="game"></canvas>
-  <div id="inventory"></div>
-  <script>
-    /***** Canvas Setup *****/
-    const canvas = document.getElementById("game");
-    const ctx = canvas.getContext("2d");
-    function resizeCanvas() {
-      canvas.width = window.innerWidth;
-      canvas.height = window.innerHeight;
-    }
-    window.addEventListener("resize", resizeCanvas);
-    resizeCanvas();
-
-    /***** World Setup *****/
-    // Our world is a 2D grid of blocks.
-    const WORLD_WIDTH = 50, WORLD_HEIGHT = 50;
-    const world = [];
-    // Generate terrain with a random ground height per column.
-    for (let x = 0; x < WORLD_WIDTH; x++) {
-      world[x] = [];
-      // Ground height between 10 and 15 (for a low, playable terrain)
-      let groundHeight = 10 + Math.floor(Math.random() * 6);
-      for (let y = 0; y < WORLD_HEIGHT; y++) {
-        if (y < groundHeight) {
-          world[x][y] = 0;  // Air (empty)
-        } else if (y === groundHeight) {
-          world[x][y] = 3;  // Grass on the surface
-        } else {
-          // Underground: 70% dirt, 30% stone
-          world[x][y] = (Math.random() < 0.7) ? 1 : 2;
-        }
+  <head>
+    <meta charset="UTF-8" />
+    <title>Mini Minecraft in HTML (Simplified Three.js Demo)</title>
+    <style>
+      body {
+        margin: 0;
+        overflow: hidden;
+        background: #000;
       }
-    }
-    // Carve caves: for several starting points, remove blocks in an irregular tunnel.
-    for (let i = 0; i < 10; i++) {
-      let cx = Math.floor(Math.random() * WORLD_WIDTH);
-      let cy = 15 + Math.floor(Math.random() * (WORLD_HEIGHT - 20));
-      for (let j = 0; j < 20; j++) {
-        for (let dx = -1; dx <= 1; dx++) {
-          for (let dy = -1; dy <= 1; dy++) {
-            let nx = cx + dx, ny = cy + dy;
-            if (nx >= 0 && nx < WORLD_WIDTH && ny >= 0 && ny < WORLD_HEIGHT) {
-              world[nx][ny] = 0;
+      canvas {
+        display: block;
+        image-rendering: pixelated;
+        background: #87CEEB;
+      }
+      /* Inventory overlay styled as a simple fixed HUD */
+      #inventory {
+        position: absolute;
+        top: 10px;
+        left: 50%;
+        transform: translateX(-50%);
+        font-family: "Courier New", monospace;
+        color: #fff;
+        padding: 8px 12px;
+        background: rgba(0, 0, 0, 0.5);
+        border: 2px solid #555;
+      }
+      #instructions {
+        position: absolute;
+        bottom: 10px;
+        left: 50%;
+        transform: translateX(-50%);
+        font-family: sans-serif;
+        color: #fff;
+        padding: 8px 12px;
+        background: rgba(0, 0, 0, 0.5);
+        border: 2px solid #555;
+      }
+    </style>
+    <!-- Include Three.js and PointerLockControls from a CDN -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r134/three.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/three@0.134.0/examples/js/controls/PointerLockControls.js"></script>
+  </head>
+  <body>
+    <div id="inventory"></div>
+    <div id="instructions">Click to lock pointer. Use WASD to move, mouse to look. Left‑click to mine, Right‑click to place block. Number keys select block type for placement.</div>
+    <script>
+      /***** GLOBALS AND WORLD DATA *****/
+      // World dimensions in blocks (a small demo world)
+      const WORLD_WIDTH = 16,
+            WORLD_DEPTH = 16,
+            WORLD_HEIGHT = 8; // vertical layers
+      
+      // We'll use a very basic 3D voxel world.
+      // Block types: 0 = air; 1 = grass; 2 = dirt; 3 = stone.
+      // (You can extend with more types later.)
+      // We'll construct the world as a 3D array: world[x][y][z] (x: east, z: south, y: vertical)
+      // For simplicity, the ground level will be at y = 0.
+      let world = [];
+      for (let x = 0; x < WORLD_WIDTH; x++) {
+        world[x] = [];
+        for (let y = 0; y < WORLD_HEIGHT; y++) {
+          world[x][y] = [];
+          for (let z = 0; z < WORLD_DEPTH; z++) {
+            if (y === 0) {
+              // Top layer is grass.
+              world[x][y][z] = 1;
+            } else if (y < 0) {
+              world[x][y][z] = 2; // below ground: dirt (if wanted)
+            } else {
+              world[x][y][z] = 0;
             }
           }
         }
-        cx += Math.floor(Math.random() * 3) - 1;
-        cy += Math.floor(Math.random() * 3) - 1;
-        if(cx < 0 || cx >= WORLD_WIDTH || cy < 0 || cy >= WORLD_HEIGHT) break;
       }
-    }
+      // For a little variety, add a few scattered stone blocks on top of grass.
+      world[5][0][5] = 3;
+      world[6][0][5] = 3;
+      world[5][0][6] = 3;
 
-    /***** Block Properties *****/
-    // Block types:
-    // 0 = Air, 1 = Dirt, 2 = Stone, 3 = Grass
-    const blockColors = {
-      0: null,
-      1: "#8B4513", // Dirt
-      2: "#808080", // Stone
-      3: "#228B22"  // Grass
-    };
-    // Durability of blocks (for mining)
-    const blockDurability = {
-      1: 2,
-      2: 3,
-      3: 2
-    };
-    // Track current block "health" (remaining hits); initialize to full durability.
-    const blockHealth = [];
-    for (let x = 0; x < WORLD_WIDTH; x++) {
-      blockHealth[x] = [];
-      for (let y = 0; y < WORLD_HEIGHT; y++) {
-        let b = world[x][y];
-        blockHealth[x][y] = (b !== 0 && blockDurability[b] !== undefined) ? blockDurability[b] : 0;
-      }
-    }
-    function setBlock(x, y, b) {
-      if (x < 0 || x >= WORLD_WIDTH || y < 0 || y >= WORLD_HEIGHT) return;
-      world[x][y] = b;
-      if (b !== 0 && blockDurability[b] !== undefined)
-        blockHealth[x][y] = blockDurability[b];
-      else
-        blockHealth[x][y] = 0;
-    }
+      /***** THREE.JS SETUP *****/
+      const scene = new THREE.Scene();
+      scene.background = new THREE.Color(0x87CEEB); // sky blue
+      const camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000);
+      // Position the camera in our world (we treat 1 block = 1 unit)
+      camera.position.set(WORLD_WIDTH / 2, 2, WORLD_DEPTH / 2);
+      
+      const renderer = new THREE.WebGLRenderer({ antialias: false });
+      renderer.setSize(window.innerWidth, window.innerHeight);
+      document.body.appendChild(renderer.domElement);
 
-    /***** Player Setup *****/
-    // Player position in world (tile coordinates, float)
-    let playerX = 25, playerY = 7;
-    // For isometric view, no rotation will be implemented (fixed top–down isometric).
-    // Our "player" is simply a point that we draw.
-    
-    /***** Inventory Setup *****/
-    // Inventory holds block resources and tools. Here we consider only blocks:
-    // "dirt", "stone", "grass". (You can extend with more types like "wood", etc.)
-    const inventory = {
-      dirt: 20,
-      stone: 20,
-      grass: 10,
-      gel: 0,  // slime drops
-      wooden_pickaxe: 0,
-      wooden_sword: 0,
-      torch: 0
-    };
-    // Hotbar order (assign number keys based on index)
-    const inventoryOrder = ["dirt", "stone", "grass"];
-    let selectedSlot = 0;
-    
-    /***** Isometric Drawing Helpers *****/
-    // We use a simple isometric projection:
-    // screenX = (x - y) * (tileW/2); screenY = (x + y) * (tileH/2);
-    const tileW = 32, tileH = 16;
-    function isoProject(x, y) {
-      return {
-        x: (x - y) * (tileW / 2),
-        y: (x + y) * (tileH / 2)
+      // Basic ambient and directional light.
+      const ambientLight = new THREE.AmbientLight(0xcccccc, 0.4);
+      scene.add(ambientLight);
+      const directionalLight = new THREE.DirectionalLight(0xffffff, 0.8);
+      directionalLight.position.set(50, 100, 50);
+      scene.add(directionalLight);
+
+      /***** PointerLockControls Setup *****/
+      const controls = new THREE.PointerLockControls( camera, renderer.domElement );
+      document.addEventListener('click', function () {
+        controls.lock();
+      }, false);
+
+      // Movement flags
+      const move = {
+        forward: false,
+        backward: false,
+        left: false,
+        right: false
       };
-    }
-    // Draw a cube in isometric view at screen coordinates (sx, sy)
-    // The cube will have a top face, left face, and right face.
-    function drawCube(sx, sy, color) {
-      const h = 32; // cube height in pixels
-      // Top face
-      ctx.fillStyle = lighten(color, 20);
-      ctx.beginPath();
-      ctx.moveTo(sx, sy);
-      ctx.lineTo(sx + tileW/2, sy + tileH/2);
-      ctx.lineTo(sx, sy + tileH);
-      ctx.lineTo(sx - tileW/2, sy + tileH/2);
-      ctx.closePath();
-      ctx.fill();
-      // Left face
-      ctx.fillStyle = darken(color, 20);
-      ctx.beginPath();
-      ctx.moveTo(sx - tileW/2, sy + tileH/2);
-      ctx.lineTo(sx, sy + tileH);
-      ctx.lineTo(sx, sy + tileH + h);
-      ctx.lineTo(sx - tileW/2, sy + tileH/2 + h);
-      ctx.closePath();
-      ctx.fill();
-      // Right face
-      ctx.fillStyle = darken(color, 40);
-      ctx.beginPath();
-      ctx.moveTo(sx + tileW/2, sy + tileH/2);
-      ctx.lineTo(sx, sy + tileH);
-      ctx.lineTo(sx, sy + tileH + h);
-      ctx.lineTo(sx + tileW/2, sy + tileH/2 + h);
-      ctx.closePath();
-      ctx.fill();
-    }
-    // Basic color adjustment functions:
-    function lighten(hex, amt) {
-      let num = parseInt(hex.slice(1),16);
-      let r = Math.min(255, Math.max(0, (num >> 16) + amt));
-      let g = Math.min(255, Math.max(0, ((num >> 8) & 0xFF) + amt));
-      let b = Math.min(255, Math.max(0, (num & 0xFF) + amt));
-      return "#" + ((r << 16) | (g << 8) | b).toString(16).padStart(6, "0");
-    }
-    function darken(hex, amt) {
-      return lighten(hex, -amt);
-    }
 
-    /***** Rendering the World (Isometric) *****/
-    function drawWorld() {
-      // Center the world drawing roughly on the canvas.
-      const centerX = canvas.width/2;
-      const offsetY = 50; // arbitrary vertical offset
-      for (let x = 0; x < WORLD_WIDTH; x++) {
-        for (let y = 0; y < WORLD_HEIGHT; y++) {
-          const block = world[x][y];
-          if (block !== 0) {
-            const iso = isoProject(x, y);
-            const screenX = iso.x + centerX;
-            const screenY = iso.y + offsetY;
-            drawCube(screenX, screenY, blockColors[block]);
-            // Optional: draw mining progress overlay if any (omitted for brevity)
-          }
+      document.addEventListener('keydown', function(event) {
+        switch(event.code) {
+          case 'KeyW': move.forward = true; break;
+          case 'KeyS': move.backward = true; break;
+          case 'KeyA': move.left = true; break;
+          case 'KeyD': move.right = true; break;
+          case 'Digit1': selectedSlot = 0; break;
+          case 'Digit2': selectedSlot = 1; break;
+          case 'Digit3': selectedSlot = 2; break;
         }
-      }
-    }
-
-    /***** Drawing the Player *****/
-    function drawPlayer() {
-      // Represent the player as a red circle.
-      const centerX = canvas.width/2;
-      const offsetY = 50;
-      const iso = isoProject(playerX, playerY);
-      const sx = iso.x + centerX;
-      const sy = iso.y + offsetY - 16; // raise a bit to stand on blocks
-      ctx.fillStyle = "red";
-      ctx.beginPath();
-      ctx.arc(sx, sy, 8, 0, 2*Math.PI);
-      ctx.fill();
-    }
-
-    /***** Inventory Display *****/
-    const invDiv = document.getElementById("inventory");
-    function updateInventoryDisplay() {
-      let text = "Inventory: ";
-      inventoryOrder.forEach((item, i) => {
-        if(i === selectedSlot) text += "[" + item + ":" + (inventory[item] || 0) + "] ";
-        else text += item + ":" + (inventory[item] || 0) + " ";
       });
-      invDiv.textContent = text;
-    }
 
-    /***** Input Handling *****/
-    // Simple arrow key movement for the player.
-    window.addEventListener("keydown", function(e) {
-      if (e.key === "ArrowUp") {
-        playerX += Math.cos(0) * 0.5;
-        playerY += Math.sin(0) * 0.5;
-      }
-      if (e.key === "ArrowDown") {
-        playerX -= Math.cos(0) * 0.5;
-        playerY -= Math.sin(0) * 0.5;
-      }
-      if(e.key === "ArrowLeft") {
-        // For simplicity, move diagonally left/up.
-        playerX -= 0.5;
-        playerY += 0.5;
-      }
-      if(e.key === "ArrowRight") {
-        playerX += 0.5;
-        playerY -= 0.5;
-      }
-      updateInventoryDisplay();
-    });
+      document.addEventListener('keyup', function(event) {
+        switch(event.code) {
+          case 'KeyW': move.forward = false; break;
+          case 'KeyS': move.backward = false; break;
+          case 'KeyA': move.left = false; break;
+          case 'KeyD': move.right = false; break;
+        }
+      });
 
-    // Left-click to break a block (using rough inverse isometric conversion)
-    canvas.addEventListener("click", function(e) {
-      const rect = canvas.getBoundingClientRect();
-      const mx = e.clientX - rect.left;
-      const my = e.clientY - rect.top;
-      // Inverse isometric: approximate (there are many methods; this is very rough)
-      const centerX = canvas.width/2;
-      const offsetY = 50;
-      // Using simple formulas:
-      let tempX = (mx - centerX) / (tileW/2);
-      let tempY = (my - offsetY) / (tileH/2);
-      // Solve:
-      let worldX = (tempX + tempY) / 2;
-      let worldY = (tempY - tempX) / 2;
-      worldX = Math.floor(worldX);
-      worldY = Math.floor(worldY);
-      if(worldX >= 0 && worldX < WORLD_WIDTH && worldY >= 0 && worldY < WORLD_HEIGHT) {
-        setBlock(worldX, worldY, 0);
+      /***** WORLD RENDERING: Create Voxel Meshes *****/
+      // We'll store meshes in a group for easy management.
+      const blockGroup = new THREE.Group();
+      scene.add(blockGroup);
+
+      // Materials for blocks based on type.
+      const materials = {
+        1: new THREE.MeshLambertMaterial({ color: 0x228B22 }), // grass: green
+        2: new THREE.MeshLambertMaterial({ color: 0x8B4513 }), // dirt: brown
+        3: new THREE.MeshLambertMaterial({ color: 0x808080 })  // stone: gray
+      };
+
+      // A cube geometry for blocks.
+      const cubeGeo = new THREE.BoxGeometry(1,1,1);
+
+      // Function to add a block at (x, y, z) if world[x][y][z] ≠ 0.
+      function addBlockMesh(x, y, z, type) {
+        if (!materials[type]) return;
+        const cube = new THREE.Mesh(cubeGeo, materials[type]);
+        cube.position.set( x + 0.5, y + 0.5, z + 0.5 );
+        cube.userData = { pos: { x, y, z } };
+        blockGroup.add(cube);
       }
-    });
-    // Right-click to place a block from inventory (selected type)
-    canvas.addEventListener("contextmenu", function(e) {
-      e.preventDefault();
-      const rect = canvas.getBoundingClientRect();
-      const mx = e.clientX - rect.left;
-      const my = e.clientY - rect.top;
-      const centerX = canvas.width/2;
-      const offsetY = 50;
-      let tempX = (mx - centerX) / (tileW/2);
-      let tempY = (my - offsetY) / (tileH/2);
-      let worldX = (tempX + tempY) / 2;
-      let worldY = (tempY - tempX) / 2;
-      worldX = Math.floor(worldX);
-      worldY = Math.floor(worldY);
-      if(worldX >= 0 && worldX < WORLD_WIDTH && worldY >= 0 && worldY < WORLD_HEIGHT) {
-        if(world[worldX][worldY] === 0) {
-          // Allow placing one of the placeable block types.
-          const sel = inventoryOrder[selectedSlot];
-          // Only allow if sel is dirt, stone, or grass.
-          if(["dirt", "stone", "grass"].includes(sel)) {
-            let bt;
-            if(sel === "dirt") bt = 1;
-            else if(sel === "stone") bt = 2;
-            else if(sel === "grass") bt = 3;
-            setBlock(worldX, worldY, bt);
-            if(inventory[sel] > 0) inventory[sel]--;
+
+      // Build the voxel world meshes
+      function buildWorldMeshes() {
+        // Clear any existing block meshes.
+        while(blockGroup.children.length) {
+          const obj = blockGroup.children[0];
+          blockGroup.remove(obj);
+        }
+        for (let x = 0; x < WORLD_WIDTH; x++) {
+          for (let y = 0; y < WORLD_HEIGHT; y++) {
+            for (let z = 0; z < WORLD_DEPTH; z++) {
+              let block = world[x][y][z];
+              if (block !== 0) {
+                addBlockMesh(x, y, z, block);
+              }
+            }
           }
         }
       }
-      return false;
-    });
+      buildWorldMeshes();
 
-    /***** Main Game Loop *****/
-    function gameLoop() {
-      ctx.clearRect(0, 0, canvas.width, canvas.height);
-      // Draw sky background
-      ctx.fillStyle = "#87CEEB";
-      ctx.fillRect(0, 0, canvas.width, canvas.height);
-      // Draw world and player
-      drawWorld();
-      drawPlayer();
+      /***** Inventory Setup *****/
+      // We use a simple inventory for block placing.
+      // We'll allow the player to select a block type (grass, dirt, stone).
+      const inventory = {
+        dirt: 100,
+        stone: 100,
+        grass: 100,
+        gel: 0
+      };
+      const inventoryOrder = ["dirt", "stone", "grass"];
+      let selectedSlot = 0; // index into inventoryOrder
+
+      const inventoryDiv = document.getElementById("inventory");
+      function updateInventoryDisplay() {
+        let text = "Inventory: ";
+        inventoryOrder.forEach((item, i) => {
+          if(i === selectedSlot) text += "["+ item +": "+ inventory[item] +"] ";
+          else text += item +": "+ inventory[item] +" ";
+        });
+        inventoryDiv.textContent = text;
+      }
       updateInventoryDisplay();
-      requestAnimationFrame(gameLoop);
-    }
-    gameLoop();
 
-    /***** Notes on Slime (Enemy) Spawning *****/
-    // Due to the complexity of a full 3D engine and entity interaction, this demo does not implement proper 3D enemy rendering.
-    // However, you might integrate enemies into the world (for example, using similar isometric drawing routines) and update their behavior.
-    // For a complete Minecraft clone, you would need a fully functional voxel engine, physics, and entity system.
-  </script>
-</body>
+      /***** Raycaster Setup (for mining and placement) *****/
+      const raycaster = new THREE.Raycaster();
+      const mouse = new THREE.Vector2();
+
+      // When left-click, try mining (removing) a block.
+      function mineBlock() {
+        // Raycast from the camera's center.
+        raycaster.setFromCamera(new THREE.Vector2(0,0), camera);
+        const intersects = raycaster.intersectObjects(blockGroup.children);
+        if(intersects.length > 0) {
+          const hit = intersects[0];
+          // Remove the block from the world and scene.
+          const pos = hit.object.userData.pos;
+          // Add mined block to inventory.
+          // For simplicity, assume the mined block type is the same as world value.
+          let type = world[pos.x][pos.y][pos.z];
+          if(type === 1) inventory.grass += 1;
+          else if(type === 2) inventory.dirt += 1;
+          else if(type === 3) inventory.stone += 1;
+          world[pos.x][pos.y][pos.z] = 0;
+          blockGroup.remove(hit.object);
+          updateInventoryDisplay();
+        }
+      }
+      // When right-click, try placing a block.
+      function placeBlock() {
+        raycaster.setFromCamera(new THREE.Vector2(0,0), camera);
+        const intersects = raycaster.intersectObjects(blockGroup.children);
+        let placePos = null;
+        if(intersects.length > 0) {
+          const hit = intersects[0];
+          // Compute the face normal and add that to the hit position.
+          const normal = hit.face.normal;
+          const pos = hit.object.userData.pos;
+          // Determine adjacent block position.
+          placePos = {
+            x: pos.x + (normal.x > 0.5 ? 1 : (normal.x < -0.5 ? -1 : 0)),
+            y: pos.y + (normal.y > 0.5 ? 1 : (normal.y < -0.5 ? -1 : 0)),
+            z: pos.z + (normal.z > 0.5 ? 1 : (normal.z < -0.5 ? -1 : 0)),
+          };
+        } else {
+          // If no block is hit, try placing directly a couple of units ahead of the camera.
+          const dir = new THREE.Vector3();
+          camera.getWorldDirection(dir);
+          const pos = camera.position.clone().add(dir.multiplyScalar(3));
+          placePos = { 
+            x: Math.floor(pos.x), 
+            y: Math.floor(pos.y), 
+            z: Math.floor(pos.z) 
+          };
+        }
+        // Ensure the position is in bounds.
+        if(placePos && placePos.x >= 0 && placePos.x < WORLD_WIDTH &&
+           placePos.y >= 0 && placePos.y < WORLD_HEIGHT &&
+           placePos.z >= 0 && placePos.z < WORLD_DEPTH) {
+          // Only place if target is empty.
+          if(world[placePos.x][placePos.y][placePos.z] === 0) {
+            // Use currently selected block type from inventoryOrder.
+            const sel = inventoryOrder[selectedSlot];
+            let blockType = null;
+            if(sel === "dirt") blockType = 2;  // place dirt (for example)
+            else if(sel === "stone") blockType = 3;
+            else if(sel === "grass") blockType = 1;
+            if(blockType !== null && inventory[sel] > 0) {
+              world[placePos.x][placePos.y][placePos.z] = blockType;
+              addBlockMesh(placePos.x, placePos.y, placePos.z, blockType);
+              inventory[sel]--;
+              updateInventoryDisplay();
+            }
+          }
+        }
+      }
+
+      // Listen for mouse clicks.
+      window.addEventListener("mousedown", function(e) {
+        if(e.button === 0) { // left click
+          mineBlock();
+        }
+      });
+      window.addEventListener("contextmenu", function(e) {
+        e.preventDefault();
+        placeBlock();
+      }, false);
+
+      /***** Animation Loop *****/
+      const clock = new THREE.Clock();
+      function animate() {
+        requestAnimationFrame(animate);
+        const delta = clock.getDelta();
+
+        // Movement (using PointerLockControls)
+        if (controls.isLocked === true) {
+          const velocity = new THREE.Vector3();
+          const direction = new THREE.Vector3();
+          
+          if(move.forward) velocity.z -= 1;
+          if(move.backward) velocity.z += 1;
+          if(move.left) velocity.x -= 1;
+          if(move.right) velocity.x += 1;
+          
+          if(velocity.length() > 0) {
+            velocity.normalize();
+            // Multiply by speed and delta time.
+            velocity.multiplyScalar(5 * delta);
+            // Move the controls (translate in local space)
+            controls.moveRight(velocity.x);
+            controls.moveForward(velocity.z);
+          }
+        }
+        
+        renderer.render(scene, camera);
+      }
+      animate();
+
+      /***** Inventory Display Update *****/
+      updateInventoryDisplay();
+
+      /***** Window Resize Handling *****/
+      window.addEventListener("resize", function() {
+        camera.aspect = window.innerWidth / window.innerHeight;
+        camera.updateProjectionMatrix();
+        renderer.setSize(window.innerWidth, window.innerHeight);
+      });
+    </script>
+  </body>
 </html>
