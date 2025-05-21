@@ -1,796 +1,481 @@
 <!DOCTYPE html>
 <html lang="en">
-<head>
-  <meta charset="UTF-8">
-  <title>Mini Terraria – 3D Cubes, Caves & Slime</title>
-  <style>
-    html, body {
-      margin: 0;
-      padding: 0;
-      overflow: hidden;
-      background: #000;
-    }
-    /* Ensure a retro, pixelated look */
-    canvas {
-      display: block;
-      image-rendering: pixelated;
-      background: #000;
-    }
-  </style>
-</head>
-<body>
-  <canvas id="game"></canvas>
-  <script>
-    /***** Canvas Setup *****/
-    const canvas = document.getElementById("game");
-    const ctx = canvas.getContext("2d");
-    function resizeCanvas() {
-      canvas.width = window.innerWidth;
-      canvas.height = window.innerHeight;
-    }
-    window.addEventListener("resize", resizeCanvas);
-    resizeCanvas();
-
-    /***** Global Definitions *****/
-    // World dimensions – now larger
-    const worldWidth = 500;    
-    const worldHeight = 200;  
-    const tileSize = 16;  // base size per tile (each “block”)
-
-    // Cube–drawing offset (for a simple 3D effect)
-    const cubeOffset = 4;
-
-    /***** 3D Cube Drawing Helpers *****/
-    // Adjust color brightness.
-    function adjustColor(col, amt) {
-      col = col.replace(/^#/, "");
-      let num = parseInt(col, 16);
-      let r = Math.max(Math.min(((num >> 16) + amt), 255), 0);
-      let g = Math.max(Math.min(((num >> 8) & 0x00FF) + amt, 255), 0);
-      let b = Math.max(Math.min((num & 0x0000FF) + amt, 255), 0);
-      return "#" + ((r << 16) | (g << 8) | b).toString(16).padStart(6, "0");
-    }
-    function lightenColor(col, amt) {
-      return adjustColor(col, amt);
-    }
-    function darkenColor(col, amt) {
-      return adjustColor(col, -amt);
-    }
-    // Draw a 3D cube at screen position (x,y) using a given base color.
-    function drawCube(x, y, color) {
-      // Top face
-      ctx.fillStyle = lightenColor(color, 30);
-      ctx.beginPath();
-      ctx.moveTo(x, y);
-      ctx.lineTo(x + cubeOffset, y - cubeOffset);
-      ctx.lineTo(x + tileSize + cubeOffset, y - cubeOffset);
-      ctx.lineTo(x + tileSize, y);
-      ctx.closePath();
-      ctx.fill();
-      // Side face
-      ctx.fillStyle = darkenColor(color, 20);
-      ctx.beginPath();
-      ctx.moveTo(x + tileSize, y);
-      ctx.lineTo(x + tileSize + cubeOffset, y - cubeOffset);
-      ctx.lineTo(x + tileSize + cubeOffset, y + tileSize - cubeOffset);
-      ctx.lineTo(x + tileSize, y + tileSize);
-      ctx.closePath();
-      ctx.fill();
-      // Front face
-      ctx.fillStyle = color;
-      ctx.fillRect(x, y, tileSize, tileSize);
-    }
-
-    /***** World Generation *****/
-    // We'll use these block types:
-    // 0: Air; 1: Dirt; 2: Stone; 3: Grass; 4: Wood; 5: Leaves
-    const world = [];
-    // Generate ground heights with a random walk.
-    const groundHeights = [];
-    let minGround = 20, maxGround = 80;
-    let currentGround = 50;
-    for (let x = 0; x < worldWidth; x++) {
-      currentGround += Math.floor(Math.random() * 5) - 2; // step between -2 and 2
-      if (currentGround < minGround) currentGround = minGround;
-      if (currentGround > maxGround) currentGround = maxGround;
-      groundHeights[x] = currentGround;
-    }
-    // Fill world grid.
-    for (let x = 0; x < worldWidth; x++) {
-      world[x] = [];
-      let ground = groundHeights[x];
-      for (let y = 0; y < worldHeight; y++) {
-        if (y > ground) {
-          // Underground: mix dirt and stone.
-          world[x][y] = (Math.random() < 0.2) ? 1 : 2;
-        } else if (y === ground) {
-          world[x][y] = 3; // Grass surface.
-        } else {
-          world[x][y] = 0; // Air.
-        }
+  <head>
+    <meta charset="UTF-8" />
+    <title>Simple Minecraft Clone in HTML (Very Simplified)</title>
+    <style>
+      body {
+        margin: 0;
+        overflow: hidden;
+        background: #000;
       }
-    }
-    // Generate simple trees on grass.
-    for (let x = 5; x < worldWidth - 5; x++) {
-      for (let y = 0; y < worldHeight; y++) {
-        if (world[x][y] === 3 && Math.random() < 0.03) {
-          const treeHeight = 3 + Math.floor(Math.random() * 3);
-          for (let t = 1; t <= treeHeight; t++) {
-            if (y - t >= 0) world[x][y - t] = 4;
-          }
-          const topY = y - treeHeight;
-          for (let dx = -1; dx <= 1; dx++) {
-            for (let dy = -1; dy <= 1; dy++) {
-              if (x + dx >= 0 && x + dx < worldWidth && topY + dy >= 0) {
-                if (Math.random() < 0.7) world[x + dx][topY + dy] = 5;
-              }
-            }
-          }
-        }
+      canvas {
+        display: block;
+        background: #000;
+        image-rendering: pixelated;
       }
-    }
-    // ---- Cave Generation ----
-    function generateCaves() {
-      const numCaves = 30;
-      for (let i = 0; i < numCaves; i++) {
-        let startX = Math.floor(Math.random() * worldWidth);
-        // Start below ground.
-        let startY = groundHeights[startX] + 5 + Math.floor(Math.random() * 20);
-        const length = Math.floor(Math.random() * 100) + 50;
-        let angle = Math.random() * 2 * Math.PI;
-        for (let j = 0; j < length; j++){
-          const cx = Math.floor(startX);
-          const cy = Math.floor(startY);
-          const radius = Math.floor(Math.random() * 2) + 1;
-          for (let ax = -radius; ax <= radius; ax++){
-            for (let ay = -radius; ay <= radius; ay++){
-              const dx = cx + ax;
-              const dy = cy + ay;
-              if (dx >= 0 && dx < worldWidth && dy >= 0 && dy < worldHeight){
-                if (ax * ax + ay * ay <= radius * radius){
-                  world[dx][dy] = 0;
-                }
-              }
-            }
-          }
-          startX += Math.cos(angle);
-          startY += Math.sin(angle);
-          angle += (Math.random() - 0.5) * 0.3;
-          if(startX < 0 || startX >= worldWidth || startY < 0 || startY >= worldHeight) break;
-        }
+      /* Basic inventory overlay */
+      #inventory {
+        position: absolute;
+        top: 10px;
+        left: 50%;
+        transform: translateX(-50%);
+        color: white;
+        font-family: "Courier New", monospace;
+        background: rgba(0, 0, 0, 0.5);
+        padding: 4px 8px;
+        border: 2px solid #555;
       }
-    }
-    generateCaves();
+    </style>
+  </head>
+  <body>
+    <canvas id="game"></canvas>
+    <div id="inventory"></div>
+    <script>
+      /***** Canvas Setup *****/
+      const canvas = document.getElementById("game");
+      const ctx = canvas.getContext("2d");
+      function resizeCanvas() {
+        canvas.width = window.innerWidth;
+        canvas.height = window.innerHeight;
+      }
+      window.addEventListener("resize", resizeCanvas);
+      resizeCanvas();
 
-    /***** Block Colors, Durability & Health *****/
-    const blockColors = {
-      0: "#87CEEB", // Air (not drawn)
-      1: "#8B4513", // Dirt
-      2: "#808080", // Stone
-      3: "#228B22", // Grass
-      4: "#A0522D", // Wood
-      5: "#32CD32"  // Leaves
-    };
-    const blockDurability = {
-      1: 2,
-      2: 3,
-      3: 2,
-      4: 3,
-      5: 1
-    };
-    const blockHealth = [];
-    for (let x = 0; x < worldWidth; x++) {
-      blockHealth[x] = [];
-      for (let y = 0; y < worldHeight; y++) {
-        const b = world[x][y];
-        blockHealth[x][y] = (b !== 0 && blockDurability[b] !== undefined) ? blockDurability[b] : 0;
-      }
-    }
-    function setBlock(x, y, block) {
-      if (x < 0 || x >= worldWidth || y < 0 || y >= worldHeight) return;
-      world[x][y] = block;
-      if (block !== 0 && blockDurability[block] !== undefined) {
-        blockHealth[x][y] = blockDurability[block];
-      } else {
-        blockHealth[x][y] = 0;
-      }
-    }
+      /***** Global Definitions *****/
+      // We'll use a 2D grid as our world map.
+      // Map dimensions used for the 2.5D raycaster:
+      const mapWidth = 16; // number of tiles horizontally
+      const mapHeight = 16; // number of tiles vertically
+      // The map: 0 = empty; 1 = dirt; 2 = stone; 3 = grass; 4 = wood; 5 = leaves
+      const worldMap = [
+        [1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1],
+        [1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1],
+        [1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1],
+        [1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1],
+        [1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1],
+        [1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1],
+        [1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1],
+        [1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1],
+        [1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1],
+        [1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1],
+        [1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1],
+        [1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1],
+        [1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1],
+        [1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1],
+        [1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1],
+        [1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1]
+      ];
 
-    /***** Player Setup *****/
-    // Here, the player's (x,y) are in tile coordinates.
-    const player = {
-      x: 50,
-      y: 40,
-      width: 1,  // in tile units (we’ll multiply by tileSize later)
-      height: 1.8,
-      vx: 0,
-      vy: 0,
-      speed: 0.1, // smaller speed because now we're in tile units
-      jumpStrength: 0.3,
-      grounded: false,
-      health: 100,
-      inventory: {
-        wood: 20,
-        stone: 20,
-        gel: 10,  // slime drops
+      /***** Player Setup (Raycaster Variables) *****/
+      // The player’s position is in "map units" (tile coordinates as float)
+      let posX = 8, posY = 8; // start in the center of the map
+      // The player’s direction vector
+      let dirX = -1, dirY = 0;
+      // The 2D camera plane; this determines the field-of-view (FOV)
+      let planeX = 0, planeY = 0.66; // FOV ~66 degrees
+
+      // Movement speeds (tweak as needed)
+      const moveSpeed = 0.05;
+      const rotSpeed = 0.03;
+
+      /***** Inventory Setup *****/
+      // Our inventory will hold counts for different block types.
+      // For simplicity, we consider:
+      // 1 (dirt), 2 (stone), 3 (grass), 4 (wood), 5 (leaves)
+      const inventory = {
         dirt: 0,
+        stone: 0,
         grass: 0,
+        wood: 0,
         leaves: 0,
+        // Also tools: e.g. wooden_pickaxe improves mining speed.
         wooden_pickaxe: 0,
         wooden_sword: 0,
         torch: 0
-      },
-      selectedSlot: 0
-    };
-    // Define hotbar order.
-    const inventoryOrder = ["wood", "stone", "gel", "dirt", "grass", "leaves", "wooden_pickaxe", "wooden_sword", "torch"];
+      };
+      // Hotbar order (keys 1 to 9)
+      const inventoryOrder = ["dirt", "stone", "grass", "wood", "leaves", "wooden_pickaxe", "wooden_sword", "torch"];
+      let selectedSlot = 0; // index into inventoryOrder
 
-    /***** Enemy Setup *****/
-    const enemies = [];
-    function spawnEnemy(x, y) {
-      enemies.push({
-        x: x,  // in tile coordinates
-        y: y,
-        width: 1,
-        height: 1,
-        vx: 0,
-        vy: 0,
-        speed: 0.05,
-        grounded: false,
-        health: 20,
-        type: "slime"
+      // For simplicity, let's pre-populate some resources:
+      inventory.dirt = 20;
+      inventory.stone = 20;
+      inventory.wood = 20;
+      inventory.grass = 10;
+      inventory.leaves = 10;
+      inventory.gel = 0; // gel for slime drops
+      // Tools start at zero – you can mine with your hand (slowly)
+
+      /***** 2D Map Collision Helpers *****/
+      function mapAt(x, y) {
+        if (x < 0 || x >= mapWidth || y < 0 || y >= mapHeight) return 1; // treat out–of–bounds as wall
+        return worldMap[Math.floor(x)][Math.floor(y)];
+      }
+      function setMap(x, y, val) {
+        if (x < 0 || x >= mapWidth || y < 0 || y >= mapHeight) return;
+        worldMap[Math.floor(x)][Math.floor(y)] = val;
+      }
+
+      /***** 2.5D Raycaster Rendering *****/
+      function renderScene() {
+        const w = canvas.width, h = canvas.height;
+        // Draw floor and ceiling
+        ctx.fillStyle = "#555"; // ceiling color
+        ctx.fillRect(0, 0, w, h / 2);
+        ctx.fillStyle = "#333"; // floor color
+        ctx.fillRect(0, h / 2, w, h / 2);
+
+        // For every vertical stripe
+        for (let x = 0; x < w; x++) {
+          // Calculate ray position and direction
+          const cameraX = 2 * x / w - 1; // x-coordinate in camera space
+          const rayDirX = dirX + planeX * cameraX;
+          const rayDirY = dirY + planeY * cameraX;
+
+          // Which box of the map we're in
+          let mapX = Math.floor(posX);
+          let mapY = Math.floor(posY);
+
+          // Length of ray from current position to next x or y-side
+          let sideDistX;
+          let sideDistY;
+
+          // Length of ray from one x or y-side to next x or y-side
+          const deltaDistX = Math.abs(1 / rayDirX);
+          const deltaDistY = Math.abs(1 / rayDirY);
+          let perpWallDist;
+
+          // What direction to step in x or y (+1 or -1)
+          let stepX, stepY;
+
+          let hit = 0; // was a wall hit?
+          let side; // was an NS or a EW wall hit?
+
+          // calculate step and sideDist
+          if (rayDirX < 0) {
+            stepX = -1;
+            sideDistX = (posX - mapX) * deltaDistX;
+          } else {
+            stepX = 1;
+            sideDistX = (mapX + 1.0 - posX) * deltaDistX;
+          }
+          if (rayDirY < 0) {
+            stepY = -1;
+            sideDistY = (posY - mapY) * deltaDistY;
+          } else {
+            stepY = 1;
+            sideDistY = (mapY + 1.0 - posY) * deltaDistY;
+          }
+
+          // Perform DDA
+          while (hit === 0) {
+            // jump to next map square, OR in x-direction, OR in y-direction
+            if (sideDistX < sideDistY) {
+              sideDistX += deltaDistX;
+              mapX += stepX;
+              side = 0;
+            } else {
+              sideDistY += deltaDistY;
+              mapY += stepY;
+              side = 1;
+            }
+            // Check if ray has hit a wall (nonzero cell)
+            if (mapAt(mapX, mapY) > 0) hit = 1;
+          }
+
+          // Calculate distance projected on camera direction (Euclidean distance will give fisheye effect!)
+          if (side === 0) {
+            perpWallDist = (mapX - posX + (1 - stepX) / 2) / rayDirX;
+          } else {
+            perpWallDist = (mapY - posY + (1 - stepY) / 2) / rayDirY;
+          }
+
+          // Calculate height of line to draw on screen
+          const lineHeight = Math.floor(h / perpWallDist);
+
+          // calculate lowest and highest pixel to fill in current stripe
+          let drawStart = -lineHeight / 2 + h / 2;
+          if (drawStart < 0) drawStart = 0;
+          let drawEnd = lineHeight / 2 + h / 2;
+          if (drawEnd >= h) drawEnd = h - 1;
+
+          // Choose wall color based on map value
+          let color;
+          const mapVal = mapAt(mapX, mapY);
+          if (mapVal === 1) color = "#8B4513"; // dirt
+          else if (mapVal === 2) color = "#808080"; // stone
+          else if (mapVal === 3) color = "#228B22"; // grass
+          else if (mapVal === 4) color = "#A0522D"; // wood
+          else if (mapVal === 5) color = "#32CD32"; // leaves
+          else color = "#FFFFFF";
+
+          // Give x and y sides different brightness
+          if (side === 1) {
+            color = darken(color, 0.5);
+          }
+
+          // Draw the vertical stripe as a filled rectangle
+          ctx.fillStyle = color;
+          ctx.fillRect(x, drawStart, 1, drawEnd - drawStart);
+        }
+      }
+
+      // Simple function to darken an HEX color by multiplying each component.
+      function darken(hex, factor) {
+        // Convert hex to RGB
+        let r = parseInt(hex.substr(1, 2), 16);
+        let g = parseInt(hex.substr(3, 2), 16);
+        let b = parseInt(hex.substr(5, 2), 16);
+        r = Math.floor(r * factor);
+        g = Math.floor(g * factor);
+        b = Math.floor(b * factor);
+        return (
+          "#" +
+          ("0" + r.toString(16)).slice(-2) +
+          ("0" + g.toString(16)).slice(-2) +
+          ("0" + b.toString(16)).slice(-2)
+        );
+      }
+
+      /***** Movement and Input *****/
+      const keysDown = {};
+
+      window.addEventListener("keydown", function (e) {
+        keysDown[e.key] = true;
+        // Use number keys 1-n to change selected inventory slot.
+        if (!isNaN(e.key) && e.key !== "0") {
+          let slot = parseInt(e.key) - 1;
+          if (slot < inventoryOrder.length) {
+            selectedSlot = slot;
+          }
+        }
+        // Toggle crafting menu with C key (not implemented in full 3D demo)
+        if (e.key === "c" || e.key === "C") {
+          // For this demo, we omit a crafting menu.
+        }
       });
-    }
-    // Initially spawn a few slimes near the surface.
-    for (let i = 0; i < 5; i++) {
-      let ex = Math.floor(Math.random() * (worldWidth - 20)) + 10;
-      let ey = 0;
-      for (let y = 0; y < worldHeight; y++) {
-        if (world[ex][y] !== 0) { ey = y - 1; break; }
-      }
-      spawnEnemy(ex, ey);
-    }
-    // Periodically spawn slimes underground.
-    function updateSlimeSpawning() {
-      if (enemies.length < 10 && Math.random() < 0.02) {  // increased probability
-        const spawnX = Math.floor(Math.random() * worldWidth);
-        const spawnYStart = groundHeights[spawnX] + 10;
-        if (spawnYStart < worldHeight - 10) {
-          const spawnY = spawnYStart + Math.floor(Math.random() * (worldHeight - spawnYStart - 10));
-          spawnEnemy(spawnX, spawnY);
-        }
-      }
-    }
 
-    /***** Crafting Setup *****/
-    const recipes = [
-      {
-        name: "Torch",
-        ingredients: { wood: 1, gel: 1 },
-        result: { key: "torch", amount: 3 }
-      },
-      {
-        name: "Wooden Pickaxe",
-        ingredients: { wood: 10, stone: 3 },
-        result: { key: "wooden_pickaxe", amount: 1 }
-      },
-      {
-        name: "Wooden Sword",
-        ingredients: { wood: 7 },
-        result: { key: "wooden_sword", amount: 1 }
-      }
-    ];
-    let craftingMenuActive = false;
-    let recipeMenuBoxes = [];
-    function canCraft(recipe) {
-      for (let ingr in recipe.ingredients) {
-        if (!player.inventory[ingr] || player.inventory[ingr] < recipe.ingredients[ingr])
-          return false;
-      }
-      return true;
-    }
-    function craftItem(recipe) {
-      if (canCraft(recipe)) {
-        for (let ingr in recipe.ingredients) {
-          player.inventory[ingr] -= recipe.ingredients[ingr];
-        }
-        const resKey = recipe.result.key;
-        player.inventory[resKey] = (player.inventory[resKey] || 0) + recipe.result.amount;
-        console.log("Crafted " + recipe.name);
-      }
-    }
+      window.addEventListener("keyup", function (e) {
+        keysDown[e.key] = false;
+      });
 
-    /***** Block Placement *****/
-    // Mapping from inventory key to the corresponding block type (placeable blocks only).
-    const placeableMapping = {
-      "dirt": 1,
-      "stone": 2,
-      "grass": 3,
-      "wood": 4,
-      "leaves": 5
-    };
-    function getBlock(x, y) {
-      if (x < 0 || x >= worldWidth || y < 0 || y >= worldHeight) return 0;
-      return world[x][y];
-    }
-    // Allow placing only if target tile is empty and adjacent to an existing block (or at world bottom).
-    function canPlaceBlockAt(x, y) {
-      if (getBlock(x, y) !== 0) return false;
-      if (y === worldHeight - 1) return true;
-      const neighbors = [
-        {dx: -1, dy: 0},
-        {dx: 1, dy: 0},
-        {dx: 0, dy: -1},
-        {dx: 0, dy: 1}
-      ];
-      for (let n of neighbors) {
-        if (getBlock(x + n.dx, y + n.dy) !== 0) return true;
+      function updatePlayer() {
+        // Move forward/backward
+        if (keysDown["w"] || keysDown["W"]) {
+          if (mapAt(posX + dirX * moveSpeed, posY) === 0) posX += dirX * moveSpeed;
+          if (mapAt(posX, posY + dirY * moveSpeed) === 0) posY += dirY * moveSpeed;
+        }
+        if (keysDown["s"] || keysDown["S"]) {
+          if (mapAt(posX - dirX * moveSpeed, posY) === 0) posX -= dirX * moveSpeed;
+          if (mapAt(posX, posY - dirY * moveSpeed) === 0) posY -= dirY * moveSpeed;
+        }
+        // Rotate left/right
+        if (keysDown["ArrowLeft"]) {
+          const oldDirX = dirX;
+          dirX = dirX * Math.cos(rotSpeed) - dirY * Math.sin(rotSpeed);
+          dirY = oldDirX * Math.sin(rotSpeed) + dirY * Math.cos(rotSpeed);
+          const oldPlaneX = planeX;
+          planeX = planeX * Math.cos(rotSpeed) - planeY * Math.sin(rotSpeed);
+          planeY = oldPlaneX * Math.sin(rotSpeed) + planeY * Math.cos(rotSpeed);
+        }
+        if (keysDown["ArrowRight"]) {
+          const oldDirX = dirX;
+          dirX = dirX * Math.cos(-rotSpeed) - dirY * Math.sin(-rotSpeed);
+          dirY = oldDirX * Math.sin(-rotSpeed) + dirY * Math.cos(-rotSpeed);
+          const oldPlaneX = planeX;
+          planeX = planeX * Math.cos(-rotSpeed) - planeY * Math.sin(-rotSpeed);
+          planeY = oldPlaneX * Math.sin(-rotSpeed) + planeY * Math.cos(-rotSpeed);
+        }
       }
-      return false;
-    }
-    function handleBlockPlacement(event) {
-      const rect = canvas.getBoundingClientRect();
-      let clientX = event.clientX || event.touches[0].clientX;
-      let clientY = event.clientY || event.touches[0].clientY;
-      const mx = clientX - rect.left;
-      const my = clientY - rect.top;
-      // For the 3D view, the camera is computed in pixels:
-      const cameraX = player.x * tileSize - canvas.width / 2 + tileSize/2;
-      const cameraY = player.y * tileSize - canvas.height / 2 + tileSize/2;
-      let targetX = Math.floor((mx + cameraX) / tileSize);
-      let targetY = Math.floor((my + cameraY) / tileSize);
-      const selectedItem = inventoryOrder[player.selectedSlot];
-      if (!(selectedItem in placeableMapping)) return;
-      if (player.inventory[selectedItem] <= 0) return;
-      if (!canPlaceBlockAt(targetX, targetY)) return;
-      setBlock(targetX, targetY, placeableMapping[selectedItem]);
-      player.inventory[selectedItem]--;
-    }
-    canvas.addEventListener("contextmenu", function(e) {
-      e.preventDefault();
-      handleBlockPlacement(e);
-      return false;
-    });
 
-    /***** Input Handling *****/
-    const keys = {};
-    window.addEventListener("keydown", e => {
-      if (e.key === "c" || e.key === "C") {
-        craftingMenuActive = !craftingMenuActive;
-      }
-      if (!isNaN(e.key) && e.key !== "0") {
-        const slot = parseInt(e.key) - 1;
-        if (slot < inventoryOrder.length) player.selectedSlot = slot;
-      }
-      if (!craftingMenuActive) keys[e.key] = true;
-    });
-    window.addEventListener("keyup", e => {
-      if (!craftingMenuActive) keys[e.key] = false;
-    });
-    canvas.addEventListener("mousemove", e => {
-      const rect = canvas.getBoundingClientRect();
-      lastMousePos.x = e.clientX - rect.left;
-      lastMousePos.y = e.clientY - rect.top;
-    });
-    canvas.addEventListener("mousedown", e => {
-      if (craftingMenuActive) {
-        handleCraftingMenuClick(e);
-      } else {
-        isMining = true;
-        const rect = canvas.getBoundingClientRect();
-        lastMousePos.x = e.clientX - rect.left;
-        lastMousePos.y = e.clientY - rect.top;
-      }
-    });
-    canvas.addEventListener("mouseup", e => {
-      if (!craftingMenuActive) {
-        isMining = false;
-        currentMiningTarget = null;
-      }
-    });
-    canvas.addEventListener("touchstart", e => {
-      e.preventDefault();
-      const touch = e.touches[0];
-      const rect = canvas.getBoundingClientRect();
-      lastMousePos.x = touch.clientX - rect.left;
-      lastMousePos.y = touch.clientY - rect.top;
-      if (craftingMenuActive) {
-        handleCraftingMenuClick(touch);
-      } else {
-        isMining = true;
-      }
-    }, { passive: false });
-    canvas.addEventListener("touchmove", e => {
-      e.preventDefault();
-      const touch = e.touches[0];
-      const rect = canvas.getBoundingClientRect();
-      lastMousePos.x = touch.clientX - rect.left;
-      lastMousePos.y = touch.clientY - rect.top;
-    }, { passive: false });
-    canvas.addEventListener("touchend", e => {
-      e.preventDefault();
-      if (!craftingMenuActive) {
-        isMining = false;
-        currentMiningTarget = null;
-      }
-    }, { passive: false });
-    function handleCraftingMenuClick(e) {
-      const rect = canvas.getBoundingClientRect();
-      let mx = e.clientX - rect.left;
-      let my = e.clientY - rect.top;
-      for (let box of recipeMenuBoxes) {
-        if (mx >= box.x && mx <= box.x + box.width &&
-            my >= box.y && my <= box.y + box.height) {
-          craftItem(box.recipe);
-        }
-      }
-    }
-
-    /***** Mining & Block Damage *****/
-    const miningDamage = 0.1;
-    function updateMining() {
-      if (!isMining) return;
-      const cameraX = player.x * tileSize - canvas.width / 2 + tileSize/2;
-      const cameraY = player.y * tileSize - canvas.height / 2 + tileSize/2;
-      let targetX = Math.floor((lastMousePos.x + cameraX) / tileSize);
-      let targetY = Math.floor((lastMousePos.y + cameraY) / tileSize);
-      if (!currentMiningTarget || currentMiningTarget.x !== targetX || currentMiningTarget.y !== targetY) {
-        currentMiningTarget = { x: targetX, y: targetY };
-      }
-      if (targetX < 0 || targetX >= worldWidth || targetY < 0 || targetY >= worldHeight) return;
-      const block = world[targetX][targetY];
-      if (block === 0 || blockDurability[block] === undefined) {
-        currentMiningTarget = null;
-        return;
-      }
-      const blockCenterX = (targetX + 0.5) * tileSize;
-      const blockCenterY = (targetY + 0.5) * tileSize;
-      const playerCenterX = player.x * tileSize + tileSize/2;
-      const playerCenterY = player.y * tileSize + tileSize/2;
-      const dx = blockCenterX - playerCenterX;
-      const dy = blockCenterY - playerCenterY;
-      const distance = Math.sqrt(dx * dx + dy * dy);
-      if (distance > 80) return;
-      const effectiveDamage = miningDamage * (player.inventory.wooden_pickaxe > 0 ? 2 : 0.5);
-      blockHealth[targetX][targetY] -= effectiveDamage;
-      if (blockHealth[targetX][targetY] <= 0) {
-        switch (block) {
-          case 1: player.inventory.dirt++; break;
-          case 2: player.inventory.stone++; break;
-          case 3: player.inventory.grass++; break;
-          case 4: player.inventory.wood++; break;
-          case 5: player.inventory.leaves++; break;
-        }
-        setBlock(targetX, targetY, 0);
-        currentMiningTarget = null;
-      }
-    }
-
-    /***** Entity Physics Helpers *****/
-    function isSolid(block) {
-      return block !== 0;
-    }
-    function checkCollision(a, b) {
-      return (a.x < b.x + b.width &&
-              a.x + a.width > b.x &&
-              a.y < b.y + b.height &&
-              a.y + a.height > b.y);
-    }
-    function isColliding(entity) {
-      const leftTile = Math.floor(entity.x);
-      const rightTile = Math.floor(entity.x + entity.width);
-      const topTile = Math.floor(entity.y);
-      const bottomTile = Math.floor(entity.y + entity.height);
-      for (let x = leftTile; x <= rightTile; x++) {
-        for (let y = topTile; y <= bottomTile; y++) {
-          if (isSolid(getBlock(x, y))) return true;
-        }
-      }
-      return false;
-    }
-    function updateEntityPhysics(entity) {
-      let steps = Math.ceil(Math.abs(entity.vx) * 10);
-      let moveX = (steps === 0) ? 0 : entity.vx / steps;
-      for (let i = 0; i < steps; i++) {
-        entity.x += moveX;
-        if (isColliding(entity)) {
-          entity.x -= moveX;
-          entity.vx = 0;
-          break;
-        }
-      }
-      steps = Math.ceil(Math.abs(entity.vy) * 10);
-      let moveY = (steps === 0) ? 0 : entity.vy / steps;
-      entity.grounded = false;
-      for (let i = 0; i < steps; i++) {
-        entity.y += moveY;
-        if (isColliding(entity)) {
-          entity.y -= moveY;
-          if (moveY > 0) entity.grounded = true;
-          entity.vy = 0;
-          break;
-        }
-      }
-    }
-
-    /***** 2D UI Drawing (Inventory & Crafting Menu) *****/
-    function drawIcon(itemKey, x, y, size) {
-      // For UI drawing we use simple square icons.
-      switch(itemKey) {
-        case "dirt":
-          ctx.fillStyle = "#8B4513";
-          ctx.fillRect(x, y, size, size);
-          break;
-        case "stone":
-          ctx.fillStyle = "#808080";
-          ctx.fillRect(x, y, size, size);
-          break;
-        case "grass":
-          ctx.fillStyle = "#228B22";
-          ctx.fillRect(x, y, size, size * 0.4);
-          ctx.fillStyle = "#8B4513";
-          ctx.fillRect(x, y + size * 0.4, size, size * 0.6);
-          break;
-        case "wood":
-          ctx.fillStyle = "#A0522D";
-          ctx.fillRect(x, y, size, size);
-          break;
-        case "leaves":
-          ctx.fillStyle = "#32CD32";
-          ctx.fillRect(x, y, size, size);
-          break;
-        case "gel":
-          ctx.fillStyle = "#7FFFD4";
-          ctx.fillRect(x, y, size, size);
-          break;
-        case "wooden_pickaxe":
-          ctx.fillStyle = "#8B4513";
-          ctx.fillRect(x + size * 0.35, y + size * 0.3, size * 0.1, size * 0.5);
-          ctx.fillStyle = "#808080";
-          ctx.fillRect(x + size * 0.2, y + size * 0.2, size * 0.2, size * 0.2);
-          break;
-        case "wooden_sword":
-          ctx.fillStyle = "#808080";
-          ctx.fillRect(x + size * 0.45, y + size * 0.1, size * 0.1, size * 0.6);
-          ctx.fillStyle = "#8B4513";
-          ctx.fillRect(x + size * 0.4, y + size * 0.7, size * 0.2, size * 0.2);
-          break;
-        case "torch":
-          ctx.fillStyle = "#8B4513";
-          ctx.fillRect(x + size * 0.45, y + size * 0.5, size * 0.1, size * 0.4);
-          ctx.beginPath();
-          ctx.arc(x + size * 0.5, y + size * 0.35, size * 0.15, 0, 2 * Math.PI);
-          ctx.fillStyle = "#FDB813";
-          ctx.fill();
-          break;
-        default:
-          ctx.fillStyle = "#FFF";
-          ctx.fillRect(x, y, size, size);
-      }
-    }
-    function drawInventory() {
-      const invSize = 50;
-      const gap = 4;
-      const totalWidth = inventoryOrder.length * (invSize + gap) - gap;
-      const startX = (canvas.width - totalWidth) / 2;
-      const y = canvas.height - invSize - 10;
-      for (let i = 0; i < inventoryOrder.length; i++) {
-        const item = inventoryOrder[i];
-        const x = startX + i * (invSize + gap);
-        ctx.fillStyle = "#333";
-        ctx.fillRect(x, y, invSize, invSize);
-        if (i === player.selectedSlot) {
-          ctx.strokeStyle = "#FFFF00";
-          ctx.lineWidth = 3;
-          ctx.strokeRect(x, y, invSize, invSize);
+      /***** Block Breaking (Mining) *****/
+      // When left–clicking, we cast a ray from the center of the screen and try to break the block there.
+      canvas.addEventListener("click", function (e) {
+        // For simplicity, use center column of the screen.
+        const centerX = Math.floor(canvas.width / 2);
+        // We perform the raycasting loop just as in renderScene but only for one column.
+        const cameraX = 2 * centerX / canvas.width - 1;
+        const rayDirX = dirX + planeX * cameraX;
+        const rayDirY = dirY + planeY * cameraX;
+        let mapX = Math.floor(posX);
+        let mapY = Math.floor(posY);
+        const deltaDistX = Math.abs(1 / rayDirX);
+        const deltaDistY = Math.abs(1 / rayDirY);
+        let sideDistX, sideDistY;
+        let stepX, stepY;
+        if (rayDirX < 0) {
+          stepX = -1;
+          sideDistX = (posX - mapX) * deltaDistX;
         } else {
-          ctx.strokeStyle = "#AAAAAA";
-          ctx.lineWidth = 2;
-          ctx.strokeRect(x, y, invSize, invSize);
+          stepX = 1;
+          sideDistX = (mapX + 1.0 - posX) * deltaDistX;
         }
-        drawIcon(item, x + 10, y + 10, invSize - 20);
-        ctx.fillStyle = "#FFF";
-        ctx.font = "12px Courier New";
-        ctx.textAlign = "right";
-        ctx.fillText(player.inventory[item] || 0, x + invSize - 4, y + invSize - 4);
+        if (rayDirY < 0) {
+          stepY = -1;
+          sideDistY = (posY - mapY) * deltaDistY;
+        } else {
+          stepY = 1;
+          sideDistY = (mapY + 1.0 - posY) * deltaDistY;
+        }
+        let hit = false;
+        let side;
+        while (!hit) {
+          if (sideDistX < sideDistY) {
+            sideDistX += deltaDistX;
+            mapX += stepX;
+            side = 0;
+          } else {
+            sideDistY += deltaDistY;
+            mapY += stepY;
+            side = 1;
+          }
+          if (mapAt(mapX, mapY) > 0) hit = true;
+        }
+        // "Break" the block: set it to 0
+        setMap(mapX, mapY, 0);
+      });
+
+      /***** Block Placement *****/
+      // When right–clicking, we place a block (from our inventory) at the center-targeted location, if possible.
+      canvas.addEventListener("contextmenu", function (e) {
+        e.preventDefault();
+        const centerX = Math.floor(canvas.width / 2);
+        const cameraX = 2 * centerX / canvas.width - 1;
+        const rayDirX = dirX + planeX * cameraX;
+        const rayDirY = dirY + planeY * cameraX;
+        let mapX = Math.floor(posX);
+        let mapY = Math.floor(posY);
+        const deltaDistX = Math.abs(1 / rayDirX);
+        const deltaDistY = Math.abs(1 / rayDirY);
+        let sideDistX, sideDistY;
+        let stepX, stepY;
+        if (rayDirX < 0) {
+          stepX = -1;
+          sideDistX = (posX - mapX) * deltaDistX;
+        } else {
+          stepX = 1;
+          sideDistX = (mapX + 1.0 - posX) * deltaDistX;
+        }
+        if (rayDirY < 0) {
+          stepY = -1;
+          sideDistY = (posY - mapY) * deltaDistY;
+        } else {
+          stepY = 1;
+          sideDistY = (mapY + 1.0 - posY) * deltaDistY;
+        }
+        let hit = false;
+        while (!hit) {
+          if (sideDistX < sideDistY) {
+            sideDistX += deltaDistX;
+            mapX += stepX;
+          } else {
+            sideDistY += deltaDistY;
+            mapY += stepY;
+          }
+          if (mapAt(mapX, mapY) > 0) hit = true;
+        }
+        // Now, try to place a block in front of the hit wall.
+        // We'll choose the block type from the currently selected slot.
+        const selItem = inventoryOrder[selectedSlot];
+        // Only allow placement if it's one of our placeable block types.
+        if (["dirt", "stone", "grass", "wood", "leaves"].includes(selItem)) {
+          // Check that target cell is empty and adjacent to a wall.
+          if (mapAt(mapX, mapY) === 0) {
+            // (For simplicity we don't do a full adjacency check here.)
+            setMap(mapX, mapY, selItem === "dirt" ? 1 :
+                                  selItem === "stone" ? 2 :
+                                  selItem === "grass" ? 3 :
+                                  selItem === "wood" ? 4 :
+                                  selItem === "leaves" ? 5 : 0);
+            if (inventory[selItem] > 0) inventory[selItem]--;
+          }
+        }
+        return false;
+      });
+
+      /***** Inventory Display *****/
+      const inventoryDiv = document.getElementById("inventory");
+      function updateInventoryDisplay() {
+        let text = "Inventory: ";
+        inventoryOrder.forEach((item, i) => {
+          if (i === selectedSlot) text += "[" + item + ":" + (inventory[item] || 0) + "] ";
+          else text += item + ":" + (inventory[item] || 0) + " ";
+        });
+        inventoryDiv.textContent = text;
       }
-    }
-    function drawCraftingMenu() {
-      ctx.fillStyle = "rgba(0, 0, 0, 0.85)";
-      ctx.fillRect(0, 0, canvas.width, canvas.height);
-      const panelWidth = canvas.width * 0.8;
-      const panelHeight = canvas.height * 0.6;
-      const panelX = (canvas.width - panelWidth) / 2;
-      const panelY = (canvas.height - panelHeight) / 2;
-      ctx.fillStyle = "#4b3621";
-      ctx.fillRect(panelX, panelY, panelWidth, panelHeight);
-      ctx.strokeStyle = "#d2b48c";
-      ctx.lineWidth = 4;
-      ctx.strokeRect(panelX, panelY, panelWidth, panelHeight);
-      ctx.font = "26px Courier New";
-      ctx.textAlign = "center";
-      ctx.fillStyle = "#FFF";
-      ctx.fillText("Crafting Station", canvas.width / 2, panelY + 40);
-      ctx.font = "16px Courier New";
-      ctx.fillText("Click a recipe box to craft. Press 'C' to exit.", canvas.width / 2, panelY + 70);
-      const recipeBoxWidth = panelWidth * 0.9;
-      const recipeBoxHeight = 60;
-      const gap = 15;
-      recipeMenuBoxes = [];
-      ctx.textAlign = "left";
-      for (let i = 0; i < recipes.length; i++) {
-        const boxX = panelX + (panelWidth - recipeBoxWidth) / 2;
-        const boxY = panelY + 90 + i * (recipeBoxHeight + gap);
-        ctx.fillStyle = canCraft(recipes[i]) ? "#6b8e23" : "#555";
-        ctx.fillRect(boxX, boxY, recipeBoxWidth, recipeBoxHeight);
-        ctx.strokeStyle = "#FFF";
-        ctx.lineWidth = 2;
-        ctx.strokeRect(boxX, boxY, recipeBoxWidth, recipeBoxHeight);
-        ctx.fillStyle = "#FFF";
-        ctx.font = "16px Courier New";
-        ctx.fillText(recipes[i].name, boxX + 10, boxY + 20);
-        let ingredText = "Requires: ";
-        for (let ingr in recipes[i].ingredients) {
-          ingredText += ingr + " x" + recipes[i].ingredients[ingr] + "  ";
-        }
-        ctx.font = "14px Courier New";
-        ctx.fillText(ingredText, boxX + 10, boxY + 40);
-        recipeMenuBoxes.push({
-          recipe: recipes[i],
-          x: boxX,
-          y: boxY,
-          width: recipeBoxWidth,
-          height: recipeBoxHeight
+
+      /***** Game Loop *****/
+      function gameLoop() {
+        updatePlayer();
+        updateInventoryDisplay();
+        renderScene();
+        // Simple enemy (slime) update and spawning
+        updateEnemies();
+        updateSlimeSpawning();
+        updateMining();
+        requestAnimationFrame(gameLoop);
+      }
+
+      /***** Enemy and Slime Code (2.5D) *****/
+      const enemies = [];
+      function spawnEnemy(x, y) {
+        enemies.push({
+          x: x, // in map coordinates (float)
+          y: y,
+          dirX: 0,
+          dirY: 1,
+          speed: 0.02,
+          health: 20,
+          type: "slime"
         });
       }
-    }
-
-    /***** Rendering *****/
-    function draw() {
-      // Draw sky background.
-      const grd = ctx.createLinearGradient(0, 0, 0, canvas.height);
-      grd.addColorStop(0, "#00BFFF");
-      grd.addColorStop(1, "#87CEEB");
-      ctx.fillStyle = grd;
-      ctx.fillRect(0, 0, canvas.width, canvas.height);
-      // Draw a simple sun.
-      ctx.beginPath();
-      ctx.arc(80, 80, 30, 0, 2 * Math.PI);
-      ctx.fillStyle = "#FDB813";
-      ctx.fill();
-      ctx.strokeStyle = "#E59400";
-      ctx.stroke();
-
-      // Compute camera offset (in pixels). Our world is drawn in tile units.
-      const cameraX = player.x * tileSize - canvas.width / 2 + tileSize/2;
-      const cameraY = player.y * tileSize - canvas.height / 2 + tileSize/2;
-      // Determine visible extents (in tile coordinates).
-      const startX = Math.floor(cameraX / tileSize) - 1;
-      const endX = Math.floor((cameraX + canvas.width) / tileSize) + 1;
-      const startY = Math.floor(cameraY / tileSize) - 1;
-      const endY = Math.floor((cameraY + canvas.height) / tileSize) + 1;
-
-      // Draw world blocks as cubes.
-      for (let y = startY; y <= endY; y++) {
-        for (let x = startX; x <= endX; x++) {
-          if (x >= 0 && x < worldWidth && y >= 0 && y < worldHeight) {
-            const block = world[x][y];
-            if (block !== 0) {
-              // Compute screen position.
-              const screenX = x * tileSize - cameraX;
-              const screenY = y * tileSize - cameraY;
-              drawCube(screenX, screenY, blockColors[block]);
-            }
+      // Spawn a few initial slimes
+      for (let i = 0; i < 3; i++) {
+        let sx = Math.floor(Math.random() * (mapWidth - 2)) + 1;
+        let sy = Math.floor(Math.random() * (mapHeight - 2)) + 1;
+        if (mapAt(sx, sy) === 0) spawnEnemy(sx + 0.5, sy + 0.5);
+      }
+      function updateEnemies() {
+        for (let i = enemies.length - 1; i >= 0; i--) {
+          let enemy = enemies[i];
+          // Very simple AI: move slowly toward the player if path is clear.
+          const dx = posX - enemy.x;
+          const dy = posY - enemy.y;
+          const dist = Math.sqrt(dx * dx + dy * dy);
+          if (dist > 0.2) {
+            enemy.x += (dx / dist) * enemy.speed;
+            enemy.y += (dy / dist) * enemy.speed;
+          }
+          // Collision with player: reduce player health.
+          if (Math.abs(enemy.x - posX) < 0.5 && Math.abs(enemy.y - posY) < 0.5) {
+            player.health -= 0.2;
+          }
+          // If enemy is "killed" (for example, by mining it out – not implemented fully here), drop gel.
+          if (enemy.health <= 0) {
+            inventory.gel = (inventory.gel || 0) + (Math.floor(Math.random() * 2) + 1);
+            enemies.splice(i, 1);
           }
         }
       }
-      // Draw player.
-      const playerScreenX = player.x * tileSize - cameraX;
-      const playerScreenY = player.y * tileSize - cameraY;
-      drawCube(playerScreenX, playerScreenY, "red");
-      
-      // Draw held tool/weapon if applicable.
-      const selectedItem = inventoryOrder[player.selectedSlot];
-      if (player.inventory[selectedItem] > 0 &&
-         (selectedItem === "wooden_pickaxe" || selectedItem === "wooden_sword" || selectedItem === "torch")) {
-        const handX = player.x * tileSize - cameraX + tileSize;
-        const handY = player.y * tileSize - cameraY + tileSize/2;
-        drawIcon(selectedItem, handX, handY, tileSize);
-      }
-      
-      // Draw enemies.
-      for (let enemy of enemies) {
-        const enemyScreenX = enemy.x * tileSize - cameraX;
-        const enemyScreenY = enemy.y * tileSize - cameraY;
-        drawCube(enemyScreenX, enemyScreenY, "green");
-      }
-      
-      // Draw UI: health and inventory.
-      ctx.fillStyle = "#000";
-      ctx.font = "16px Courier New";
-      ctx.fillText("Health: " + Math.floor(player.health), 10, 20);
-      drawInventory();
-      if (craftingMenuActive) {
-        drawCraftingMenu();
-      }
-      // Draw mining progress (same 2D overlay as before) on targeted block.
-      if (currentMiningTarget) {
-        const tx = currentMiningTarget.x;
-        const ty = currentMiningTarget.y;
-        if (tx >= 0 && tx < worldWidth && ty >= 0 && ty < worldHeight) {
-          const block = world[tx][ty];
-          if (block !== 0 && blockDurability[block] !== undefined) {
-            const bx = tx * tileSize - cameraX;
-            const by = ty * tileSize - cameraY;
-            const origDur = blockDurability[block];
-            let progress = 1 - (blockHealth[tx][ty] / origDur);
-            progress = Math.max(0, Math.min(1, progress));
-            ctx.fillStyle = "rgba(0, 0, 0, " + (0.5 * progress) + ")";
-            ctx.fillRect(bx, by, tileSize, tileSize);
-            ctx.fillStyle = "gray";
-            ctx.fillRect(bx, by - 6, tileSize, 4);
-            ctx.fillStyle = "yellow";
-            ctx.fillRect(bx, by - 6, tileSize * progress, 4);
-            ctx.strokeStyle = "black";
-            ctx.strokeRect(bx, by - 6, tileSize, 4);
-          }
+      function updateSlimeSpawning() {
+        // Increase slime spawning frequency
+        if (enemies.length < 5 && Math.random() < 0.02) {
+          let sx = Math.floor(Math.random() * (mapWidth - 2)) + 1;
+          let sy = Math.floor(Math.random() * (mapHeight - 2)) + 1;
+          if (mapAt(sx, sy) === 0) spawnEnemy(sx + 0.5, sy + 0.5);
         }
       }
-    }
 
-    /***** Game Loop *****/
-    function gameLoop() {
-      updatePlayer();
-      updateEnemies();
-      updateSlimeSpawning();
-      updateMining();
-      draw();
-      requestAnimationFrame(gameLoop);
-    }
+      /***** Mining (for enemies) *****/
+      // For simplicity, left-clicking breaks blocks (as above) but if you "mine" an enemy by colliding with it (or extended code) you could reduce its health.
+      // (Not fully implemented in this minimal demo.)
+      function updateMining() {
+        // This demo relies on click events to break blocks.
+      }
 
-    /***** Player & Enemy Updates *****/
-    function updatePlayer() {
-      if (craftingMenuActive) return;
-      if (keys["a"] || keys["ArrowLeft"]) {
-        player.vx = -player.speed;
-      } else if (keys["d"] || keys["ArrowRight"]) {
-        player.vx = player.speed;
-      } else {
-        player.vx = 0;
-      }
-      if ((keys["w"] || keys["ArrowUp"] || keys[" "]) && player.grounded) {
-        player.vy = -player.jumpStrength;
-        player.grounded = false;
-      }
-      player.vy += 0.4;
-      updateEntityPhysics(player);
-    }
-    function updateEnemies() {
-      for (let i = enemies.length - 1; i >= 0; i--) {
-        let enemy = enemies[i];
-        if (Math.abs(enemy.x - player.x) < 300) {
-          enemy.vx = enemy.x < player.x ? enemy.speed : -enemy.speed;
-        } else {
-          enemy.vx += (Math.random() - 0.5) * 0.2;
-          if (enemy.vx > enemy.speed) enemy.vx = enemy.speed;
-          if (enemy.vx < -enemy.speed) enemy.vx = -enemy.speed;
-        }
-        enemy.vy += 0.4;
-        updateEntityPhysics(enemy);
-        if (checkCollision(enemy, player)) {
-          player.health -= 0.2;
-        }
-        if (enemy.health <= 0) {
-          if (enemy.type === "slime") {
-            player.inventory.gel += Math.floor(Math.random() * 2) + 1;
-          }
-          enemies.splice(i, 1);
-        }
-      }
-    }
-
-    /***** Start the Game Loop *****/
-    gameLoop();
-  </script>
-</body>
+      /***** Start the Game Loop *****/
+      gameLoop();
+    </script>
+  </body>
 </html>
