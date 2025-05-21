@@ -21,6 +21,9 @@
 <body>
   <canvas id="game"></canvas>
   <script>
+    /* Load Player Image */
+    const playerImg = new Image();
+    playerImg.src = "projects/explorebox/player.ico";
     /***** Canvas Setup *****/
     const canvas = document.getElementById("game");
     const ctx = canvas.getContext("2d");
@@ -708,9 +711,14 @@
           }
         }
       }
-      // Draw player.
-      ctx.fillStyle = "red";
-      ctx.fillRect(player.x - cameraX, player.y - cameraY, player.width, player.height);
+      // Draw player using the icon.
+      ctx.drawImage(
+        playerImg,
+        player.x - cameraX,
+        player.y - cameraY,
+        player.width,
+        player.height
+      );
       // Draw held tool/weapon if applicable.
       const selectedItem = inventoryOrder[player.selectedSlot];
       if (player.inventory[selectedItem] > 0 && 
@@ -757,7 +765,7 @@
         drawCraftingMenu();
       }
     }
-
+    
     /***** Game Loop *****/
     function gameLoop() {
       updatePlayer();
@@ -767,6 +775,11 @@
       draw();
       requestAnimationFrame(gameLoop);
     }
+
+    playerImg.onload = () => {
+      gameLoop();
+    };
+    
     function updatePlayer() {
       if (craftingMenuActive) return; // Freeze movement during crafting.
       if (keys["a"] || keys["ArrowLeft"]) {
