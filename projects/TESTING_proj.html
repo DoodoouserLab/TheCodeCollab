@@ -1,412 +1,130 @@
 <!DOCTYPE html>
-<html lang="en">
-<head>
-  <meta charset="UTF-8" />
-  <title>Mini Minecraft Demo</title>
-  <style>
-    body {
-      margin: 0;
-      overflow: hidden;
-      background: #000;
-    }
-    canvas {
-      display: block;
-      image-rendering: pixelated;
-      background: #87CEEB; /* sky blue background */
-    }
-    /* Inventory HUD using flexbox */
-    #hud {
-      position: absolute;
-      top: 10px;
-      left: 50%;
-      transform: translateX(-50%);
-      font-family: "Courier New", monospace;
-      color: #fff;
-      background: rgba(0, 0, 0, 0.7);
-      padding: 10px;
-      border: 2px solid #555;
-      display: flex;
-      gap: 10px;
-    }
-    .inv-slot {
-      display: flex;
-      flex-direction: column;
-      align-items: center;
-      border: 2px solid #555;
-      padding: 4px;
-      width: 64px;
-      height: 64px;
-    }
-    .inv-slot.selected {
-      border-color: yellow;
-    }
-    .inv-slot img {
-      width: 48px;
-      height: 48px;
-      image-rendering: pixelated;
-    }
-    /* Instructions overlay */
-    #instructions {
-      position: absolute;
-      bottom: 10px;
-      left: 50%;
-      transform: translateX(-50%);
-      font-family: sans-serif;
-      color: #fff;
-      background: rgba(0, 0, 0, 0.7);
-      padding: 10px;
-      border: 2px solid #555;
-      text-align: center;
-    }
-  </style>
-  <!-- Load Three.js and PointerLockControls from CDN -->
-  <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r134/three.min.js"></script>
-  <script src="https://cdn.jsdelivr.net/npm/three@0.134.0/examples/js/controls/PointerLockControls.js"></script>
-</head>
-<body>
-  <div id="hud"></div>
-  <div id="instructions">
-    Click to lock pointer. Use WASD to move and mouse to look.<br>
-    Left‑click to mine, right‑click to place a block.<br>
-    Press 1 for Stone, 2 for Dirt, 3 for Grass (for placement).
-  </div>
-  <script>
-    /***** TEXTURE CREATION FUNCTIONS *****/
-    function createStoneTexture() {
-      const canvasT = document.createElement("canvas");
-      canvasT.width = 64; canvasT.height = 64;
-      const ctxT = canvasT.getContext("2d");
-      ctxT.fillStyle = "#808080";
-      ctxT.fillRect(0, 0, 64, 64);
-      for (let i = 0; i < 500; i++) {
-        let x = Math.floor(Math.random() * 64);
-        let y = Math.floor(Math.random() * 64);
-        ctxT.fillStyle = "rgba(0,0,0,0.1)";
-        ctxT.fillRect(x, y, 1, 1);
+<html>
+  <head>
+    <meta charset="utf-8" />
+    <title>PointerLock Movement Test</title>
+    <style>
+      body {
+        margin: 0;
+        overflow: hidden;
+        background: #000;
       }
-      return new THREE.CanvasTexture(canvasT);
-    }
-    function createDirtTexture() {
-      const canvasT = document.createElement("canvas");
-      canvasT.width = 64; canvasT.height = 64;
-      const ctxT = canvasT.getContext("2d");
-      ctxT.fillStyle = "#8B4513";
-      ctxT.fillRect(0, 0, 64, 64);
-      for (let i = 0; i < 150; i++) {
-        let x = Math.floor(Math.random() * 64);
-        let y = Math.floor(Math.random() * 64);
-        ctxT.fillStyle = "rgba(0,0,0,0.2)";
-        ctxT.fillRect(x, y, 3, 3);
+      canvas {
+        display: block;
       }
-      return new THREE.CanvasTexture(canvasT);
-    }
-    function createGrassTexture() {
-      const canvasT = document.createElement("canvas");
-      canvasT.width = 64; canvasT.height = 64;
-      const ctxT = canvasT.getContext("2d");
-      ctxT.fillStyle = "#228B22";
-      ctxT.fillRect(0, 0, 64, 32); // top half green
-      ctxT.fillStyle = "#8B4513";
-      ctxT.fillRect(0, 32, 64, 32); // bottom half brown
-      return new THREE.CanvasTexture(canvasT);
-    }
-    
-    /***** WORLD GENERATION *****/
-    // World dimensions in blocks.
-    const WORLD_WIDTH = 32, WORLD_DEPTH = 32, WORLD_HEIGHT = 8;
-    // We'll build a worldData dictionary keyed by "x_y_z" with block type: 0 = air; 1 = stone; 2 = dirt; 3 = grass.
-    let worldData = {};
-    let stoneCount = 0, dirtCount = 0, grassCount = 0;
-    for (let x = 0; x < WORLD_WIDTH; x++) {
-      for (let z = 0; z < WORLD_DEPTH; z++) {
-        // For each column, choose a random ground height between 3 and 6.
-        let h = 3 + Math.floor(Math.random() * 4);
-        // Build layers: lower layers are stone, then a dirt layer, then a grass layer on top.
-        for (let y = 0; y < WORLD_HEIGHT; y++) {
-          const key = x + "_" + y + "_" + z;
-          if (y < h - 2 && y < WORLD_HEIGHT) {
-            worldData[key] = 1; // stone
-            stoneCount++;
-          } else if (y === h - 2 && y < WORLD_HEIGHT) {
-            worldData[key] = 2; // dirt
-            dirtCount++;
-          } else if (y === h - 1 && y < WORLD_HEIGHT) {
-            worldData[key] = 3; // grass
-            grassCount++;
-          } else {
-            worldData[key] = 0;
-          }
-        }
+      #instructions {
+        position: absolute;
+        top: 0;
+        width: 100%;
+        text-align: center;
+        font-family: sans-serif;
+        color: white;
+        pointer-events: none;
       }
-    }
-    // Optionally, carve caves by randomly removing some blocks.
-    for (let i = 0; i < 200; i++) {
-      let cx = Math.floor(Math.random() * WORLD_WIDTH);
-      let cz = Math.floor(Math.random() * WORLD_DEPTH);
-      let cy = Math.floor(Math.random() * (WORLD_HEIGHT - 2));
-      for (let dx = -1; dx <= 1; dx++) {
-        for (let dy = -1; dy <= 1; dy++) {
-          for (let dz = -1; dz <= 1; dz++) {
-            let key = (cx+dx) + "_" + (cy+dy) + "_" + (cz+dz);
-            if (worldData[key] !== undefined) {
-              worldData[key] = 0;
-            }
-          }
-        }
-      }
-    }
-    
-    /***** THREE.JS SETUP *****/
-    const scene = new THREE.Scene();
-    scene.background = new THREE.Color(0x87CEEB);
-    const camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000);
-    // Position the camera roughly in the middle of our world
-    camera.position.set(WORLD_WIDTH/2, 10, WORLD_DEPTH/2);
-    const renderer = new THREE.WebGLRenderer({ antialias: false });
-    renderer.setSize(window.innerWidth, window.innerHeight);
-    document.body.appendChild(renderer.domElement);
-    
-    // Lighting
-    const ambientLight = new THREE.AmbientLight(0xffffff, 0.6);
-    scene.add(ambientLight);
-    const directionalLight = new THREE.DirectionalLight(0xffffff, 0.8);
-    directionalLight.position.set(50, 100, 50);
-    scene.add(directionalLight);
-    
-    /***** POINTER LOCK CONTROLS *****/
-    const controls = new THREE.PointerLockControls(camera, document.body);
-    scene.add(controls.getObject());
-    document.addEventListener("click", () => {
-      controls.lock();
-    }, false);
-    
-    /***** MOVEMENT *****/
-    const move = { forward: false, backward: false, left: false, right: false };
-    const velocity = new THREE.Vector3();
-    const direction = new THREE.Vector3();
-    const clock = new THREE.Clock();
-    
-    document.addEventListener("keydown", function(e) {
-      switch(e.code) {
-        case "KeyW": move.forward = true; break;
-        case "KeyS": move.backward = true; break;
-        case "KeyA": move.left = true; break;
-        case "KeyD": move.right = true; break;
-        case "Digit1": selectedSlot = 0; break;
-        case "Digit2": selectedSlot = 1; break;
-        case "Digit3": selectedSlot = 2; break;
-      }
-    });
-    document.addEventListener("keyup", function(e) {
-      switch(e.code) {
-        case "KeyW": move.forward = false; break;
-        case "KeyS": move.backward = false; break;
-        case "KeyA": move.left = false; break;
-        case "KeyD": move.right = false; break;
-      }
-    });
-    
-    /***** VOXEL WORLD MESHES USING INSTANCED MESHES *****/
-    const cubeGeo = new THREE.BoxGeometry(1,1,1);
-    const stoneMesh = new THREE.InstancedMesh(cubeGeo, new THREE.MeshLambertMaterial({ map: createStoneTexture() }), stoneCount);
-    const dirtMesh  = new THREE.InstancedMesh(cubeGeo, new THREE.MeshLambertMaterial({ map: createDirtTexture() }), dirtCount);
-    const grassMesh = new THREE.InstancedMesh(cubeGeo, new THREE.MeshLambertMaterial({ map: createGrassTexture() }), grassCount);
-    
-    // Arrays to store instance data for later reference.
-    let stoneInstances = [];
-    let dirtInstances = [];
-    let grassInstances = [];
-    
-    let iStone = 0, iDirt = 0, iGrass = 0;
-    const dummy = new THREE.Object3D();
-    for (let key in worldData) {
-      const type = worldData[key];
-      if (type !== 0) {
-        const parts = key.split("_").map(Number);
-        dummy.position.set(parts[0] + 0.5, parts[1] + 0.5, parts[2] + 0.5);
-        dummy.updateMatrix();
-        if (type === 1) {
-          stoneMesh.setMatrixAt(iStone, dummy.matrix);
-          stoneInstances.push({ x: parts[0], y: parts[1], z: parts[2], instanceId: iStone });
-          iStone++;
-        } else if (type === 2) {
-          dirtMesh.setMatrixAt(iDirt, dummy.matrix);
-          dirtInstances.push({ x: parts[0], y: parts[1], z: parts[2], instanceId: iDirt });
-          iDirt++;
-        } else if (type === 3) {
-          grassMesh.setMatrixAt(iGrass, dummy.matrix);
-          grassInstances.push({ x: parts[0], y: parts[1], z: parts[2], instanceId: iGrass });
-          iGrass++;
-        }
-      }
-    }
-    stoneMesh.instanceMatrix.needsUpdate = true;
-    dirtMesh.instanceMatrix.needsUpdate = true;
-    grassMesh.instanceMatrix.needsUpdate = true;
-    
-    const voxelGroup = new THREE.Group();
-    voxelGroup.add(stoneMesh);
-    voxelGroup.add(dirtMesh);
-    voxelGroup.add(grassMesh);
-    scene.add(voxelGroup);
-    
-    /***** INVENTORY HUD *****/
-    // Inventory for block placement.
-    const inventoryData = {
-      stone: 0,
-      dirt: 0,
-      grass: 0,
-      gel: 0
-    };
-    // We'll let mined blocks add to the inventory.
-    const invOrder = ["stone", "dirt", "grass"];
-    let selectedSlot = 0;
-    
-    const hudDiv = document.getElementById("hud");
-    function updateHUD() {
-      let html = "";
-      invOrder.forEach((item, i) => {
-        let border = (i === selectedSlot) ? "yellow" : "#555";
-        // Convert the texture canvas to a data URL.
-        let imgSrc = "";
-        if (item === "stone") imgSrc = createStoneTexture().image.toDataURL();
-        else if (item === "dirt") imgSrc = createDirtTexture().image.toDataURL();
-        else if (item === "grass") imgSrc = createGrassTexture().image.toDataURL();
-        html += `<div class="inv-slot" style="border: 2px solid ${border};">
-                   <img src="${imgSrc}" /><br>${item}: ${inventoryData[item]}
-                 </div>`;
-      });
-      hudDiv.innerHTML = html;
-    }
-    updateHUD();
-    
-    /***** RAYCASTER FOR MINING & PLACEMENT *****/
-    const raycaster = new THREE.Raycaster();
-    const pointer = new THREE.Vector2(0,0); // center of screen
-    
-    // Left-click: mine block
-    window.addEventListener("mousedown", function(e) {
-      if(e.button === 0 && controls.isLocked) {
-        raycaster.setFromCamera(pointer, camera);
-        const intersects = raycaster.intersectObjects([stoneMesh, dirtMesh, grassMesh]);
-        if (intersects.length > 0) {
-          const hit = intersects[0];
-          const mesh = hit.object;
-          let instanceArray, instancesArray, blockType = "";
-          if (mesh === stoneMesh) { instanceArray = stoneMesh; instancesArray = stoneInstances; blockType = "stone"; }
-          else if (mesh === dirtMesh) { instanceArray = dirtMesh; instancesArray = dirtInstances; blockType = "dirt"; }
-          else if (mesh === grassMesh) { instanceArray = grassMesh; instancesArray = grassInstances; blockType = "grass"; }
-          if (instanceArray && hit.instanceId != null) {
-            // Get the grid position from our instance data.
-            const data = instancesArray[hit.instanceId];
-            if (data) {
-              const key = data.x + "_" + data.y + "_" + data.z;
-              // Remove block in our worldData.
-              worldData[key] = 0;
-              // Add block resource to inventory.
-              inventoryData[blockType]++;
-              updateHUD();
-              // "Remove" the block by moving the instance offscreen.
-              dummy.position.set(9999, 9999, 9999);
-              dummy.updateMatrix();
-              instanceArray.setMatrixAt(hit.instanceId, dummy.matrix);
-              instanceArray.instanceMatrix.needsUpdate = true;
-            }
-          }
-        }
-      }
-    });
-    
-    // Right-click: place block
-    window.addEventListener("contextmenu", function(e) {
-      e.preventDefault();
-      if (!controls.isLocked) return; 
-      raycaster.setFromCamera(pointer, camera);
-      const intersects = raycaster.intersectObjects([stoneMesh, dirtMesh, grassMesh]);
-      let placePos = null;
-      if(intersects.length > 0) {
-        const hit = intersects[0];
-        // Get the face normal and the block's grid position from instance data.
-        let data;
-        if(hit.object === stoneMesh) data = stoneInstances[hit.instanceId];
-        else if(hit.object === dirtMesh) data = dirtInstances[hit.instanceId];
-        else if(hit.object === grassMesh) data = grassInstances[hit.instanceId];
-        if(data) {
-          const normal = hit.face.normal;
-          placePos = {
-            x: data.x + (normal.x > 0.5 ? 1 : (normal.x < -0.5 ? -1 : 0)),
-            y: data.y + (normal.y > 0.5 ? 1 : (normal.y < -0.5 ? -1 : 0)),
-            z: data.z + (normal.z > 0.5 ? 1 : (normal.z < -0.5 ? -1 : 0))
-          };
-        }
-      } else {
-        // If no block is hit, place 3 units in front of the camera.
-        const dir = new THREE.Vector3();
-        camera.getWorldDirection(dir);
-        const pos = controls.getObject().position.clone().add(dir.multiplyScalar(3));
-        placePos = {
-          x: Math.floor(pos.x),
-          y: Math.floor(pos.y),
-          z: Math.floor(pos.z)
-        };
-      }
-      if(placePos) {
-        const key = placePos.x + "_" + placePos.y + "_" + placePos.z;
-        if (!worldData[key] || worldData[key] === 0) {
-          // Get the selected block type from invOrder.
-          const sel = invOrder[selectedSlot];
-          let blockType = 0;
-          if(sel === "stone") blockType = 1;
-          else if(sel === "dirt") blockType = 2;
-          else if(sel === "grass") blockType = 3;
-          if(blockType !== 0 && inventoryData[sel] > 0) {
-            worldData[key] = blockType;
-            // For simplicity, add a new individual mesh for this block.
-            const geo = new THREE.BoxGeometry(1,1,1);
-            const mat = new THREE.MeshLambertMaterial({ map: 
-                      blockType === 1 ? createStoneTexture() : 
-                      blockType === 2 ? createDirtTexture() : createGrassTexture() });
-            const cube = new THREE.Mesh(geo, mat);
-            cube.position.set(placePos.x + 0.5, placePos.y + 0.5, placePos.z + 0.5);
-            voxelGroup.add(cube);
-            inventoryData[sel]--;
-            updateHUD();
-          }
-        }
-      }
-      return false;
-    });
-    
-    /***** ANIMATION LOOP & MOVEMENT *****/
-    const clockMovement = new THREE.Clock();
-    function animate() {
-      requestAnimationFrame(animate);
-      const delta = clockMovement.getDelta();
-      if(controls.isLocked === true) {
-        velocity.x -= velocity.x * 10.0 * delta;
-        velocity.z -= velocity.z * 10.0 * delta;
-      
-        direction.z = Number(move.forward) - Number(move.backward);
-        direction.x = Number(move.right) - Number(move.left);
-        direction.normalize();
-      
-        if(move.forward || move.backward) velocity.z -= direction.z * 400.0 * delta;
-        if(move.left || move.right) velocity.x -= direction.x * 400.0 * delta;
-      
-        controls.moveRight(- velocity.x * delta);
-        controls.moveForward(- velocity.z * delta);
-      }
-      renderer.render(scene, camera);
-    }
-    animate();
-    
-    window.addEventListener("resize", function() {
-      camera.aspect = window.innerWidth / window.innerHeight;
-      camera.updateProjectionMatrix();
+    </style>
+    <!-- Load Three.js and PointerLockControls from a CDN -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r134/three.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/three@0.134.0/examples/js/controls/PointerLockControls.js"></script>
+  </head>
+  <body>
+    <div id="instructions">Click to lock pointer. Use WASD to move and mouse to look.</div>
+    <script>
+      // Setup scene, camera, renderer
+      let scene = new THREE.Scene();
+      scene.background = new THREE.Color(0x87CEEB);  // sky blue
+
+      let camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000);
+      camera.position.set(0, 10, 0);
+
+      const renderer = new THREE.WebGLRenderer({ antialias: true });
       renderer.setSize(window.innerWidth, window.innerHeight);
-    });
-    
-    /***** End of Demo *****/
-  </script>
-</body>
+      document.body.appendChild(renderer.domElement);
+
+      // Add a flat ground for reference
+      const groundGeo = new THREE.PlaneGeometry(200, 200);
+      const groundMat = new THREE.MeshLambertMaterial({ color: 0x228B22 });
+      const ground = new THREE.Mesh(groundGeo, groundMat);
+      ground.rotation.x = -Math.PI / 2;
+      scene.add(ground);
+
+      // Add ambient and directional lights
+      const ambientLight = new THREE.AmbientLight(0xffffff, 0.5);
+      scene.add(ambientLight);
+      const directionalLight = new THREE.DirectionalLight(0xffffff, 0.8);
+      directionalLight.position.set(0, 50, 50);
+      scene.add(directionalLight);
+
+      // Setup PointerLockControls
+      const controls = new THREE.PointerLockControls(camera, document.body);
+      scene.add(controls.getObject());
+
+      // When the pointer is locked, hide instructions.
+      document.addEventListener("pointerlockchange", function() {
+        if(document.pointerLockElement === document.body) {
+          document.getElementById("instructions").style.display = "none";
+        } else {
+          document.getElementById("instructions").style.display = "";
+        }
+      }, false);
+
+      // Click to lock the pointer.
+      document.body.addEventListener("click", () => {
+        controls.lock();
+      }, false);
+
+      // Movement variables
+      const move = { forward: false, backward: false, left: false, right: false };
+      const velocity = new THREE.Vector3();
+      const direction = new THREE.Vector3();
+      const clock = new THREE.Clock();
+
+      // keyboard input events
+      document.addEventListener("keydown", function(e) {
+        switch(e.code) {
+          case "KeyW": move.forward = true; break;
+          case "KeyS": move.backward = true; break;
+          case "KeyA": move.left = true; break;
+          case "KeyD": move.right = true; break;
+        }
+      });
+      document.addEventListener("keyup", function(e) {
+        switch(e.code) {
+          case "KeyW": move.forward = false; break;
+          case "KeyS": move.backward = false; break;
+          case "KeyA": move.left = false; break;
+          case "KeyD": move.right = false; break;
+        }
+      });
+
+      // Animation loop: update movement and render
+      function animate() {
+        requestAnimationFrame(animate);
+        const delta = clock.getDelta();
+
+        if (controls.isLocked === true) {
+          // Apply friction
+          velocity.x -= velocity.x * 10.0 * delta;
+          velocity.z -= velocity.z * 10.0 * delta;
+          // Determine movement direction
+          direction.z = Number(move.forward) - Number(move.backward);
+          direction.x = Number(move.right) - Number(move.left);
+          direction.normalize();
+          // Accelerate based on input
+          if (move.forward || move.backward) velocity.z -= direction.z * 400.0 * delta;
+          if (move.left || move.right) velocity.x -= direction.x * 400.0 * delta;
+          // Move at the updated velocity
+          controls.moveRight(- velocity.x * delta);
+          controls.moveForward(- velocity.z * delta);
+        }
+        renderer.render(scene, camera);
+      }
+      animate();
+
+      window.addEventListener("resize", function () {
+        camera.aspect = window.innerWidth / window.innerHeight;
+        camera.updateProjectionMatrix();
+        renderer.setSize(window.innerWidth, window.innerHeight);
+      });
+    </script>
+  </body>
 </html>
