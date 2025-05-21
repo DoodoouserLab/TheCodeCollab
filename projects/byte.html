@@ -48,6 +48,26 @@
       text-shadow: 0 0 1px rgba(51, 255, 51, 0.4), 0 0 2px rgba(255, 255, 255, 0.8);
     }
 
+    .terminal {
+      &::-webkit-scrollbar {
+        width: 12px;
+        background: #111;
+      }
+      &::-webkit-scrollbar-thumb {
+        background: rgba(51, 255, 51, 0.5);
+        border-radius: 6px;
+        border: 2px solid #222;
+      }
+      &::-webkit-scrollbar-thumb:hover {
+        background: rgba(51, 255, 51, 0.8);
+      }
+      &::-webkit-scrollbar-corner {
+        background: #222;
+      }
+      scrollbar-color: rgba(51,255,51,0.5) #111;
+      scrollbar-width: thin;
+    }
+
     .os-header {
       text-align: center;
       font-size: 1.5rem;
