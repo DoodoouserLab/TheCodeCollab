@@ -4,17 +4,8 @@
   <meta charset="UTF-8">
   <title>ExploreBox v1.2.2</title>
   <style>
-    html, body {
-      margin: 0;
-      padding: 0;
-      overflow: hidden;
-      background: #000;
-    }
-    canvas {
-      display: block;
-      image-rendering: pixelated;
-      background: #000;
-    }
+    html, body { margin:0; padding:0; overflow:hidden; background: #000; }
+    canvas { display: block; image-rendering: pixelated; background: #000; }
   </style>
 </head>
 <body>
@@ -35,6 +26,25 @@
     window.addEventListener("resize", resizeCanvas);
     resizeCanvas();
 
+    // ===== FPS Meter =====
+    let lastFrameTime = performance.now();
+    let frames = 0, fps = 0, lastFpsUpdate = performance.now();
+    function updateFpsMeter() {
+      frames++;
+      let now = performance.now();
+      if (now - lastFpsUpdate >= 500) {
+        fps = Math.round(frames * 1000 / (now - lastFpsUpdate));
+        frames = 0;
+        lastFpsUpdate = now;
+      }
+    }
+    function drawFpsMeter() {
+      ctx.font = "16px Courier New";
+      ctx.fillStyle = "#fff";
+      ctx.textAlign = "left";
+      ctx.fillText("FPS: " + fps, 12, 24);
+    }
+
     // ===== Player Image =====
     const playerImg = new Image();
     playerImg.src = "assets/player.png";
@@ -45,13 +55,8 @@
     // ===== World =====
     const worldWidth = 1000, worldHeight = 400, tileSize = 16;
     const blockColors = {
-      0: "#87CEEB", // air (not drawn)
-      1: "#8B4513", // dirt
-      2: "#808080", // stone
-      3: "#228B22", // grass
-      4: "#A0522D", // wood
-      5: "#32CD32", // leaves
-      6: "#FFD700"  // torch
+      0: "#87CEEB", 1: "#8B4513", 2: "#808080", 3: "#228B22",
+      4: "#A0522D", 5: "#32CD32", 6: "#FFD700"
     };
     const blockDurability = { 1: 2, 2: 4, 3: 1, 4: 3, 5: 1, 6: 1 };
     const world = [];
@@ -193,10 +198,11 @@
         height: tileSize,
         vx: 0,
         vy: 0,
-        speed: 0.7,
+        speed: 0.85,
         grounded: false,
         health: 20,
-        type: "slime"
+        type: "slime",
+        bounceCooldown: 0 // ticks until next jump
       });
     }
     for (let i = 0; i < 10; i++) {
@@ -207,17 +213,31 @@
     function updateEnemies() {
       for (let i = enemies.length - 1; i >= 0; i--) {
         let enemy = enemies[i];
+
+        // --- Slime Bouncing AI ---
+        enemy.bounceCooldown--;
         let dx = player.x - enemy.x, dy = player.y - enemy.y;
         let dist = Math.sqrt(dx * dx + dy * dy);
-        // AI: chase player if close, wander otherwise
-        if (dist < 300) {
-          enemy.vx = (dx > 2) ? enemy.speed : (dx < -2 ? -enemy.speed : 0);
-        } else {
-          enemy.vx += (Math.random() - 0.5) * 0.1;
-          if (enemy.vx > enemy.speed) enemy.vx = enemy.speed;
-          if (enemy.vx < -enemy.speed) enemy.vx = -enemy.speed;
+
+        // Only jump if on ground and cooldown over
+        if (enemy.grounded && enemy.bounceCooldown <= 0) {
+          let jumpDir = 0;
+          // If player is close, jump toward them, else random direction
+          if (dist < 300) {
+            jumpDir = (dx > 8) ? 1 : ((dx < -8) ? -1 : 0);
+          } else {
+            jumpDir = (Math.random() < 0.5) ? -1 : 1;
+            if (Math.random() < 0.15) jumpDir = 0; // sometimes just jump up
+          }
+          enemy.vy = -6.2 - Math.random() * 1.5;
+          enemy.vx = jumpDir * (enemy.speed + Math.random() * 0.5);
+          enemy.bounceCooldown = 45 + Math.floor(Math.random() * 25); // ~0.75s at 60fps
         }
+        // Friction on ground
+        if (enemy.grounded) enemy.vx *= 0.7;
+
         updateEntityPhysics(enemy);
+
         // Hurt player if touching
         if (checkCollision(enemy, player) && !isDead) {
           player.health -= 0.5;
@@ -641,6 +661,9 @@
         }
       }
 
+      // FPS Meter
+      drawFpsMeter();
+
       // Inventory
       drawInventory();
       // Crafting menu
@@ -681,6 +704,7 @@
       }
     }
     function gameLoop() {
+      updateFpsMeter();
       updatePlayer();
       updateEnemies();
       updateSlimeSpawning();
