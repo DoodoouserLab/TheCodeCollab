@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8">
-  <title>ExploreBox - Sunlight/Day-Night Lighting</title>
+  <title>ExploreBox Enhanced</title>
   <style>
     html, body { margin:0; padding:0; overflow:hidden; background:#000; }
     canvas { display:block; image-rendering: pixelated; background: #000; }
@@ -11,7 +11,7 @@
 <body>
 <canvas id="game"></canvas>
 <script>
-// ===== Canvas =====
+/* ===== Canvas & FPS Meter ===== */
 const canvas = document.getElementById("game");
 const ctx = canvas.getContext("2d");
 function resizeCanvas() {
@@ -21,7 +21,6 @@ function resizeCanvas() {
 window.addEventListener("resize", resizeCanvas);
 resizeCanvas();
 
-// ===== FPS Meter =====
 let frames = 0, fps = 0, lastFpsUpdate = performance.now();
 function updateFpsMeter() {
   frames++;
@@ -32,14 +31,14 @@ function updateFpsMeter() {
     lastFpsUpdate = now;
   }
 }
-function drawFpsMeter() {
+function drawFpsMeter(ctx) {
   ctx.font = "16px Courier New";
   ctx.fillStyle = "#fff";
   ctx.textAlign = "left";
   ctx.fillText("FPS: " + fps, 12, 24);
 }
 
-// ===== World Generation =====
+/* ===== World Generation ===== */
 const tileSize = 16;
 const worldWidth = 1000, worldHeight = 400;
 const blockColors = {
@@ -96,6 +95,7 @@ for (let x = 5; x < worldWidth - 5; x++) {
     }
   }
 })();
+
 function findSurfaceY(x) {
   for (let y = 0; y < worldHeight; y++) if (world[x][y] !== 0) return y - 1;
   return worldHeight - 2;
@@ -118,61 +118,16 @@ function getBlock(x, y) {
   return world[x][y];
 }
 
-// ===== Day/Night Cycle and Sun/Moon Light Source =====
-let timeOfDay = 0; // 0 to 1, where 0 = sunrise, 0.5 = sunset, 1 = next sunrise
-let DAY_LENGTH_SEC = 240; // 4 min per full day
-function updateTimeOfDay() {
-  timeOfDay += 1 / (DAY_LENGTH_SEC * 60); // 60fps
-  if (timeOfDay > 1) timeOfDay -= 1;
-}
-function isNight() {
-  return (timeOfDay < 0.20 || timeOfDay > 0.80);
-}
-function getDayLightValue() {
-  // Returns a value between 0.2 (midnight) and 1.0 (midday)
-  let t = timeOfDay;
-  let daylight = 0.2 + 0.8 * Math.max(0, Math.cos((t - 0.25) * 2 * Math.PI));
-  return daylight;
-}
-function getSunMoonPos() {
-  // Sun/moon moves in a big arc
-  let angle = (timeOfDay - 0.25) * 2 * Math.PI; // noon is at top
-  let sunX = worldWidth/2 + Math.cos(angle) * (worldWidth/2 - 80/tileSize);
-  let sunY = 8 + Math.sin(angle) * 8;
-  return {x: sunX, y: sunY, angle: angle};
-}
-
-// ===== Terraria-Style Lighting (with sun as circular light source) =====
-const TORCH_LIGHT_RADIUS = 8;
-const TORCH_LIGHT_STRENGTH = 1.0;
-const SUN_LIGHT_RADIUS = 40; // in tiles
-const MOON_LIGHT_RADIUS = 24;
-const MIN_LIGHT = 0.10;
+/* ===== Lighting System (fixed, no over-darkening) ===== */
+const LIGHT_SURFACE_Y = 15;
+const TORCH_LIGHT_RADIUS = 6;
 let dynamicLightMap = [];
 function resetLightMap() {
-  const daylight = getDayLightValue();
   dynamicLightMap = [];
-  // Sun or moon's pixel position in world coords
-  let sunMoon = getSunMoonPos();
-  let sunTileX = sunMoon.x, sunTileY = sunMoon.y;
-  let surfaceLight = isNight() ? 0.30 : daylight;
-  let sunRadius = isNight() ? MOON_LIGHT_RADIUS : SUN_LIGHT_RADIUS;
   for (let x = 0; x < worldWidth; x++) {
     dynamicLightMap[x] = [];
     for (let y = 0; y < worldHeight; y++) {
-      // Distance from sun/moon
-      let dx = x - sunTileX;
-      let dy = y - sunTileY;
-      let dist = Math.sqrt(dx * dx + dy * dy);
-      // Sun (day): big, strong, slightly yellowish light
-      // Moon (night): smaller, dimmer, blue-tinted
-      let localLight = Math.max(MIN_LIGHT, surfaceLight * Math.max(0, 1 - dist / sunRadius));
-      // Fade with depth
-      if (y > 14) {
-        localLight *= 1 - Math.min(1, (y - 14) / 20);
-        localLight = Math.max(MIN_LIGHT, localLight);
-      }
-      dynamicLightMap[x][y] = localLight;
+      dynamicLightMap[x][y] = (y < LIGHT_SURFACE_Y) ? 1 : 0.35; // underground is dim, not black
     }
   }
 }
@@ -185,10 +140,8 @@ function propagateTorchLight() {
             let tx = x + dx, ty = y + dy;
             if (tx < 0 || tx >= worldWidth || ty < 0 || ty >= worldHeight) continue;
             let dist = Math.sqrt(dx * dx + dy * dy);
-            let strength = Math.max(0, TORCH_LIGHT_STRENGTH * (1 - dist / TORCH_LIGHT_RADIUS));
-            if (dist === 0 || getBlock(tx, ty) === 0 || !isSolid(getBlock(tx,ty))) {
-              dynamicLightMap[tx][ty] = Math.max(dynamicLightMap[tx][ty], strength);
-            }
+            let strength = Math.max(0, 1 - dist / TORCH_LIGHT_RADIUS);
+            dynamicLightMap[tx][ty] = Math.max(dynamicLightMap[tx][ty], strength);
           }
         }
       }
@@ -196,7 +149,7 @@ function propagateTorchLight() {
   }
 }
 
-// ===== Player =====
+/* ===== Player ===== */
 const player = {
   x: 50 * tileSize,
   y: findSurfaceY(50) * tileSize,
@@ -231,7 +184,7 @@ function respawnPlayer() {
   player.y = findSurfaceY(50) * tileSize;
 }
 
-// ===== Hunger System =====
+/* ===== Hunger System ===== */
 let hungerTick = 0;
 function updateHunger() {
   if (isDead || craftingMenuActive) return;
@@ -257,9 +210,9 @@ function tryEatGel() {
   }
 }
 
-// ====== Enemies (Slimes) ======
+/* ====== Enemies (Slimes) ====== */
 const enemies = [];
-const MAX_ENEMIES = 16;
+const MAX_ENEMIES = 6;
 const ENEMY_VISIBLE_RADIUS = 900;
 const SLIME_SIGHT_DISTANCE = tileSize * 17.75;
 function spawnEnemy(x, y) {
@@ -270,14 +223,14 @@ function spawnEnemy(x, y) {
     y: tileY * tileSize,
     width: tileSize,
     height: tileSize,
-    vx: 0, vy: 0, speed: 1.05,
+    vx: 0, vy: 0, speed: 0.4,
     grounded: false,
     health: 20,
     type: "slime",
     bounceCooldown: 0
   });
 }
-for (let i = 0; i < 5; i++) {
+for (let i = 0; i < 8; i++) {
   let ex = Math.floor(Math.random() * (worldWidth - 20)) + 10, ey = findSurfaceY(ex);
   spawnEnemy(ex * tileSize, ey * tileSize);
 }
@@ -286,7 +239,8 @@ function updateEnemies() {
     let enemy = enemies[i];
     let centerX = enemy.x + enemy.width / 2, centerY = enemy.y + enemy.height / 2;
     let dx = centerX - (player.x + player.width / 2), dy = centerY - (player.y + player.height / 2);
-    if (Math.abs(dx) > canvas.width/2 + 100 || Math.abs(dy) > canvas.height/2 + 100) continue;
+    if (Math.abs(dx) > ENEMY_VISIBLE_RADIUS || Math.abs(dy) > ENEMY_VISIBLE_RADIUS) continue;
+
     enemy.bounceCooldown--;
     let pdx = player.x - enemy.x, pdist = Math.abs(pdx);
     if (pdist < SLIME_SIGHT_DISTANCE) {
@@ -319,9 +273,7 @@ function updateSlimeSpawning() {
     let dx = centerX - (player.x + player.width / 2), dy = centerY - (player.y + player.height / 2);
     if (Math.abs(dx) < ENEMY_VISIBLE_RADIUS && Math.abs(dy) < ENEMY_VISIBLE_RADIUS) onscreen++;
   }
-  // More slimes at night!
-  let baseRate = isNight() ? 0.009 : 0.003;
-  if (onscreen < MAX_ENEMIES && Math.random() < baseRate) {
+  if (onscreen < MAX_ENEMIES && Math.random() < 0.001) {
     let attempts = 0, found = false, spawnX, spawnY;
     while (attempts < 10 && !found) {
       spawnX = Math.floor(player.x / tileSize) + Math.floor((Math.random() - 0.5) * 30);
@@ -333,7 +285,7 @@ function updateSlimeSpawning() {
       attempts++;
     }
     if (found) spawnEnemy(spawnX * tileSize, spawnY * tileSize);
-    else if (Math.random() < 0.13) {
+    else if (Math.random() < 0.11) {
       let ex = Math.floor(player.x / tileSize) + Math.floor((Math.random() - 0.5) * 40);
       ex = Math.max(3, Math.min(worldWidth - 3, ex));
       let ey = findSurfaceY(ex);
@@ -342,7 +294,7 @@ function updateSlimeSpawning() {
   }
 }
 
-// ===== Physics =====
+/* ===== Physics ===== */
 function checkCollision(a, b) {
   return (a.x < b.x + b.width && a.x + a.width > b.x && a.y < b.y + b.height && a.y + a.height > b.y);
 }
@@ -370,7 +322,7 @@ function updateEntityPhysics(entity) {
   }
 }
 
-// ===== Mining =====
+/* ===== Mining ===== */
 let isMining = false, currentMiningTarget = null, lastMousePos = { x: 0, y: 0 };
 function getMiningMultiplier() { return player.inventory.wooden_pickaxe > 0 ? 2 : 0.5; }
 const miningDamage = 0.1;
@@ -405,7 +357,7 @@ function updateMining() {
   }
 }
 
-// ===== Block Placement =====
+/* ===== Block Placement ===== */
 const placeableMapping = {"dirt": 1, "stone": 2, "grass": 3, "wood": 4, "leaves": 5, "torch": 6};
 function canPlaceBlockAt(x, y) {
   if (getBlock(x, y) !== 0) return false;
@@ -436,7 +388,7 @@ function handleBlockPlacement(event) {
 }
 canvas.addEventListener("contextmenu", function(e) { e.preventDefault(); handleBlockPlacement(e); return false; });
 
-// ===== Crafting =====
+/* ===== Crafting ===== */
 const recipes = [
   { name: "Torch", ingredients: { wood: 1, gel: 1 }, result: { key: "torch", amount: 3 }},
   { name: "Wooden Pickaxe", ingredients: { wood: 10, stone: 3 }, result: { key: "wooden_pickaxe", amount: 1 }},
@@ -462,7 +414,7 @@ function handleCraftingMenuClick(e) {
     if (mx >= box.x && mx <= box.x + box.width && my >= box.y && my <= box.y + box.height) craftItem(box.recipe);
 }
 
-// ===== Input =====
+/* ===== Input ===== */
 const keys = {};
 window.addEventListener("keydown", e => {
   if (e.key === "c" || e.key === "C") craftingMenuActive = !craftingMenuActive;
@@ -497,7 +449,7 @@ canvas.addEventListener("touchend", e => {
   if (!craftingMenuActive) { isMining = false; currentMiningTarget = null; }
 }, { passive: false });
 
-// ===== Combat =====
+/* ===== Combat ===== */
 function tryAttackEnemy() {
   const selectedItem = inventoryOrder[player.selectedSlot];
   if (selectedItem !== "wooden_sword" || player.inventory.wooden_sword <= 0) return;
@@ -509,7 +461,7 @@ function tryAttackEnemy() {
   }
 }
 
-// ===== UI =====
+/* ===== UI ===== */
 function drawIcon(itemKey, x, y, size) {
   switch (itemKey) {
     case "dirt": ctx.fillStyle = "#8B4513"; ctx.fillRect(x, y, size, size); break;
@@ -519,8 +471,8 @@ function drawIcon(itemKey, x, y, size) {
     case "leaves": ctx.fillStyle = "#32CD32"; ctx.fillRect(x, y, size, size); break;
     case "gel": ctx.fillStyle = "#7FFFD4"; ctx.fillRect(x, y, size, size); break;
     case "torch": ctx.fillStyle = "#FFD700"; ctx.fillRect(x, y, size, size); break;
-    case "wooden_pickaxe": ctx.fillStyle = "#8B4513"; ctx.fillRect(x + size * 0.35, y + size * 0.3, size * 0.1, size * 0.5); ctx.fillStyle = "#808080"; ctx.fillRect(x + size * 0.2, y + size * 0.2, size * 0.2, size * 0.2); break;
-    case "wooden_sword": ctx.fillStyle = "#808080"; ctx.fillRect(x + size * 0.45, y + size * 0.1, size * 0.1, size * 0.6); ctx.fillStyle = "#8B4513"; ctx.fillRect(x + size * 0.4, y + size * 0.7, size * 0.2, size * 0.2); break;
+    case "wooden_pickaxe": ctx.fillStyle = "#8B4513"; ctx.fillRect(x + size * 0.35, y + size * 0.3, size * 0.1, size * 0.5); ctx.fillStyle = "#808080"; ctx.fillRect(x + size * 0.2, y + size * 0.2, size * 0.6, size * 0.15); break;
+    case "wooden_sword": ctx.fillStyle = "#808080"; ctx.fillRect(x + size * 0.45, y + size * 0.1, size * 0.1, size * 0.6); ctx.fillStyle = "#8B4513"; ctx.fillRect(x + size * 0.4, y + size * 0.7, size * 0.2, size * 0.15); break;
     default: ctx.fillStyle = "#FFF"; ctx.fillRect(x, y, size, size);
   }
 }
@@ -565,29 +517,9 @@ function drawCraftingMenu() {
   }
 }
 function draw() {
-  // Sky background changes with time
-  let t = timeOfDay;
-  let skyColorTop, skyColorBottom;
-  if (isNight()) {
-    skyColorTop = "#0D1B2A";
-    skyColorBottom = "#232946";
-  } else {
-    skyColorTop = "#00BFFF";
-    skyColorBottom = "#87CEEB";
-  }
-  const grd = ctx.createLinearGradient(0, 0, 0, canvas.height);
-  grd.addColorStop(0, skyColorTop); grd.addColorStop(1, skyColorBottom);
+  const grd = ctx.createLinearGradient(0, 0, 0, canvas.height); grd.addColorStop(0, "#00BFFF"); grd.addColorStop(1, "#87CEEB");
   ctx.fillStyle = grd; ctx.fillRect(0, 0, canvas.width, canvas.height);
-
-  // Sun/moon
-  let sunMoon = getSunMoonPos();
-  let sunScreenX = (sunMoon.x * tileSize) - (player.x - canvas.width/2 + player.width/2);
-  let sunScreenY = (sunMoon.y * tileSize) - (player.y - canvas.height/2 + player.height/2);
-  if (!isNight()) {
-    ctx.beginPath(); ctx.arc(sunScreenX, sunScreenY, 30, 0, 2 * Math.PI); ctx.fillStyle = "#FDB813"; ctx.fill(); ctx.strokeStyle = "#E59400"; ctx.stroke();
-  } else {
-    ctx.beginPath(); ctx.arc(sunScreenX, sunScreenY, 22, 0, 2 * Math.PI); ctx.fillStyle = "#dbeafe"; ctx.fill(); ctx.strokeStyle = "#7f9fc9"; ctx.stroke();
-  }
+  ctx.beginPath(); ctx.arc(80, 80, 30, 0, 2 * Math.PI); ctx.fillStyle = "#FDB813"; ctx.fill(); ctx.strokeStyle = "#E59400"; ctx.stroke();
 
   resetLightMap();
   propagateTorchLight();
@@ -596,26 +528,23 @@ function draw() {
   const startCol = Math.floor(cameraX / tileSize) - 1, endCol = startCol + Math.ceil(canvas.width / tileSize) + 2;
   const startRow = Math.floor(cameraY / tileSize) - 1, endRow = startRow + Math.ceil(canvas.height / tileSize) + 2;
 
-  for (let x = startCol; x <= endCol; x++) {
-    for (let y = startRow; y <= endRow; y++) {
-      if (x >= 0 && x < worldWidth && y >= 0 && y < worldHeight) {
-        const block = world[x][y];
-        if (block !== 0) {
-          const drawX = x * tileSize - cameraX, drawY = y * tileSize - cameraY;
-          let light = dynamicLightMap[x][y];
-          ctx.fillStyle = blockColors[block] || "#FFF";
+  for (let x = startCol; x <= endCol; x++) for (let y = startRow; y <= endRow; y++)
+    if (x >= 0 && x < worldWidth && y >= 0 && y < worldHeight) {
+      const block = world[x][y];
+      if (block !== 0) {
+        const drawX = x * tileSize - cameraX, drawY = y * tileSize - cameraY;
+        let light = dynamicLightMap[x][y];
+        ctx.fillStyle = blockColors[block] || "#FFF";
+        ctx.fillRect(drawX, drawY, tileSize, tileSize);
+        ctx.strokeStyle = "rgba(0,0,0,0.3)"; ctx.lineWidth = 1; ctx.strokeRect(drawX, drawY, tileSize, tileSize);
+        if (light < 0.99) {
+          ctx.globalAlpha = 1 - Math.max(light, 0.18); // never fully black!
+          ctx.fillStyle = "#000";
           ctx.fillRect(drawX, drawY, tileSize, tileSize);
-          ctx.strokeStyle = "rgba(0,0,0,0.3)"; ctx.lineWidth = 1; ctx.strokeRect(drawX, drawY, tileSize, tileSize);
-          if (light < 0.99) {
-            ctx.globalAlpha = 1 - light;
-            ctx.fillStyle = "#000";
-            ctx.fillRect(drawX, drawY, tileSize, tileSize);
-            ctx.globalAlpha = 1.0;
-          }
+          ctx.globalAlpha = 1.0;
         }
       }
     }
-  }
 
   for (let drop of droppedItems)
     drawIcon(drop.key, drop.x * tileSize - cameraX, drop.y * tileSize - cameraY, tileSize);
@@ -630,14 +559,13 @@ function draw() {
     drawIcon(selectedItem, handX - cameraX, handY - cameraY, tileSize);
   }
 
-  // Only render slimes if visible on screen!
   for (let enemy of enemies) {
     let centerX = enemy.x + enemy.width / 2, centerY = enemy.y + enemy.height / 2;
     let dx = centerX - (player.x + player.width / 2), dy = centerY - (player.y + player.height / 2);
     if (Math.abs(dx) > canvas.width / 2 + 100 || Math.abs(dy) > canvas.height / 2 + 100) continue;
     let tileX = Math.floor(enemy.x / tileSize), tileY = Math.floor(enemy.y / tileSize);
-    let light = (dynamicLightMap[tileX] && dynamicLightMap[tileX][tileY]) || MIN_LIGHT;
-    ctx.globalAlpha = Math.max(light, MIN_LIGHT);
+    let light = (dynamicLightMap[tileX] && dynamicLightMap[tileX][tileY]) || 0.18;
+    ctx.globalAlpha = Math.max(light, 0.26); // slimes are always visible (but faded in the dark)
     ctx.fillStyle = "green";
     ctx.fillRect(enemy.x - cameraX, enemy.y - cameraY, enemy.width, enemy.height);
     let barWidth = enemy.width, barHeight = 4, hpFrac = Math.max(0, enemy.health / 20),
@@ -686,7 +614,7 @@ function draw() {
       }
     }
   }
-  drawFpsMeter();
+  drawFpsMeter(ctx);
   drawInventory();
   if (craftingMenuActive) drawCraftingMenu();
   if (isDead) {
@@ -699,7 +627,7 @@ function draw() {
   }
 }
 
-// ====== Game Loop ======
+/* ====== Game Loop ====== */
 let isDead = false, droppedItems = [];
 function updatePlayer() {
   if (craftingMenuActive || isDead) return;
@@ -721,7 +649,6 @@ function updatePlayer() {
 }
 function gameLoop() {
   updateFpsMeter();
-  updateTimeOfDay();
   updatePlayer();
   updateHunger();
   updateEnemies();
