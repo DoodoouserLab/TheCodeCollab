@@ -2,16 +2,130 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8">
-  <title>ExploreBox v1.4.0</title>
+  <title>ExploreBox v1.4.1</title>
   <style>
     html, body { margin:0; padding:0; overflow:hidden; background:#141414; }
     canvas { display:block; image-rendering: pixelated; background: #222; }
     /* Inventory/Panel UI for better appearance */
     #game::-webkit-scrollbar { display: none; }
+    /* Inventory Modal Styles */
+    #extra-inventory-modal {
+      position: fixed;
+      top: 0; left: 0;
+      width: 100vw; height: 100vh;
+      background: rgba(0,0,0,0.7);
+      display: none;
+      z-index: 11;
+      justify-content: center;
+      align-items: center;
+    }
+    #extra-inventory-content {
+      background: #232b2b;
+      border: 3px solid #ffe066;
+      border-radius: 18px;
+      min-width: 420px;
+      min-height: 300px;
+      max-width: 92vw;
+      max-height: 80vh;
+      overflow: auto;
+      box-shadow: 0 10px 48px #000c;
+      padding: 22px 28px 16px 28px;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+    }
+    #extra-inventory-content h2 {
+      margin: 0 0 18px 0;
+      color: #ffe066;
+      font-family: "Courier New", monospace;
+      font-size: 28px;
+      text-align: center;
+    }
+    .extra-inventory-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(80px, 1fr));
+      gap: 13px;
+      width: 100%;
+      justify-items: center;
+      margin-bottom: 10px;
+    }
+    .extra-inventory-slot {
+      background: #383838;
+      border: 2px solid #888;
+      border-radius: 9px;
+      padding: 8px 6px 3px 6px;
+      min-width: 72px;
+      min-height: 62px;
+      text-align: center;
+      color: #FFF;
+      font-family: "Courier New", monospace;
+      font-size: 15px;
+      box-shadow: 0 2px 6px #0004;
+      transition: border-color 0.2s;
+      position: relative;
+    }
+    .extra-inventory-slot .qty {
+      position: absolute;
+      bottom: 3px;
+      right: 7px;
+      font-size: 14px;
+      color: #ffe066;
+      font-weight: bold;
+      text-shadow: 1px 1px 2px #222, 0 0 2px #222;
+    }
+    #close-extra-inv {
+      color: #ffe066;
+      background: #222;
+      border: 1px solid #ffe066;
+      border-radius: 6px;
+      padding: 2px 10px;
+      font-size: 17px;
+      margin-top: 5px;
+      cursor: pointer;
+      transition: background 0.18s, color 0.18s;
+      font-family: "Courier New", monospace;
+    }
+    #close-extra-inv:hover {
+      background: #ffe066;
+      color: #232b2b;
+    }
+    /* Crafting Search Styles */
+    #crafting-search-bar {
+      margin-bottom: 15px;
+      width: 90%;
+      max-width: 350px;
+      padding: 7px 10px;
+      font-size: 16px;
+      border-radius: 7px;
+      border: 1.6px solid #ffe066;
+      background: #232b2b;
+      color: #ffe066;
+      outline: none;
+      font-family: "Courier New", monospace;
+      box-shadow: 0 2px 7px #0003;
+    }
+    @media (max-width: 500px) {
+      #extra-inventory-content {
+        min-width: 88vw;
+        padding: 7vw 2vw 3vw 2vw;
+      }
+      .extra-inventory-slot { min-width: 56px; min-height: 48px; font-size: 12px;}
+      #extra-inventory-content h2 { font-size: 20px;}
+    }
   </style>
 </head>
 <body>
 <canvas id="game"></canvas>
+
+<!-- Extra Inventory Modal -->
+<div id="extra-inventory-modal">
+  <div id="extra-inventory-content">
+    <h2>Inventory</h2>
+    <div class="extra-inventory-grid" id="extra-inventory-grid"></div>
+    <button id="close-extra-inv" tabindex="0">Close [E]</button>
+  </div>
+</div>
+
 <script>
 /* ===== Canvas & FPS Meter ===== */
 const canvas = document.getElementById("game");
@@ -188,6 +302,15 @@ function propagateTorchLight() {
 }
 
 /* ===== Player ===== */
+const mainInventoryOrder = [
+  "wood", "stone", "gel", "dirt", "grass", "leaves", "wooden_pickaxe", "wooden_sword", "torch"
+];
+// All other items go in extra inventory
+const extraInventoryOrder = [
+  "copper_ore", "iron_ore", "gold_ore", "sapphire_ore",
+  "copper_bar", "iron_bar", "gold_bar", "sapphire_gem",
+  "iron_pickaxe", "iron_sword", "gold_pickaxe", "sapphire_staff"
+];
 const player = {
   x: 50 * tileSize,
   y: findSurfaceY(50) * tileSize,
@@ -209,16 +332,8 @@ const player = {
   xp: 0, xpToNext: 20,
   selectedSlot: 0
 };
-// Add new inventory slots to inventoryOrder
-const inventoryOrder = [
-  "wood", "stone", "gel", "dirt", "grass", "leaves",
-  "wooden_pickaxe", "wooden_sword", "torch",
-  "copper_ore", "iron_ore", "gold_ore", "sapphire_ore",
-  "copper_bar", "iron_bar", "gold_bar", "sapphire_gem",
-  "iron_pickaxe", "iron_sword", "gold_pickaxe", "sapphire_staff"
-];
 function handlePlayerDeath() {
-  for (let key of inventoryOrder) {
+  for (let key in player.inventory) {
     let amt = player.inventory[key] || 0;
     if (amt > 0) {
       droppedItems.push({x: Math.floor(player.x / tileSize), y: Math.floor(player.y / tileSize), key, amount: amt});
@@ -480,7 +595,7 @@ function handleBlockPlacement(event) {
         cameraY = player.y - canvas.height / 2 + player.height / 2;
   let targetX = Math.floor((mx + cameraX) / tileSize),
       targetY = Math.floor((my + cameraY) / tileSize);
-  const selectedItem = inventoryOrder[player.selectedSlot];
+  const selectedItem = mainInventoryOrder[player.selectedSlot];
   if (!(selectedItem in placeableMapping)) return;
   if (player.inventory[selectedItem] <= 0) return;
   if (!canPlaceBlockAt(targetX, targetY)) return;
@@ -509,6 +624,8 @@ const recipes = [
   { name: "Sapphire Staff", ingredients: { sapphire_gem: 5, wood: 3 }, result: { key: "sapphire_staff", amount: 1 }},
 ];
 let craftingMenuActive = false, recipeMenuBoxes = [];
+let craftingSearchQuery = ""; // for search bar
+
 function canCraft(recipe) {
   for (let ingr in recipe.ingredients)
     if (!player.inventory[ingr] || player.inventory[ingr] < recipe.ingredients[ingr]) return false;
@@ -531,15 +648,27 @@ function handleCraftingMenuClick(e) {
 /* ===== Input ===== */
 const keys = {};
 window.addEventListener("keydown", e => {
+  // Inventory modal toggle - "e"
+  if ((e.key === "e" || e.key === "E") && !craftingMenuActive && !isDead) {
+    toggleExtraInventory();
+    e.preventDefault();
+    return;
+  }
+  // Crafting menu toggle - "c"
   if (e.key === "c" || e.key === "C") craftingMenuActive = !craftingMenuActive;
+  // Main inventory hotbar selection
   if (!isNaN(e.key) && e.key !== "0") {
     const slot = parseInt(e.key) - 1;
-    if (slot < inventoryOrder.length) player.selectedSlot = slot;
+    if (slot < mainInventoryOrder.length) player.selectedSlot = slot;
   }
-  if (!craftingMenuActive) keys[e.key] = true;
-  if (e.key === "e" || e.key === "E") tryEatGel();
+  // Only allow movement/attack if not in modal or crafting
+  if (!craftingMenuActive && !extraInventoryOpen) keys[e.key] = true;
+  // Move food-eating to F (or f)
+  if (e.key === "f" || e.key === "F") tryEatGel();
 });
-window.addEventListener("keyup", e => { if (!craftingMenuActive) keys[e.key] = false; });
+window.addEventListener("keyup", e => {
+  if (!craftingMenuActive && !extraInventoryOpen) keys[e.key] = false;
+});
 canvas.addEventListener("mousemove", e => {
   const rect = canvas.getBoundingClientRect();
   lastMousePos.x = e.clientX - rect.left;
@@ -547,25 +676,28 @@ canvas.addEventListener("mousemove", e => {
 });
 canvas.addEventListener("mousedown", e => {
   if (isDead) { respawnPlayer(); return; }
+  // Don't allow mining or attack when inventory modal open
+  if (extraInventoryOpen) return;
   if (craftingMenuActive) { handleCraftingMenuClick(e); }
   else { isMining = true; const rect = canvas.getBoundingClientRect(); lastMousePos.x = e.clientX - rect.left; lastMousePos.y = e.clientY - rect.top; tryAttackEnemy(); }
 });
-canvas.addEventListener("mouseup", e => { if (!craftingMenuActive) { isMining = false; currentMiningTarget = null; }});
+canvas.addEventListener("mouseup", e => { if (!craftingMenuActive && !extraInventoryOpen) { isMining = false; currentMiningTarget = null; }});
 canvas.addEventListener("touchstart", e => {
   e.preventDefault();
   if (isDead) { respawnPlayer(); return; }
+  if (extraInventoryOpen) return;
   const touch = e.touches[0], rect = canvas.getBoundingClientRect();
   lastMousePos.x = touch.clientX - rect.left; lastMousePos.y = touch.clientY - rect.top;
   if (craftingMenuActive) { handleCraftingMenuClick(touch); } else isMining = true;
 }, { passive: false });
 canvas.addEventListener("touchend", e => {
   e.preventDefault();
-  if (!craftingMenuActive) { isMining = false; currentMiningTarget = null; }
+  if (!craftingMenuActive && !extraInventoryOpen) { isMining = false; currentMiningTarget = null; }
 }, { passive: false });
 
 /* ===== Combat ===== */
 function tryAttackEnemy() {
-  const selectedItem = inventoryOrder[player.selectedSlot];
+  const selectedItem = mainInventoryOrder[player.selectedSlot];
   // New: allow iron/gold sword and sapphire staff
   const swords = ["wooden_sword", "iron_sword", "sapphire_staff"];
   if (!swords.includes(selectedItem) || player.inventory[selectedItem] <= 0) return;
@@ -694,10 +826,10 @@ function roundRect(ctx, x, y, w, h, r) {
   ctx.closePath();
 }
 function drawInventory() {
-  const invSize = 50, gap = 4, totalWidth = inventoryOrder.length * (invSize + gap) - gap;
+  const invSize = 50, gap = 4, totalWidth = mainInventoryOrder.length * (invSize + gap) - gap;
   const startX = (canvas.width - totalWidth) / 2, y = canvas.height - invSize - 10;
-  for (let i = 0; i < inventoryOrder.length; i++) {
-    const item = inventoryOrder[i], x = startX + i * (invSize + gap);
+  for (let i = 0; i < mainInventoryOrder.length; i++) {
+    const item = mainInventoryOrder[i], x = startX + i * (invSize + gap);
     ctx.save();
     ctx.shadowColor = "#000";
     ctx.shadowBlur = 10;
@@ -741,24 +873,238 @@ function drawCraftingMenu() {
   ctx.fillText("Crafting Station", canvas.width / 2, panelY + 40);
   ctx.font = "16px Courier New";
   ctx.fillText("Click a recipe box to craft. Press 'C' to exit.", canvas.width / 2, panelY + 70);
+
+  // Draw search bar
+  const searchBarX = canvas.width / 2 - 160, searchBarY = panelY + 80, searchBarW = 320, searchBarH = 28;
+  ctx.save();
+  ctx.fillStyle = "#232b2b";
+  roundRect(ctx, searchBarX, searchBarY, searchBarW, searchBarH, 7); ctx.fill();
+  ctx.strokeStyle = "#ffe066"; ctx.lineWidth = 2;
+  roundRect(ctx, searchBarX, searchBarY, searchBarW, searchBarH, 7); ctx.stroke();
+  ctx.font = "15px Courier New"; ctx.fillStyle = "#ffe066"; ctx.textAlign = "left";
+  ctx.fillText(craftingSearchQuery ? craftingSearchQuery : "Search recipes...", searchBarX + 10, searchBarY + 20);
+  ctx.restore();
+
+  // Detect click in search bar for focusing search
+  craftingSearchBarClickableRect = {x: searchBarX, y: searchBarY, width: searchBarW, height: searchBarH};
+
+  // Draw recipes (filtered)
+  let filteredRecipes = recipes.filter(r =>
+    r.name.toLowerCase().includes(craftingSearchQuery.toLowerCase()) ||
+    Object.keys(r.ingredients).some(ingr => ingr.replace(/_/g," ").toLowerCase().includes(craftingSearchQuery.toLowerCase()))
+  );
   const recipeBoxWidth = panelWidth * 0.9, recipeBoxHeight = 60, gap = 15;
   recipeMenuBoxes = []; ctx.textAlign = "left";
-  for (let i = 0; i < recipes.length; i++) {
-    const boxX = panelX + (panelWidth - recipeBoxWidth) / 2, boxY = panelY + 90 + i * (recipeBoxHeight + gap);
-    ctx.fillStyle = canCraft(recipes[i]) ? "#8fd14f" : "#555";
+  for (let i = 0; i < filteredRecipes.length; i++) {
+    const boxX = panelX + (panelWidth - recipeBoxWidth) / 2, boxY = panelY + 120 + i * (recipeBoxHeight + gap);
+    ctx.fillStyle = canCraft(filteredRecipes[i]) ? "#8fd14f" : "#555";
     roundRect(ctx, boxX, boxY, recipeBoxWidth, recipeBoxHeight, 12); ctx.fill();
     ctx.strokeStyle = "#FFF"; ctx.lineWidth = 2;
     roundRect(ctx, boxX, boxY, recipeBoxWidth, recipeBoxHeight, 12); ctx.stroke();
     ctx.fillStyle = "#FFF"; ctx.font = "16px Courier New";
-    ctx.fillText(recipes[i].name, boxX + 10, boxY + 20);
+    ctx.fillText(filteredRecipes[i].name, boxX + 10, boxY + 20);
     let ingredText = "Requires: ";
-    for (let ingr in recipes[i].ingredients) ingredText += ingr.replace(/_/, " ") + " x" + recipes[i].ingredients[ingr] + "  ";
+    for (let ingr in filteredRecipes[i].ingredients) ingredText += ingr.replace(/_/, " ") + " x" + filteredRecipes[i].ingredients[ingr] + "  ";
     ctx.font = "14px Courier New";
     ctx.fillText(ingredText, boxX + 10, boxY + 40);
-    recipeMenuBoxes.push({recipe: recipes[i], x: boxX, y: boxY, width: recipeBoxWidth, height: recipeBoxHeight});
+    recipeMenuBoxes.push({recipe: filteredRecipes[i], x: boxX, y: boxY, width: recipeBoxWidth, height: recipeBoxHeight});
   }
+
   ctx.restore();
 }
+
+let craftingSearchBarClickableRect = null;
+let craftingSearchFocused = false;
+window.addEventListener("mousedown", function(e) {
+  if (craftingMenuActive && craftingSearchBarClickableRect) {
+    const rect = canvas.getBoundingClientRect();
+    let mx = e.clientX - rect.left, my = e.clientY - rect.top;
+    let b = craftingSearchBarClickableRect;
+    if (mx >= b.x && mx <= b.x + b.width && my >= b.y && my <= b.y + b.height) {
+      craftingSearchFocused = true;
+      e.preventDefault();
+    } else {
+      craftingSearchFocused = false;
+    }
+  }
+});
+window.addEventListener("keydown", function(e) {
+  if (craftingMenuActive && craftingSearchFocused) {
+    if (e.key.length === 1 && craftingSearchQuery.length < 32) {
+      craftingSearchQuery += e.key;
+    } else if (e.key === "Backspace") {
+      craftingSearchQuery = craftingSearchQuery.slice(0, -1);
+    } else if (e.key === "Escape") {
+      craftingSearchFocused = false;
+    }
+    e.preventDefault();
+    return false;
+  }
+  // Clear search on crafting menu close
+  if ((e.key === "c" || e.key === "C") && craftingMenuActive === false) {
+    craftingSearchQuery = "";
+    craftingSearchFocused = false;
+  }
+});
+
+/* ===== Extra Inventory Modal ===== */
+let extraInventoryOpen = false;
+function toggleExtraInventory(forceState) {
+  const modal = document.getElementById("extra-inventory-modal");
+  if (typeof forceState === "boolean") extraInventoryOpen = forceState;
+  else extraInventoryOpen = !extraInventoryOpen;
+  if (extraInventoryOpen) {
+    renderExtraInventory();
+    modal.style.display = "flex";
+    setTimeout(() => {
+      document.getElementById("close-extra-inv").focus();
+    }, 16);
+  } else {
+    modal.style.display = "none";
+  }
+  // Prevent input if modal is open
+}
+function renderExtraInventory() {
+  const grid = document.getElementById("extra-inventory-grid");
+  grid.innerHTML = "";
+  extraInventoryOrder.forEach(item => {
+    const amt = player.inventory[item] || 0;
+    const slot = document.createElement("div");
+    slot.className = "extra-inventory-slot";
+    // Canvas for icon
+    const iconCanvas = document.createElement("canvas");
+    iconCanvas.width = 32;
+    iconCanvas.height = 32;
+    const iconCtx = iconCanvas.getContext("2d");
+    drawIconToContext(item, iconCtx, 0, 0, 28);
+    slot.appendChild(iconCanvas);
+    // Name
+    const label = document.createElement("div");
+    label.style.fontSize = "12px";
+    label.style.color = "#ffe066";
+    label.style.marginTop = "-1px";
+    label.style.marginBottom = "1px";
+    label.textContent = item.replace(/_/g, " ");
+    slot.appendChild(label);
+    // Qty
+    const qty = document.createElement("span");
+    qty.className = "qty";
+    qty.textContent = amt;
+    slot.appendChild(qty);
+
+    grid.appendChild(slot);
+  });
+}
+function drawIconToContext(itemKey, iconCtx, x, y, size) {
+  // Same as drawIcon but for any 2D context
+  iconCtx.save();
+  iconCtx.shadowColor = "rgba(0,0,0,0.3)";
+  iconCtx.shadowBlur = 2;
+  switch (itemKey) {
+    case "dirt":
+      iconCtx.fillStyle = "#ba7a3a"; roundRect(iconCtx, x, y, size, size, 5); iconCtx.fill();
+      break;
+    case "stone":
+      iconCtx.fillStyle = "#a7a7a7"; roundRect(iconCtx, x, y, size, size, 5); iconCtx.fill();
+      break;
+    case "grass":
+      iconCtx.fillStyle = "#3ec14d"; roundRect(iconCtx, x, y, size, size * 0.4, 5); iconCtx.fill();
+      iconCtx.fillStyle = "#ba7a3a"; roundRect(iconCtx, x, y + size * 0.4, size, size * 0.6, 5); iconCtx.fill();
+      break;
+    case "wood":
+      iconCtx.fillStyle = "#ad814b"; roundRect(iconCtx, x, y, size, size, 5); iconCtx.fill();
+      break;
+    case "leaves":
+      iconCtx.fillStyle = "#62e05e"; roundRect(iconCtx, x, y, size, size, 5); iconCtx.fill();
+      break;
+    case "gel":
+      iconCtx.fillStyle = "#7FFFD4"; roundRect(iconCtx, x, y, size, size, 5); iconCtx.fill();
+      break;
+    case "torch":
+      iconCtx.fillStyle = "#ffe066"; roundRect(iconCtx, x + size*0.35, y + size*0.2, size*0.3, size*0.6, 4); iconCtx.fill();
+      iconCtx.fillStyle = "#dca700"; roundRect(iconCtx, x + size*0.42, y + size*0.18, size*0.16, size*0.18, 2); iconCtx.fill();
+      break;
+    case "wooden_pickaxe":
+      iconCtx.fillStyle = "#ad814b"; roundRect(iconCtx, x + size * 0.35, y + size * 0.3, size * 0.1, size * 0.5, 2); iconCtx.fill();
+      iconCtx.fillStyle = "#a7a7a7"; roundRect(iconCtx, x + size * 0.2, y + size * 0.2, size * 0.4, size * 0.12, 2); iconCtx.fill();
+      break;
+    case "wooden_sword":
+      iconCtx.fillStyle = "#a7a7a7"; roundRect(iconCtx, x + size * 0.45, y + size * 0.1, size * 0.1, size * 0.6, 2); iconCtx.fill();
+      iconCtx.fillStyle = "#ad814b"; roundRect(iconCtx, x + size * 0.4, y + size * 0.7, size * 0.2, size * 0.12, 2); iconCtx.fill();
+      break;
+    case "copper_ore":
+      iconCtx.fillStyle = "#a0522d"; roundRect(iconCtx, x, y, size, size, 5); iconCtx.fill();
+      iconCtx.strokeStyle = "#ff7f50"; iconCtx.lineWidth = 2;
+      roundRect(iconCtx, x+2, y+2, size-4, size-4, 5); iconCtx.stroke();
+      break;
+    case "iron_ore":
+      iconCtx.fillStyle = "#b5b5b5"; roundRect(iconCtx, x, y, size, size, 5); iconCtx.fill();
+      iconCtx.strokeStyle = "#888"; iconCtx.lineWidth = 2;
+      roundRect(iconCtx, x+2, y+2, size-4, size-4, 5); iconCtx.stroke();
+      break;
+    case "gold_ore":
+      iconCtx.fillStyle = "#FFD700"; roundRect(iconCtx, x, y, size, size, 5); iconCtx.fill();
+      iconCtx.strokeStyle = "#b89d00"; iconCtx.lineWidth = 2;
+      roundRect(iconCtx, x+2, y+2, size-4, size-4, 5); iconCtx.stroke();
+      break;
+    case "sapphire_ore":
+      iconCtx.fillStyle = "#1e90ff"; roundRect(iconCtx, x, y, size, size, 5); iconCtx.fill();
+      iconCtx.strokeStyle = "#1860a7"; iconCtx.lineWidth = 2;
+      roundRect(iconCtx, x+2, y+2, size-4, size-4, 5); iconCtx.stroke();
+      break;
+    case "copper_bar":
+      iconCtx.fillStyle = "#ff7f50"; roundRect(iconCtx, x, y+size*0.4, size, size*0.4, 4); iconCtx.fill();
+      iconCtx.strokeStyle = "#a0522d"; iconCtx.lineWidth = 1.5; iconCtx.strokeRect(x, y+size*0.4, size, size*0.4);
+      break;
+    case "iron_bar":
+      iconCtx.fillStyle = "#d8d8d8"; roundRect(iconCtx, x, y+size*0.4, size, size*0.4, 4); iconCtx.fill();
+      iconCtx.strokeStyle = "#888"; iconCtx.lineWidth = 1.5; iconCtx.strokeRect(x, y+size*0.4, size, size*0.4);
+      break;
+    case "gold_bar":
+      iconCtx.fillStyle = "#FFD700"; roundRect(iconCtx, x, y+size*0.4, size, size*0.4, 4); iconCtx.fill();
+      iconCtx.strokeStyle = "#b89d00"; iconCtx.lineWidth = 1.5; iconCtx.strokeRect(x, y+size*0.4, size, size*0.4);
+      break;
+    case "sapphire_gem":
+      iconCtx.fillStyle = "#aaaaff"; iconCtx.beginPath();
+      iconCtx.moveTo(x+size/2, y);
+      iconCtx.lineTo(x+size, y+size/2);
+      iconCtx.lineTo(x+size/2, y+size);
+      iconCtx.lineTo(x, y+size/2);
+      iconCtx.closePath(); iconCtx.fill();
+      iconCtx.strokeStyle = "#5e5ecf"; iconCtx.lineWidth = 2; iconCtx.stroke();
+      break;
+    case "iron_pickaxe":
+      iconCtx.fillStyle = "#d8d8d8"; roundRect(iconCtx, x + size * 0.35, y + size * 0.3, size * 0.1, size * 0.5, 2); iconCtx.fill();
+      iconCtx.fillStyle = "#888"; roundRect(iconCtx, x + size * 0.2, y + size * 0.2, size * 0.4, size * 0.12, 2); iconCtx.fill();
+      break;
+    case "iron_sword":
+      iconCtx.fillStyle = "#d8d8d8"; roundRect(iconCtx, x + size * 0.45, y + size * 0.1, size * 0.1, size * 0.6, 2); iconCtx.fill();
+      iconCtx.fillStyle = "#888"; roundRect(iconCtx, x + size * 0.4, y + size * 0.7, size * 0.2, size * 0.12, 2); iconCtx.fill();
+      break;
+    case "gold_pickaxe":
+      iconCtx.fillStyle = "#FFD700"; roundRect(iconCtx, x + size * 0.35, y + size * 0.3, size * 0.1, size * 0.5, 2); iconCtx.fill();
+      iconCtx.fillStyle = "#b89d00"; roundRect(iconCtx, x + size * 0.2, y + size * 0.2, size * 0.4, size * 0.12, 2); iconCtx.fill();
+      break;
+    case "sapphire_staff":
+      iconCtx.fillStyle = "#aaaaff"; roundRect(iconCtx, x + size * 0.47, y + size * 0.18, size * 0.07, size * 0.6, 2); iconCtx.fill();
+      iconCtx.fillStyle = "#5e5ecf"; iconCtx.beginPath(); iconCtx.arc(x + size * 0.5, y + size * 0.15, size * 0.13, 0, Math.PI * 2); iconCtx.fill();
+      break;
+    default: iconCtx.fillStyle = "#FFF"; roundRect(iconCtx, x, y, size, size, 5); iconCtx.fill();
+  }
+  iconCtx.restore();
+}
+document.getElementById("close-extra-inv").onclick = () => toggleExtraInventory(false);
+window.addEventListener("keydown", e => {
+  if (extraInventoryOpen && (e.key === "e" || e.key === "E" || e.key === "Escape" || e.key === "Enter")) {
+    toggleExtraInventory(false);
+    e.preventDefault();
+  }
+});
+document.getElementById("extra-inventory-modal").addEventListener("mousedown", e => {
+  if (e.target === document.getElementById("extra-inventory-modal")) toggleExtraInventory(false);
+});
+
+/* ===== DRAW MAIN GAME ===== */
 function draw() {
   // Sky gradient
   const grd = ctx.createLinearGradient(0, 0, 0, canvas.height);
@@ -792,11 +1138,9 @@ function draw() {
         const drawX = x * tileSize - cameraX, drawY = y * tileSize - cameraY;
         let light = dynamicLightMap[x][y];
         ctx.save();
-        // No shadow, no rounded corners, no alpha for "blocky" look
         ctx.fillStyle = blockColors[block] || "#FFF";
         ctx.fillRect(drawX, drawY, tileSize, tileSize);
 
-        // Simple edge/border for block separation (optional)
         ctx.strokeStyle = blockEdgeColors[block] || "rgba(0,0,0,0.2)";
         ctx.lineWidth = 1.4;
         ctx.strokeRect(drawX + 0.5, drawY + 0.5, tileSize - 1, tileSize - 1);
@@ -830,7 +1174,7 @@ function draw() {
   }
 
   // Draw selected item in hand
-  const selectedItem = inventoryOrder[player.selectedSlot];
+  const selectedItem = mainInventoryOrder[player.selectedSlot];
   // All pickaxes/staff/sword in hand
   if (player.inventory[selectedItem] > 0 && ["wooden_pickaxe", "wooden_sword", "iron_pickaxe", "iron_sword", "gold_pickaxe", "sapphire_staff", "torch"].includes(selectedItem)) {
     const handX = player.x + player.width, handY = player.y + player.height * 0.5;
@@ -950,7 +1294,7 @@ function draw() {
 /* ====== Game Loop ====== */
 let isDead = false, droppedItems = [];
 function updatePlayer() {
-  if (craftingMenuActive || isDead) return;
+  if (craftingMenuActive || isDead || extraInventoryOpen) return;
 
   // Slower movement if hunger below 10
   let originalSpeed = player.speed;
