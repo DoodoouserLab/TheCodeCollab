@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8">
-  <title>ExploreBox Terraria-Style Lighting</title>
+  <title>ExploreBox - Day/Night Cycle</title>
   <style>
     html, body { margin:0; padding:0; overflow:hidden; background:#000; }
     canvas { display:block; image-rendering: pixelated; background: #000; }
@@ -118,25 +118,44 @@ function getBlock(x, y) {
   return world[x][y];
 }
 
-/* ===== Terraria-Style Lighting ===== */
+/* ===== Day/Night Cycle ===== */
+let timeOfDay = 0; // 0 to 1, where 0 = sunrise, 0.5 = sunset, 1 = next sunrise
+let DAY_LENGTH_SEC = 240; // 4 min per full day
+function updateTimeOfDay() {
+  // Advance time
+  timeOfDay += 1 / (DAY_LENGTH_SEC * 60); // 60fps
+  if (timeOfDay > 1) timeOfDay -= 1;
+}
+function getDayLightValue() {
+  // Returns a value between 0.2 (midnight) and 1.0 (midday)
+  // Daylight: cosine curve, peak at t=0.25, min at t=0/1 and t=0.5
+  // t: 0.0 = sunrise, 0.25 = noon, 0.5 = sunset, 0.75 = midnight
+  let t = timeOfDay;
+  let daylight = 0.2 + 0.8 * Math.max(0, Math.cos((t - 0.25) * 2 * Math.PI));
+  return daylight;
+}
+function isNight() {
+  return (timeOfDay < 0.20 || timeOfDay > 0.80);
+}
+
+/* ===== Terraria-Style Lighting (with day/night) ===== */
 const LIGHT_SURFACE_Y = 15;
 const TORCH_LIGHT_RADIUS = 8;
 const TORCH_LIGHT_STRENGTH = 1.0;
-const SURFACE_LIGHT_STRENGTH = 1.0;
-const MIN_LIGHT = 0.13;
-
+const MIN_LIGHT = 0.10;
 let dynamicLightMap = [];
 function resetLightMap() {
+  const daylight = getDayLightValue();
   dynamicLightMap = [];
   for (let x = 0; x < worldWidth; x++) {
     dynamicLightMap[x] = [];
     for (let y = 0; y < worldHeight; y++) {
-      // Surface is fully lit, fades to dark with depth
+      // Surface is daylight, fades with depth
       if (y < LIGHT_SURFACE_Y) {
-        dynamicLightMap[x][y] = SURFACE_LIGHT_STRENGTH;
+        dynamicLightMap[x][y] = daylight;
       } else {
         // Simple fade with depth, min is MIN_LIGHT
-        let factor = 1 - Math.min(1, (y - LIGHT_SURFACE_Y) / 20);
+        let factor = daylight * (1 - Math.min(1, (y - LIGHT_SURFACE_Y) / 20));
         dynamicLightMap[x][y] = Math.max(MIN_LIGHT, factor);
       }
     }
@@ -152,7 +171,6 @@ function propagateTorchLight() {
             if (tx < 0 || tx >= worldWidth || ty < 0 || ty >= worldHeight) continue;
             let dist = Math.sqrt(dx * dx + dy * dy);
             let strength = Math.max(0, TORCH_LIGHT_STRENGTH * (1 - dist / TORCH_LIGHT_RADIUS));
-            // Light does not pass through solid blocks, simple check
             if (dist === 0 || getBlock(tx, ty) === 0 || !isSolid(getBlock(tx,ty))) {
               dynamicLightMap[tx][ty] = Math.max(dynamicLightMap[tx][ty], strength);
             }
@@ -253,7 +271,8 @@ function updateEnemies() {
     let enemy = enemies[i];
     let centerX = enemy.x + enemy.width / 2, centerY = enemy.y + enemy.height / 2;
     let dx = centerX - (player.x + player.width / 2), dy = centerY - (player.y + player.height / 2);
-    if (Math.abs(dx) > ENEMY_VISIBLE_RADIUS || Math.abs(dy) > ENEMY_VISIBLE_RADIUS) continue;
+    // Only update if slime is visible on screen (not just nearby)
+    if (Math.abs(dx) > canvas.width/2 + 100 || Math.abs(dy) > canvas.height/2 + 100) continue;
 
     enemy.bounceCooldown--;
     let pdx = player.x - enemy.x, pdist = Math.abs(pdx);
@@ -287,7 +306,9 @@ function updateSlimeSpawning() {
     let dx = centerX - (player.x + player.width / 2), dy = centerY - (player.y + player.height / 2);
     if (Math.abs(dx) < ENEMY_VISIBLE_RADIUS && Math.abs(dy) < ENEMY_VISIBLE_RADIUS) onscreen++;
   }
-  if (onscreen < MAX_ENEMIES && Math.random() < 0.003) {
+  // More slimes at night!
+  let baseRate = isNight() ? 0.009 : 0.003;
+  if (onscreen < MAX_ENEMIES && Math.random() < baseRate) {
     let attempts = 0, found = false, spawnX, spawnY;
     while (attempts < 10 && !found) {
       spawnX = Math.floor(player.x / tileSize) + Math.floor((Math.random() - 0.5) * 30);
@@ -295,6 +316,7 @@ function updateSlimeSpawning() {
       let surfaceY = groundHeights[spawnX];
       spawnY = surfaceY + Math.floor(Math.random() * 35);
       spawnY = Math.min(worldHeight - 10, spawnY);
+      // More likely to spawn in dark
       if (dynamicLightMap[spawnX] && dynamicLightMap[spawnX][spawnY] < 0.35) found = true;
       attempts++;
     }
@@ -531,9 +553,30 @@ function drawCraftingMenu() {
   }
 }
 function draw() {
-  const grd = ctx.createLinearGradient(0, 0, 0, canvas.height); grd.addColorStop(0, "#00BFFF"); grd.addColorStop(1, "#87CEEB");
+  // Sky background changes with time
+  let t = timeOfDay;
+  let skyColorTop, skyColorBottom;
+  if (isNight()) {
+    skyColorTop = "#0D1B2A";
+    skyColorBottom = "#232946";
+  } else {
+    skyColorTop = "#00BFFF";
+    skyColorBottom = "#87CEEB";
+  }
+  const grd = ctx.createLinearGradient(0, 0, 0, canvas.height);
+  grd.addColorStop(0, skyColorTop); grd.addColorStop(1, skyColorBottom);
   ctx.fillStyle = grd; ctx.fillRect(0, 0, canvas.width, canvas.height);
-  ctx.beginPath(); ctx.arc(80, 80, 30, 0, 2 * Math.PI); ctx.fillStyle = "#FDB813"; ctx.fill(); ctx.strokeStyle = "#E59400"; ctx.stroke();
+
+  // Day/night sun/moon
+  let sunAngle = (timeOfDay - 0.25) * 2 * Math.PI; // noon is at top
+  let sunX = canvas.width/2 + Math.cos(sunAngle) * (canvas.width/2 - 80);
+  let sunY = 80 + Math.sin(sunAngle) * 80;
+  if (!isNight()) {
+    ctx.beginPath(); ctx.arc(sunX, sunY, 30, 0, 2 * Math.PI); ctx.fillStyle = "#FDB813"; ctx.fill(); ctx.strokeStyle = "#E59400"; ctx.stroke();
+  } else {
+    // Moon
+    ctx.beginPath(); ctx.arc(sunX, sunY, 22, 0, 2 * Math.PI); ctx.fillStyle = "#dbeafe"; ctx.fill(); ctx.strokeStyle = "#7f9fc9"; ctx.stroke();
+  }
 
   resetLightMap();
   propagateTorchLight();
@@ -553,8 +596,6 @@ function draw() {
           ctx.fillRect(drawX, drawY, tileSize, tileSize);
           ctx.strokeStyle = "rgba(0,0,0,0.3)"; ctx.lineWidth = 1; ctx.strokeRect(drawX, drawY, tileSize, tileSize);
           // Terraria-style: fade out smoothly from light
-          // Light values: 1 = bright, MIN_LIGHT = darkest
-          // So overlay is (1 - light)
           if (light < 0.99) {
             ctx.globalAlpha = 1 - light;
             ctx.fillStyle = "#000";
@@ -579,6 +620,7 @@ function draw() {
     drawIcon(selectedItem, handX - cameraX, handY - cameraY, tileSize);
   }
 
+  // Only render slimes if visible on screen!
   for (let enemy of enemies) {
     let centerX = enemy.x + enemy.width / 2, centerY = enemy.y + enemy.height / 2;
     let dx = centerX - (player.x + player.width / 2), dy = centerY - (player.y + player.height / 2);
@@ -669,6 +711,7 @@ function updatePlayer() {
 }
 function gameLoop() {
   updateFpsMeter();
+  updateTimeOfDay();
   updatePlayer();
   updateHunger();
   updateEnemies();
