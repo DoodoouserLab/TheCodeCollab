@@ -4,8 +4,10 @@
   <meta charset="UTF-8">
   <title>ExploreBox v1.3.20</title>
   <style>
-    html, body { margin:0; padding:0; overflow:hidden; background:#000; }
-    canvas { display:block; image-rendering: pixelated; background: #000; }
+    html, body { margin:0; padding:0; overflow:hidden; background:#141414; }
+    canvas { display:block; image-rendering: pixelated; background: #222; }
+    /* Inventory/Panel UI for better appearance */
+    #game::-webkit-scrollbar { display: none; }
   </style>
 </head>
 <body>
@@ -42,9 +44,17 @@ function drawFpsMeter(ctx) {
 const tileSize = 16;
 const worldWidth = 1000, worldHeight = 400;
 const blockColors = {
-  0: "#87CEEB", 1: "#8B4513", 2: "#808080", 3: "#228B22",
-  4: "#A0522D", 5: "#32CD32", 6: "#FFD700"
+  0: "#87CEEB", // sky
+  1: "#ba7a3a", // dirt
+  2: "#a7a7a7", // stone
+  3: "#3ec14d", // grass
+  4: "#ad814b", // wood
+  5: "#62e05e", // leaves
+  6: "#ffe066"  // torch
 };
+const blockEdgeColors = {
+  1: "#9f682c", 2: "#8b8b8b", 3: "#2b8c34", 4: "#8c6431", 5: "#3e9045", 6: "#ffd700"
+}
 const blockDurability = { 1: 2, 2: 4, 3: 1, 4: 3, 5: 1, 6: 1 };
 const world = [], groundHeights = [];
 let currentGround = 50;
@@ -120,7 +130,7 @@ function getBlock(x, y) {
 
 /* ===== Lighting System (BRIGHTER) ===== */
 const LIGHT_SURFACE_Y = 15;
-const TORCH_LIGHT_RADIUS = 6;
+const TORCH_LIGHT_RADIUS = 6; // << 6 blocks
 let dynamicLightMap = [];
 function resetLightMap() {
   dynamicLightMap = [];
@@ -156,8 +166,8 @@ const player = {
   width: tileSize,
   height: tileSize * 1.8,
   vx: 0, vy: 0,
-  speed: 4,           // NORMAL SPEED
-  jumpStrength: 12,   // NORMAL JUMP STRENGTH
+  speed: 4,
+  jumpStrength: 12,
   grounded: false,
   health: 100,
   hunger: 100,
@@ -237,6 +247,7 @@ function spawnEnemy(x, y) {
   });
 }
 
+// Initial spawn
 for (let i = 0; i < 3; i++) {
   let ex = Math.floor(Math.random() * (worldWidth - 20)) + 10, ey = findSurfaceY(ex);
   spawnEnemy(ex * tileSize, ey * tileSize);
@@ -283,6 +294,19 @@ function updateEnemies() {
   }
 }
 
+// Slime spawn prevention: No spawn in any torch radius
+function isInTorchLightRadius(x, y) {
+  for (let tx = Math.max(0, x - TORCH_LIGHT_RADIUS); tx <= Math.min(worldWidth - 1, x + TORCH_LIGHT_RADIUS); tx++) {
+    for (let ty = Math.max(0, y - TORCH_LIGHT_RADIUS); ty <= Math.min(worldHeight - 1, y + TORCH_LIGHT_RADIUS); ty++) {
+      if (world[tx][ty] === 6) {
+        const dist = Math.sqrt((tx - x) * (tx - x) + (ty - y) * (ty - y));
+        if (dist <= TORCH_LIGHT_RADIUS) return true;
+      }
+    }
+  }
+  return false;
+}
+
 function updateSlimeSpawning() {
   let onscreen = 0;
   for (let e of enemies) {
@@ -298,7 +322,8 @@ function updateSlimeSpawning() {
       let surfaceY = groundHeights[spawnX];
       spawnY = surfaceY + Math.floor(Math.random() * 35);
       spawnY = Math.min(worldHeight - 10, spawnY);
-      if (dynamicLightMap[spawnX] && dynamicLightMap[spawnX][spawnY] < 0.85) found = true;
+      // Ensure not in torch radius
+      if (!isInTorchLightRadius(spawnX, spawnY) && dynamicLightMap[spawnX] && dynamicLightMap[spawnX][spawnY] < 0.85) found = true;
       attempts++;
     }
     if (found) spawnEnemy(spawnX * tileSize, spawnY * tileSize);
@@ -306,7 +331,7 @@ function updateSlimeSpawning() {
       let ex = Math.floor(player.x / tileSize) + Math.floor((Math.random() - 0.5) * 40);
       ex = Math.max(3, Math.min(worldWidth - 3, ex));
       let ey = findSurfaceY(ex);
-      spawnEnemy(ex * tileSize, ey * tileSize);
+      if (!isInTorchLightRadius(ex, ey)) spawnEnemy(ex * tileSize, ey * tileSize);
     }
   }
 }
@@ -326,7 +351,6 @@ function isColliding(entity) {
       if (isSolid(getBlock(x, y))) return true;
   return false;
 }
-// NORMAL GRAVITY AND FRICTION
 const GRAVITY = 0.4;
 const FRICTION_GROUND = 0.8;
 const FRICTION_AIR = 0.96;
@@ -489,39 +513,103 @@ function tryAttackEnemy() {
 
 /* ===== UI ===== */
 function drawIcon(itemKey, x, y, size) {
+  ctx.save();
+  ctx.shadowColor = "rgba(0,0,0,0.3)";
+  ctx.shadowBlur = 2;
   switch (itemKey) {
-    case "dirt": ctx.fillStyle = "#8B4513"; ctx.fillRect(x, y, size, size); break;
-    case "stone": ctx.fillStyle = "#808080"; ctx.fillRect(x, y, size, size); break;
-    case "grass": ctx.fillStyle = "#228B22"; ctx.fillRect(x, y, size, size * 0.4); ctx.fillStyle = "#8B4513"; ctx.fillRect(x, y + size * 0.4, size, size * 0.6); break;
-    case "wood": ctx.fillStyle = "#A0522D"; ctx.fillRect(x, y, size, size); break;
-    case "leaves": ctx.fillStyle = "#32CD32"; ctx.fillRect(x, y, size, size); break;
-    case "gel": ctx.fillStyle = "#7FFFD4"; ctx.fillRect(x, y, size, size); break;
-    case "torch": ctx.fillStyle = "#FFD700"; ctx.fillRect(x, y, size, size); break;
-    case "wooden_pickaxe": ctx.fillStyle = "#8B4513"; ctx.fillRect(x + size * 0.35, y + size * 0.3, size * 0.1, size * 0.5); ctx.fillStyle = "#808080"; ctx.fillRect(x + size * 0.2, y + size * 0.2, size * 0.6, size * 0.12); break;
-    case "wooden_sword": ctx.fillStyle = "#808080"; ctx.fillRect(x + size * 0.45, y + size * 0.1, size * 0.1, size * 0.6); ctx.fillStyle = "#8B4513"; ctx.fillRect(x + size * 0.4, y + size * 0.7, size * 0.2, size * 0.15); break;
-    default: ctx.fillStyle = "#FFF"; ctx.fillRect(x, y, size, size);
+    case "dirt":
+      ctx.fillStyle = "#ba7a3a"; roundRect(ctx, x, y, size, size, 5); ctx.fill();
+      break;
+    case "stone":
+      ctx.fillStyle = "#a7a7a7"; roundRect(ctx, x, y, size, size, 5); ctx.fill();
+      break;
+    case "grass":
+      ctx.fillStyle = "#3ec14d"; roundRect(ctx, x, y, size, size * 0.4, 5); ctx.fill();
+      ctx.fillStyle = "#ba7a3a"; roundRect(ctx, x, y + size * 0.4, size, size * 0.6, 5); ctx.fill();
+      break;
+    case "wood":
+      ctx.fillStyle = "#ad814b"; roundRect(ctx, x, y, size, size, 5); ctx.fill();
+      break;
+    case "leaves":
+      ctx.fillStyle = "#62e05e"; roundRect(ctx, x, y, size, size, 5); ctx.fill();
+      break;
+    case "gel":
+      ctx.fillStyle = "#7FFFD4"; roundRect(ctx, x, y, size, size, 5); ctx.fill();
+      break;
+    case "torch":
+      ctx.fillStyle = "#ffe066"; roundRect(ctx, x + size*0.35, y + size*0.2, size*0.3, size*0.6, 4); ctx.fill();
+      ctx.fillStyle = "#dca700"; roundRect(ctx, x + size*0.42, y + size*0.18, size*0.16, size*0.18, 2); ctx.fill();
+      break;
+    case "wooden_pickaxe":
+      ctx.fillStyle = "#ad814b"; roundRect(ctx, x + size * 0.35, y + size * 0.3, size * 0.1, size * 0.5, 2); ctx.fill();
+      ctx.fillStyle = "#a7a7a7"; roundRect(ctx, x + size * 0.2, y + size * 0.2, size * 0.4, size * 0.12, 2); ctx.fill();
+      break;
+    case "wooden_sword":
+      ctx.fillStyle = "#a7a7a7"; roundRect(ctx, x + size * 0.45, y + size * 0.1, size * 0.1, size * 0.6, 2); ctx.fill();
+      ctx.fillStyle = "#ad814b"; roundRect(ctx, x + size * 0.4, y + size * 0.7, size * 0.2, size * 0.12, 2); ctx.fill();
+      break;
+    default: ctx.fillStyle = "#FFF"; roundRect(ctx, x, y, size, size, 5); ctx.fill();
   }
+  ctx.restore();
+}
+function roundRect(ctx, x, y, w, h, r) {
+  ctx.beginPath();
+  ctx.moveTo(x+r, y);
+  ctx.lineTo(x+w-r, y);
+  ctx.quadraticCurveTo(x+w, y, x+w, y+r);
+  ctx.lineTo(x+w, y+h-r);
+  ctx.quadraticCurveTo(x+w, y+h, x+w-r, y+h);
+  ctx.lineTo(x+r, y+h);
+  ctx.quadraticCurveTo(x, y+h, x, y+h-r);
+  ctx.lineTo(x, y+r);
+  ctx.quadraticCurveTo(x, y, x+r, y);
+  ctx.closePath();
 }
 function drawInventory() {
   const invSize = 50, gap = 4, totalWidth = inventoryOrder.length * (invSize + gap) - gap;
   const startX = (canvas.width - totalWidth) / 2, y = canvas.height - invSize - 10;
   for (let i = 0; i < inventoryOrder.length; i++) {
     const item = inventoryOrder[i], x = startX + i * (invSize + gap);
-    ctx.fillStyle = "#333"; ctx.fillRect(x, y, invSize, invSize);
-    if (i === player.selectedSlot) { ctx.strokeStyle = "#FFFF00"; ctx.lineWidth = 3; ctx.strokeRect(x, y, invSize, invSize);}
-    else { ctx.strokeStyle = "#AAAAAA"; ctx.lineWidth = 2; ctx.strokeRect(x, y, invSize, invSize);}
+    ctx.save();
+    ctx.shadowColor = "#000";
+    ctx.shadowBlur = 10;
+    ctx.fillStyle = "#232b2b";
+    roundRect(ctx, x, y, invSize, invSize, 10);
+    ctx.fill();
+    if (i === player.selectedSlot) {
+      ctx.strokeStyle = "#ffff5e";
+      ctx.lineWidth = 4;
+    } else {
+      ctx.strokeStyle = "#AAAAAA";
+      ctx.lineWidth = 2;
+    }
+    roundRect(ctx, x, y, invSize, invSize, 10);
+    ctx.stroke();
+    ctx.restore();
     drawIcon(item, x + 10, y + 10, invSize - 20);
-    ctx.fillStyle = "#FFF"; ctx.font = "12px Courier New"; ctx.textAlign = "right";
-    ctx.fillText(player.inventory[item] || 0, x + invSize - 4, y + invSize - 4);
+    ctx.fillStyle = "#FFF";
+    ctx.font = "bold 13px Courier New";
+    ctx.textAlign = "right";
+    ctx.fillText(player.inventory[item] || 0, x + invSize - 4, y + invSize - 6);
   }
 }
 function drawCraftingMenu() {
-  ctx.fillStyle = "rgba(0,0,0,0.85)"; ctx.fillRect(0, 0, canvas.width, canvas.height);
+  ctx.save();
+  ctx.shadowColor = "#000";
+  ctx.shadowBlur = 30;
+  ctx.fillStyle = "rgba(30,20,10,0.92)";
+  ctx.fillRect(0, 0, canvas.width, canvas.height);
   const panelWidth = canvas.width * 0.8, panelHeight = canvas.height * 0.6;
   const panelX = (canvas.width - panelWidth) / 2, panelY = (canvas.height - panelHeight) / 2;
-  ctx.fillStyle = "#4b3621"; ctx.fillRect(panelX, panelY, panelWidth, panelHeight);
-  ctx.strokeStyle = "#d2b48c"; ctx.lineWidth = 4; ctx.strokeRect(panelX, panelY, panelWidth, panelHeight);
-  ctx.font = "26px Courier New"; ctx.textAlign = "center"; ctx.fillStyle = "#FFF";
+  ctx.fillStyle = "#473622";
+  roundRect(ctx, panelX, panelY, panelWidth, panelHeight, 20);
+  ctx.fill();
+  ctx.strokeStyle = "#ffe066";
+  ctx.lineWidth = 5;
+  roundRect(ctx, panelX, panelY, panelWidth, panelHeight, 20);
+  ctx.stroke();
+  ctx.font = "26px Courier New";
+  ctx.textAlign = "center"; ctx.fillStyle = "#FFF";
   ctx.fillText("Crafting Station", canvas.width / 2, panelY + 40);
   ctx.font = "16px Courier New";
   ctx.fillText("Click a recipe box to craft. Press 'C' to exit.", canvas.width / 2, panelY + 70);
@@ -529,10 +617,10 @@ function drawCraftingMenu() {
   recipeMenuBoxes = []; ctx.textAlign = "left";
   for (let i = 0; i < recipes.length; i++) {
     const boxX = panelX + (panelWidth - recipeBoxWidth) / 2, boxY = panelY + 90 + i * (recipeBoxHeight + gap);
-    ctx.fillStyle = canCraft(recipes[i]) ? "#6b8e23" : "#555";
-    ctx.fillRect(boxX, boxY, recipeBoxWidth, recipeBoxHeight);
+    ctx.fillStyle = canCraft(recipes[i]) ? "#8fd14f" : "#555";
+    roundRect(ctx, boxX, boxY, recipeBoxWidth, recipeBoxHeight, 12); ctx.fill();
     ctx.strokeStyle = "#FFF"; ctx.lineWidth = 2;
-    ctx.strokeRect(boxX, boxY, recipeBoxWidth, recipeBoxHeight);
+    roundRect(ctx, boxX, boxY, recipeBoxWidth, recipeBoxHeight, 12); ctx.stroke();
     ctx.fillStyle = "#FFF"; ctx.font = "16px Courier New";
     ctx.fillText(recipes[i].name, boxX + 10, boxY + 20);
     let ingredText = "Requires: ";
@@ -541,11 +629,25 @@ function drawCraftingMenu() {
     ctx.fillText(ingredText, boxX + 10, boxY + 40);
     recipeMenuBoxes.push({recipe: recipes[i], x: boxX, y: boxY, width: recipeBoxWidth, height: recipeBoxHeight});
   }
+  ctx.restore();
 }
 function draw() {
-  const grd = ctx.createLinearGradient(0, 0, 0, canvas.height); grd.addColorStop(0, "#00BFFF"); grd.addColorStop(1, "#87CEEB");
-  ctx.fillStyle = grd; ctx.fillRect(0, 0, canvas.width, canvas.height);
-  ctx.beginPath(); ctx.arc(80, 80, 30, 0, 2 * Math.PI); ctx.fillStyle = "#FDB813"; ctx.fill(); ctx.strokeStyle = "#E59400"; ctx.stroke();
+  // Sky gradient
+  const grd = ctx.createLinearGradient(0, 0, 0, canvas.height);
+  grd.addColorStop(0, "#5cbbff");
+  grd.addColorStop(1, "#aee6ff");
+  ctx.fillStyle = grd;
+  ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+  // Sun with glow
+  ctx.save();
+  ctx.shadowColor = "#ffef8e";
+  ctx.shadowBlur = 40;
+  ctx.beginPath();
+  ctx.arc(80, 80, 30, 0, 2 * Math.PI);
+  ctx.fillStyle = "#FFD200";
+  ctx.fill();
+  ctx.restore();
 
   resetLightMap();
   propagateTorchLight();
@@ -554,78 +656,144 @@ function draw() {
   const startCol = Math.floor(cameraX / tileSize) - 1, endCol = startCol + Math.ceil(canvas.width / tileSize) + 2;
   const startRow = Math.floor(cameraY / tileSize) - 1, endRow = startRow + Math.ceil(canvas.height / tileSize) + 2;
 
+  // Draw blocks with soft edges, rounded corners, and shadow
   for (let x = startCol; x <= endCol; x++) for (let y = startRow; y <= endRow; y++)
     if (x >= 0 && x < worldWidth && y >= 0 && y < worldHeight) {
       const block = world[x][y];
       if (block !== 0) {
         const drawX = x * tileSize - cameraX, drawY = y * tileSize - cameraY;
         let light = dynamicLightMap[x][y];
+
+        ctx.save();
+        ctx.shadowColor = "#000";
+        ctx.shadowBlur = 7;
+        ctx.globalAlpha = 0.93;
         ctx.fillStyle = blockColors[block] || "#FFF";
-        ctx.fillRect(drawX, drawY, tileSize, tileSize);
-        ctx.strokeStyle = "rgba(0,0,0,0.3)"; ctx.lineWidth = 1; ctx.strokeRect(drawX, drawY, tileSize, tileSize);
+        roundRect(ctx, drawX, drawY, tileSize, tileSize, 4);
+        ctx.fill();
+        ctx.shadowBlur = 0;
+        ctx.globalAlpha = 1;
+
+        // Draw inner border for blocks
+        ctx.strokeStyle = blockEdgeColors[block] || "rgba(0,0,0,0.2)";
+        ctx.lineWidth = 1.4;
+        roundRect(ctx, drawX+0.5, drawY+0.5, tileSize-1, tileSize-1, 3);
+        ctx.stroke();
+
+        // Dim if not fully lit
         if (light < 0.99) {
-          ctx.globalAlpha = 1 - Math.max(light, 0.45);
+          ctx.globalAlpha = 1 - Math.max(light, 0.40);
           ctx.fillStyle = "#000";
-          ctx.fillRect(drawX, drawY, tileSize, tileSize);
+          roundRect(ctx, drawX, drawY, tileSize, tileSize, 4);
+          ctx.fill();
           ctx.globalAlpha = 1.0;
         }
+        ctx.restore();
       }
     }
 
+  // Draw dropped items
   for (let drop of droppedItems)
     drawIcon(drop.key, drop.x * tileSize - cameraX, drop.y * tileSize - cameraY, tileSize);
 
+  // Draw player
   if (playerImg.complete && playerImg.naturalWidth > 0)
     ctx.drawImage(playerImg, player.x - cameraX, player.y - cameraY, player.width, player.height);
-  else { ctx.fillStyle = "#fff"; ctx.fillRect(player.x - cameraX, player.y - cameraY, player.width, player.height); }
+  else {
+    ctx.save();
+    ctx.shadowColor = "#000";
+    ctx.shadowBlur = 10;
+    ctx.fillStyle = "#fff";
+    roundRect(ctx, player.x - cameraX, player.y - cameraY, player.width, player.height, 6);
+    ctx.fill();
+    ctx.restore();
+  }
 
+  // Draw selected item in hand
   const selectedItem = inventoryOrder[player.selectedSlot];
   if (player.inventory[selectedItem] > 0 && ["wooden_pickaxe", "wooden_sword", "torch"].includes(selectedItem)) {
     const handX = player.x + player.width, handY = player.y + player.height * 0.5;
     drawIcon(selectedItem, handX - cameraX, handY - cameraY, tileSize);
   }
 
+  // Draw slimes
   for (let enemy of enemies) {
     let centerX = enemy.x + enemy.width / 2, centerY = enemy.y + enemy.height / 2;
     let dx = centerX - (player.x + player.width / 2), dy = centerY - (player.y + player.height / 2);
     if (Math.abs(dx) > canvas.width / 2 + 100 || Math.abs(dy) > canvas.height / 2 + 100) continue;
     let tileX = Math.floor(enemy.x / tileSize), tileY = Math.floor(enemy.y / tileSize);
     let light = (dynamicLightMap[tileX] && dynamicLightMap[tileX][tileY]) || 0.45;
+    ctx.save();
     ctx.globalAlpha = Math.max(light, 0.55);
-    ctx.fillStyle = "green";
-    ctx.fillRect(enemy.x - cameraX, enemy.y - cameraY, enemy.width, enemy.height);
+    ctx.shadowColor = "#44ff44";
+    ctx.shadowBlur = 16;
+    ctx.fillStyle = "#42ec4f";
+    roundRect(ctx, enemy.x - cameraX, enemy.y - cameraY, enemy.width, enemy.height, 6);
+    ctx.fill();
+    ctx.shadowBlur = 0;
+    // Slime eyes
+    ctx.fillStyle = "#222";
+    ctx.beginPath(); ctx.arc(enemy.x - cameraX + enemy.width*0.3, enemy.y - cameraY + enemy.height*0.5, 2.2, 0, Math.PI*2); ctx.fill();
+    ctx.beginPath(); ctx.arc(enemy.x - cameraX + enemy.width*0.7, enemy.y - cameraY + enemy.height*0.5, 2.2, 0, Math.PI*2); ctx.fill();
+    // HP bar
     let barWidth = enemy.width, barHeight = 4, hpFrac = Math.max(0, enemy.health / 20),
         bx = enemy.x - cameraX, by = enemy.y - cameraY - 8;
-    ctx.fillStyle = "#333"; ctx.fillRect(bx, by, barWidth, barHeight);
-    ctx.fillStyle = "#0f0"; ctx.fillRect(bx, by, barWidth * hpFrac, barHeight);
-    ctx.strokeStyle = "#000"; ctx.strokeRect(bx, by, barWidth, barHeight);
-    ctx.globalAlpha = 1.0;
+    ctx.globalAlpha = 0.7;
+    ctx.fillStyle = "#333"; roundRect(ctx, bx, by, barWidth, barHeight, 2); ctx.fill();
+    ctx.fillStyle = "#1fff00"; roundRect(ctx, bx, by, barWidth * hpFrac, barHeight, 2); ctx.fill();
+    ctx.restore();
   }
 
+  // Health bar
   const barX = 20, barY = 20, barWidth = 200, barHeight = 20;
-  ctx.fillStyle = "#333"; ctx.fillRect(barX, barY, barWidth, barHeight);
+  ctx.save();
+  ctx.shadowColor = "#ff4444";
+  ctx.shadowBlur = 10;
+  ctx.fillStyle = "#222";
+  roundRect(ctx, barX, barY, barWidth, barHeight, 7); ctx.fill();
   ctx.fillStyle = "#e74c3c"; let healthFrac = Math.max(0, player.health / 100);
-  ctx.fillRect(barX, barY, barWidth * healthFrac, barHeight);
-  ctx.strokeStyle = "#fff"; ctx.strokeRect(barX, barY, barWidth, barHeight);
+  roundRect(ctx, barX, barY, barWidth * healthFrac, barHeight, 7); ctx.fill();
+  ctx.shadowBlur = 0;
+  ctx.strokeStyle = "#fff"; ctx.lineWidth = 2;
+  roundRect(ctx, barX, barY, barWidth, barHeight, 7); ctx.stroke();
   ctx.fillStyle = "#fff"; ctx.font = "16px Courier New";
+  ctx.textAlign = "center";
   ctx.fillText("Health: " + Math.floor(player.health), barX + barWidth / 2, barY + barHeight - 4);
+  ctx.restore();
 
-  const hungerBarX = barX, hungerBarY = barY + barHeight + 8 + 16, hungerBarWidth = 200, hungerBarHeight = 10;
-  ctx.fillStyle = "#333"; ctx.fillRect(hungerBarX, hungerBarY, hungerBarWidth, hungerBarHeight);
+  // Hunger bar
+  const hungerBarX = barX, hungerBarY = barY + barHeight + 10, hungerBarWidth = 200, hungerBarHeight = 10;
+  ctx.save();
+  ctx.shadowColor = "#ffb900";
+  ctx.shadowBlur = 8;
+  ctx.fillStyle = "#222"; roundRect(ctx, hungerBarX, hungerBarY, hungerBarWidth, hungerBarHeight, 5); ctx.fill();
   ctx.fillStyle = "#ffa500"; let hungerFrac = Math.max(0, player.hunger / player.maxHunger);
-  ctx.fillRect(hungerBarX, hungerBarY, hungerBarWidth * hungerFrac, hungerBarHeight);
-  ctx.strokeStyle = "#fff"; ctx.strokeRect(hungerBarX, hungerBarY, hungerBarWidth, hungerBarHeight);
+  roundRect(ctx, hungerBarX, hungerBarY, hungerBarWidth * hungerFrac, hungerBarHeight, 5); ctx.fill();
+  ctx.shadowBlur = 0;
+  ctx.strokeStyle = "#fff"; ctx.lineWidth = 1.2;
+  roundRect(ctx, hungerBarX, hungerBarY, hungerBarWidth, hungerBarHeight, 5); ctx.stroke();
   ctx.fillStyle = "#fff"; ctx.font = "12px Courier New";
+  ctx.textAlign = "center";
   ctx.fillText("Hunger: " + Math.floor(player.hunger) + "/" + player.maxHunger, hungerBarX + hungerBarWidth / 2, hungerBarY + hungerBarHeight - 2);
+  ctx.restore();
 
+  // XP bar
   const xpBarX = barX, xpBarY = hungerBarY + hungerBarHeight + 8, xpBarWidth = 200, xpBarHeight = 10;
-  ctx.fillStyle = "#333"; ctx.fillRect(xpBarX, xpBarY, xpBarWidth, xpBarHeight);
-  ctx.fillStyle = "#00f"; let xpFrac = Math.max(0, player.xp / player.xpToNext);
-  ctx.fillRect(xpBarX, xpBarY, xpBarWidth * xpFrac, xpBarHeight);
-  ctx.strokeStyle = "#fff"; ctx.strokeRect(xpBarX, xpBarY, xpBarWidth, xpBarHeight);
+  ctx.save();
+  ctx.shadowColor = "#00bbff";
+  ctx.shadowBlur = 8;
+  ctx.fillStyle = "#222"; roundRect(ctx, xpBarX, xpBarY, xpBarWidth, xpBarHeight, 5); ctx.fill();
+  ctx.fillStyle = "#00c3ff"; let xpFrac = Math.max(0, player.xp / player.xpToNext);
+  roundRect(ctx, xpBarX, xpBarY, xpBarWidth * xpFrac, xpBarHeight, 5); ctx.fill();
+  ctx.shadowBlur = 0;
+  ctx.strokeStyle = "#fff"; ctx.lineWidth = 1.2;
+  roundRect(ctx, xpBarX, xpBarY, xpBarWidth, xpBarHeight, 5); ctx.stroke();
   ctx.fillStyle = "#fff"; ctx.font = "12px Courier New";
+  ctx.textAlign = "center";
   ctx.fillText("XP: " + Math.floor(player.xp) + "/" + player.xpToNext, xpBarX + xpBarWidth / 2, xpBarY + xpBarHeight - 2);
+  ctx.restore();
 
+  // Mining progress
   if (currentMiningTarget) {
     const tx = currentMiningTarget.x, ty = currentMiningTarget.y;
     if (tx >= 0 && tx < worldWidth && ty >= 0 && ty < worldHeight) {
@@ -633,10 +801,15 @@ function draw() {
       if (block !== 0 && blockDurability[block] !== undefined) {
         const bx = tx * tileSize - cameraX, by = ty * tileSize - cameraY, origDur = blockDurability[block];
         let progress = 1 - (blockHealth[tx][ty] / origDur); progress = Math.max(0, Math.min(1, progress));
-        ctx.fillStyle = "rgba(0,0,0," + (0.5 * progress) + ")"; ctx.fillRect(bx, by, tileSize, tileSize);
-        ctx.fillStyle = "gray"; ctx.fillRect(bx, by - 6, tileSize, 4);
-        ctx.fillStyle = "yellow"; ctx.fillRect(bx, by - 6, tileSize * progress, 4);
-        ctx.strokeStyle = "black"; ctx.strokeRect(bx, by - 6, tileSize, 4);
+        ctx.save();
+        ctx.globalAlpha = 0.5 * progress;
+        ctx.fillStyle = "gray";
+        roundRect(ctx, bx, by, tileSize, tileSize, 4); ctx.fill();
+        ctx.globalAlpha = 1;
+        ctx.fillStyle = "yellow"; roundRect(ctx, bx, by - 6, tileSize * progress, 4, 2); ctx.fill();
+        ctx.strokeStyle = "black"; ctx.lineWidth = 1;
+        roundRect(ctx, bx, by - 6, tileSize, 4, 2); ctx.stroke();
+        ctx.restore();
       }
     }
   }
