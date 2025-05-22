@@ -22,7 +22,7 @@
   <canvas id="game"></canvas>
   <script>
     let isDead = false;
-    letdroppedItems = [];
+    let droppedItems = [];
     /* Load Player Image */
     const playerImg = new Image();
     playerImg.src = "assets/player.png";
@@ -204,6 +204,8 @@
         xp: 0,
         xpToNext: 20
       },
+      xp: 0,
+      xpToNext: 20,
       selectedSlot: 0 // Index into hotbar.
     };
     // Define the order in which items appear in the hotbar.
@@ -812,13 +814,7 @@ function tryAttackEnemy() {
         const handY = player.y + player.height * 0.5;
         drawIcon(selectedItem, handX - cameraX, handY - cameraY, tileSize);
       }
-    /****
-      // Draw enemies.
-      for (let enemy of enemies) {
-        ctx.fillStyle = "green";
-        ctx.fillRect(enemy.x - cameraX, enemy.y - cameraY, enemy.width, enemy.height);
-      }
-****/
+  
        // Draw enemies.
       for (let enemy of enemies) {
         ctx.fillStyle = "green";
@@ -836,7 +832,7 @@ function tryAttackEnemy() {
         ctx.fillRect(bx, by, barWidth * hpFrac, barHeight);
         ctx.strokeStyle = "#000";
         ctx.strokeRect(bx, by, barWidth, barHeight);
-      };
+      }
       ctx.fillStyle = "#000";
       ctx.font = "16px Courier New";
       
@@ -936,7 +932,7 @@ function tryAttackEnemy() {
         }
       }
     }
-    function updateEnemies() {
+    /****function updateEnemies() {
       for (let i = enemies.length - 1; i >= 0; i--) {
         let enemy = enemies[i];
         if (Math.abs(enemy.x - player.x) < 300) {
@@ -963,6 +959,7 @@ function tryAttackEnemy() {
         }
       }
     }
+    ****/
     playerImg.onload = function() {
       gameLoop();
     };
