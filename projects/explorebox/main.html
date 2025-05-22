@@ -118,7 +118,7 @@ function getBlock(x, y) {
   return world[x][y];
 }
 
-/* ===== Lighting System (fixed, no over-darkening) ===== */
+/* ===== Lighting System (BRIGHTER) ===== */
 const LIGHT_SURFACE_Y = 15;
 const TORCH_LIGHT_RADIUS = 6;
 let dynamicLightMap = [];
@@ -127,7 +127,7 @@ function resetLightMap() {
   for (let x = 0; x < worldWidth; x++) {
     dynamicLightMap[x] = [];
     for (let y = 0; y < worldHeight; y++) {
-      dynamicLightMap[x][y] = (y < LIGHT_SURFACE_Y) ? 1 : 0.35; // underground is dim, not black
+      dynamicLightMap[x][y] = (y < LIGHT_SURFACE_Y) ? 1 : 0.65; // underground is much brighter now!
     }
   }
 }
@@ -156,8 +156,8 @@ const player = {
   width: tileSize,
   height: tileSize * 1.8,
   vx: 0, vy: 0,
-  speed: 4,
-  jumpStrength: 13,
+  speed: 2.2,         // REDUCED SPEED (was 4)
+  jumpStrength: 8.2,  // REDUCED JUMP STRENGTH (matches new gravity)
   grounded: false,
   health: 100,
   hunger: 100,
@@ -215,6 +215,8 @@ const enemies = [];
 const MAX_ENEMIES = 6;
 const ENEMY_VISIBLE_RADIUS = 900;
 const SLIME_SIGHT_DISTANCE = tileSize * 17.75;
+
+// --- ENSURE SLIME SPAWN ---
 function spawnEnemy(x, y) {
   let tileX = Math.floor(x / tileSize), tileY = Math.floor(y / tileSize);
   while (tileY > 0 && getBlock(tileX, tileY) !== 0) tileY--;
@@ -223,17 +225,20 @@ function spawnEnemy(x, y) {
     y: tileY * tileSize,
     width: tileSize,
     height: tileSize,
-    vx: 0, vy: 0, speed: 0.4,
+    vx: 0, vy: 0, speed: 0.3, // slightly reduced enemy speed too
     grounded: false,
     health: 20,
     type: "slime",
     bounceCooldown: 0
   });
 }
-for (let i = 0; i < 8; i++) {
+
+// Initial spawn: SPREAD THEM OUT & ALWAYS SPAWN
+for (let i = 0; i < 12; i++) {
   let ex = Math.floor(Math.random() * (worldWidth - 20)) + 10, ey = findSurfaceY(ex);
   spawnEnemy(ex * tileSize, ey * tileSize);
 }
+
 function updateEnemies() {
   for (let i = enemies.length - 1; i >= 0; i--) {
     let enemy = enemies[i];
@@ -244,28 +249,30 @@ function updateEnemies() {
     enemy.bounceCooldown--;
     let pdx = player.x - enemy.x, pdist = Math.abs(pdx);
     if (pdist < SLIME_SIGHT_DISTANCE) {
-      if (pdx > 8) enemy.vx = Math.min(enemy.vx + 0.19, enemy.speed);
-      else if (pdx < -8) enemy.vx = Math.max(enemy.vx - 0.19, -enemy.speed);
-      else enemy.vx *= 0.8;
+      if (pdx > 8) enemy.vx = Math.min(enemy.vx + 0.13, enemy.speed); // slightly less sticky
+      else if (pdx < -8) enemy.vx = Math.max(enemy.vx - 0.13, -enemy.speed);
+      else enemy.vx *= 0.85;
     } else {
-      if (Math.random() < 0.01) enemy.vx = (Math.random() - 0.5) * enemy.speed * 2;
-      else enemy.vx *= 0.96;
+      if (Math.random() < 0.02) enemy.vx = (Math.random() - 0.5) * enemy.speed * 2;
+      else enemy.vx *= 0.98;
     }
     if (enemy.grounded && enemy.bounceCooldown <= 0) {
-      enemy.vy = -6.7 - Math.random() * 1.8;
-      enemy.bounceCooldown = 40 + Math.floor(Math.random() * 20);
+      enemy.vy = -4.5 - Math.random() * 1.3; // gentler bounce
+      enemy.bounceCooldown = 50 + Math.floor(Math.random() * 30);
     }
-    if (enemy.grounded) enemy.vx *= 0.75;
+    if (enemy.grounded) enemy.vx *= 0.80;
 
     updateEntityPhysics(enemy);
 
     if (checkCollision(enemy, player) && !isDead) {
-      player.health -= 0.5;
+      player.health -= 0.4;
       if (player.health <= 0 && !isDead) { isDead = true; handlePlayerDeath(); }
     }
     if (enemy.health <= 0) enemies.splice(i, 1);
   }
 }
+
+// --- IMPROVED SLIME SPAWNING RATE ---
 function updateSlimeSpawning() {
   let onscreen = 0;
   for (let e of enemies) {
@@ -273,19 +280,20 @@ function updateSlimeSpawning() {
     let dx = centerX - (player.x + player.width / 2), dy = centerY - (player.y + player.height / 2);
     if (Math.abs(dx) < ENEMY_VISIBLE_RADIUS && Math.abs(dy) < ENEMY_VISIBLE_RADIUS) onscreen++;
   }
-  if (onscreen < MAX_ENEMIES && Math.random() < 0.001) {
+  // Increase spawn chance and make sure it always succeeds after a while
+  if (onscreen < MAX_ENEMIES && Math.random() < 0.04) {
     let attempts = 0, found = false, spawnX, spawnY;
-    while (attempts < 10 && !found) {
+    while (attempts < 16 && !found) {
       spawnX = Math.floor(player.x / tileSize) + Math.floor((Math.random() - 0.5) * 30);
       spawnX = Math.max(3, Math.min(worldWidth - 3, spawnX));
       let surfaceY = groundHeights[spawnX];
       spawnY = surfaceY + Math.floor(Math.random() * 35);
       spawnY = Math.min(worldHeight - 10, spawnY);
-      if (dynamicLightMap[spawnX] && dynamicLightMap[spawnX][spawnY] < 0.35) found = true;
+      if (dynamicLightMap[spawnX] && dynamicLightMap[spawnX][spawnY] < 0.85) found = true;
       attempts++;
     }
     if (found) spawnEnemy(spawnX * tileSize, spawnY * tileSize);
-    else if (Math.random() < 0.11) {
+    else if (Math.random() < 0.5) {
       let ex = Math.floor(player.x / tileSize) + Math.floor((Math.random() - 0.5) * 40);
       ex = Math.max(3, Math.min(worldWidth - 3, ex));
       let ey = findSurfaceY(ex);
@@ -309,10 +317,15 @@ function isColliding(entity) {
       if (isSolid(getBlock(x, y))) return true;
   return false;
 }
+// --- REDUCED GRAVITY, ADDED FRICTION ---
+const GRAVITY = 0.19; // much less gravity
+const FRICTION_GROUND = 0.81; // slows down when on ground
+const FRICTION_AIR = 0.96; // slows down when in air
+
 function updateEntityPhysics(entity) {
   entity.x += entity.vx;
   if (isColliding(entity)) { entity.x -= entity.vx; entity.vx = 0; }
-  entity.vy += 0.45;
+  entity.vy += GRAVITY;
   entity.y += entity.vy;
   entity.grounded = false;
   if (isColliding(entity)) {
@@ -320,6 +333,9 @@ function updateEntityPhysics(entity) {
     if (entity.vy > 0) entity.grounded = true;
     entity.vy = 0;
   }
+  // Friction!
+  if (entity.grounded) entity.vx *= FRICTION_GROUND;
+  else entity.vx *= FRICTION_AIR;
 }
 
 /* ===== Mining ===== */
@@ -471,8 +487,8 @@ function drawIcon(itemKey, x, y, size) {
     case "leaves": ctx.fillStyle = "#32CD32"; ctx.fillRect(x, y, size, size); break;
     case "gel": ctx.fillStyle = "#7FFFD4"; ctx.fillRect(x, y, size, size); break;
     case "torch": ctx.fillStyle = "#FFD700"; ctx.fillRect(x, y, size, size); break;
-    case "wooden_pickaxe": ctx.fillStyle = "#8B4513"; ctx.fillRect(x + size * 0.35, y + size * 0.3, size * 0.1, size * 0.5); ctx.fillStyle = "#808080"; ctx.fillRect(x + size * 0.2, y + size * 0.2, size * 0.6, size * 0.15); break;
-    case "wooden_sword": ctx.fillStyle = "#808080"; ctx.fillRect(x + size * 0.45, y + size * 0.1, size * 0.1, size * 0.6); ctx.fillStyle = "#8B4513"; ctx.fillRect(x + size * 0.4, y + size * 0.7, size * 0.2, size * 0.15); break;
+    case "wooden_pickaxe": ctx.fillStyle = "#8B4513"; ctx.fillRect(x + size * 0.35, y + size * 0.3, size * 0.1, size * 0.5); ctx.fillStyle = "#808080"; ctx.fillRect(x + size * 0.2, y + size * 0.2, size * 0.5, size * 0.13); break;
+    case "wooden_sword": ctx.fillStyle = "#808080"; ctx.fillRect(x + size * 0.45, y + size * 0.1, size * 0.1, size * 0.6); ctx.fillStyle = "#8B4513"; ctx.fillRect(x + size * 0.4, y + size * 0.7, size * 0.2, size * 0.12); break;
     default: ctx.fillStyle = "#FFF"; ctx.fillRect(x, y, size, size);
   }
 }
@@ -538,7 +554,7 @@ function draw() {
         ctx.fillRect(drawX, drawY, tileSize, tileSize);
         ctx.strokeStyle = "rgba(0,0,0,0.3)"; ctx.lineWidth = 1; ctx.strokeRect(drawX, drawY, tileSize, tileSize);
         if (light < 0.99) {
-          ctx.globalAlpha = 1 - Math.max(light, 0.18); // never fully black!
+          ctx.globalAlpha = 1 - Math.max(light, 0.45); // never fully black, much brighter now!
           ctx.fillStyle = "#000";
           ctx.fillRect(drawX, drawY, tileSize, tileSize);
           ctx.globalAlpha = 1.0;
@@ -564,8 +580,8 @@ function draw() {
     let dx = centerX - (player.x + player.width / 2), dy = centerY - (player.y + player.height / 2);
     if (Math.abs(dx) > canvas.width / 2 + 100 || Math.abs(dy) > canvas.height / 2 + 100) continue;
     let tileX = Math.floor(enemy.x / tileSize), tileY = Math.floor(enemy.y / tileSize);
-    let light = (dynamicLightMap[tileX] && dynamicLightMap[tileX][tileY]) || 0.18;
-    ctx.globalAlpha = Math.max(light, 0.26); // slimes are always visible (but faded in the dark)
+    let light = (dynamicLightMap[tileX] && dynamicLightMap[tileX][tileY]) || 0.45;
+    ctx.globalAlpha = Math.max(light, 0.55); // slimes are always visible (but faded in the dark)
     ctx.fillStyle = "green";
     ctx.fillRect(enemy.x - cameraX, enemy.y - cameraY, enemy.width, enemy.height);
     let barWidth = enemy.width, barHeight = 4, hpFrac = Math.max(0, enemy.health / 20),
@@ -637,7 +653,8 @@ function updatePlayer() {
   if ((keys["w"] || keys["ArrowUp"] || keys[" "]) && player.grounded) {
     player.vy = -player.jumpStrength; player.grounded = false;
   }
-  player.vy += 0.45; updateEntityPhysics(player);
+  // Don't add extra gravity here, handled in updateEntityPhysics
+  updateEntityPhysics(player);
   for (let i = droppedItems.length - 1; i >= 0; i--) {
     let drop = droppedItems[i], px = player.x + player.width / 2, py = player.y + player.height / 2,
         dx = drop.x * tileSize + tileSize / 2 - px, dy = drop.y * tileSize + tileSize / 2 - py;
