@@ -127,7 +127,7 @@ function resetLightMap() {
   for (let x = 0; x < worldWidth; x++) {
     dynamicLightMap[x] = [];
     for (let y = 0; y < worldHeight; y++) {
-      dynamicLightMap[x][y] = (y < LIGHT_SURFACE_Y) ? 1 : 0.65; // underground is much brighter now!
+      dynamicLightMap[x][y] = (y < LIGHT_SURFACE_Y) ? 1 : 0.65;
     }
   }
 }
@@ -156,8 +156,8 @@ const player = {
   width: tileSize,
   height: tileSize * 1.8,
   vx: 0, vy: 0,
-  speed: 2.2,
-  jumpStrength: 6.0,   // REDUCED JUMP STRENGTH for lower jump
+  speed: 4,           // NORMAL SPEED
+  jumpStrength: 12,   // NORMAL JUMP STRENGTH
   grounded: false,
   health: 100,
   hunger: 100,
@@ -201,7 +201,7 @@ function updateHunger() {
       }
     }
   }
-  // --- Healing if hunger > 80 and not full health ---
+  // Healing if hunger > 80 and not full health
   if (player.health < 100 && player.hunger > 80) {
     player.health += 0.15;
     if (player.health > 100) player.health = 100;
@@ -217,11 +217,10 @@ function tryEatGel() {
 
 /* ====== Enemies (Slimes) ====== */
 const enemies = [];
-const MAX_ENEMIES = 3; // REDUCED max enemies (was 6)
+const MAX_ENEMIES = 3;
 const ENEMY_VISIBLE_RADIUS = 900;
 const SLIME_SIGHT_DISTANCE = tileSize * 17.75;
 
-// --- ENSURE SLIME SPAWN ---
 function spawnEnemy(x, y) {
   let tileX = Math.floor(x / tileSize), tileY = Math.floor(y / tileSize);
   while (tileY > 0 && getBlock(tileX, tileY) !== 0) tileY--;
@@ -238,8 +237,7 @@ function spawnEnemy(x, y) {
   });
 }
 
-// Initial spawn: LESS slimes
-for (let i = 0; i < 3; i++) { // REDUCED from 12 to 3
+for (let i = 0; i < 3; i++) {
   let ex = Math.floor(Math.random() * (worldWidth - 20)) + 10, ey = findSurfaceY(ex);
   spawnEnemy(ex * tileSize, ey * tileSize);
 }
@@ -274,7 +272,6 @@ function updateEnemies() {
       if (player.health <= 0 && !isDead) { isDead = true; handlePlayerDeath(); }
     }
     if (enemy.health <= 0) {
-      // Drop gel when killed
       droppedItems.push({
         x: Math.floor(enemy.x / tileSize),
         y: Math.floor(enemy.y / tileSize),
@@ -286,7 +283,6 @@ function updateEnemies() {
   }
 }
 
-// --- IMPROVED SLIME SPAWNING RATE ---
 function updateSlimeSpawning() {
   let onscreen = 0;
   for (let e of enemies) {
@@ -294,8 +290,7 @@ function updateSlimeSpawning() {
     let dx = centerX - (player.x + player.width / 2), dy = centerY - (player.y + player.height / 2);
     if (Math.abs(dx) < ENEMY_VISIBLE_RADIUS && Math.abs(dy) < ENEMY_VISIBLE_RADIUS) onscreen++;
   }
-  // Lowered spawn chance and max onscreen
-  if (onscreen < MAX_ENEMIES && Math.random() < 0.01) { // REDUCED spawn rate (was 0.04)
+  if (onscreen < MAX_ENEMIES && Math.random() < 0.01) {
     let attempts = 0, found = false, spawnX, spawnY;
     while (attempts < 16 && !found) {
       spawnX = Math.floor(player.x / tileSize) + Math.floor((Math.random() - 0.5) * 30);
@@ -331,9 +326,9 @@ function isColliding(entity) {
       if (isSolid(getBlock(x, y))) return true;
   return false;
 }
-// --- REDUCED GRAVITY, ADDED FRICTION ---
-const GRAVITY = 0.19;
-const FRICTION_GROUND = 0.81;
+// NORMAL GRAVITY AND FRICTION
+const GRAVITY = 0.4;
+const FRICTION_GROUND = 0.8;
 const FRICTION_AIR = 0.96;
 
 function updateEntityPhysics(entity) {
@@ -347,7 +342,6 @@ function updateEntityPhysics(entity) {
     if (entity.vy > 0) entity.grounded = true;
     entity.vy = 0;
   }
-  // Friction!
   if (entity.grounded) entity.vx *= FRICTION_GROUND;
   else entity.vx *= FRICTION_AIR;
 }
@@ -488,7 +482,7 @@ function tryAttackEnemy() {
     const enemy = enemies[i], enemyCenterX = enemy.x + enemy.width / 2, enemyCenterY = enemy.y + enemy.height / 2,
           dx = enemyCenterX - playerCenterX, dy = enemyCenterY - playerCenterY, distance = Math.sqrt(dx * dx + dy * dy);
     if (distance < 50) { enemy.health -= 10; if (enemy.health <= 0) {
-      // Drop gel when killed (already handled in updateEnemies, so do nothing here)
+      // Drop gel when killed (handled in updateEnemies)
     } break; }
   }
 }
