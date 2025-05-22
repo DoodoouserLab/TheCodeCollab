@@ -200,9 +200,7 @@
         leaves: 0,
         wooden_pickaxe: 0,
         wooden_sword: 0,
-        torch: 0,
-        xp: 0,
-        xpToNext: 20
+        torch: 0
       },
       xp: 0,
       xpToNext: 20,
@@ -932,34 +930,7 @@ function tryAttackEnemy() {
         }
       }
     }
-    /****function updateEnemies() {
-      for (let i = enemies.length - 1; i >= 0; i--) {
-        let enemy = enemies[i];
-        if (Math.abs(enemy.x - player.x) < 300) {
-          enemy.vx = enemy.x < player.x ? enemy.speed : -enemy.speed;
-        } else {
-          enemy.vx += (Math.random() - 0.5) * 0.2;
-          if (enemy.vx > enemy.speed) enemy.vx = enemy.speed;
-          if (enemy.vx < -enemy.speed) enemy.vx = -enemy.speed;
-        }
-        enemy.vy += 0.4;
-        updateEntityPhysics(enemy);
-        if (checkCollision(enemy, player)) {
-          player.health -= 0.2;
-          if (player.health <= 0 && !isDead) {
-            isDead = true;
-            handlePlayerDeath();
-        }
-        if (enemy.health <= 0) {
-          // If the enemy is a slime, drop 1-2 gel.
-          if (enemy.type === "slime") {
-            player.inventory.gel += Math.floor(Math.random() * 2) + 1;
-          }
-          enemies.splice(i, 1);
-        }
-      }
-    }
-    ****/
+   
     playerImg.onload = function() {
       gameLoop();
     };
