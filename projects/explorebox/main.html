@@ -21,6 +21,8 @@
 <body>
   <canvas id="game"></canvas>
   <script>
+    let isDead = false;
+    letdroppedItems = [];
     /* Load Player Image */
     const playerImg = new Image();
     playerImg.src = "assets/player.png";
@@ -164,7 +166,7 @@
         blockHealth[x][y] = (b !== 0 && blockDurability[b] !== undefined) ? blockDurability[b] : 0;
       }
     }
-    // Helper to set a block and its health.
+    // Helper to set a block and its health
     function setBlock(x, y, block) {
       if (x < 0 || x >= worldWidth || y < 0 || y >= worldHeight) return;
       world[x][y] = block;
@@ -198,13 +200,37 @@
         leaves: 0,
         wooden_pickaxe: 0,
         wooden_sword: 0,
-        torch: 0
+        torch: 0,
+        xp: 0,
+        xpToNext: 20
       },
       selectedSlot: 0 // Index into hotbar.
     };
     // Define the order in which items appear in the hotbar.
     const inventoryOrder = ["wood", "stone", "gel", "dirt", "grass", "leaves", "wooden_pickaxe", "wooden_sword", "torch"];
 
+    function handlePlayerDeath() {
+      for (let key of inventoryOrder) {
+        let amt = player.inventory[key] || 0;
+        if (amt > 0) {
+          droppedItems.push({
+           x: Math.floor(player.x / tileSize),
+           y: Math.floor(player.y / tileSize),
+           key: key,
+           amount: amt
+         });
+         player.inventory[key] = 0;
+        }
+      }
+    }
+
+    function respawnPlayer() {
+      isDead = false;
+      player.health = 100;
+      player.x = 50 * tileSize;
+      player.y = findSurfaceY(50) * tileSize;
+    }
+    
     /***** Enemy Setup *****/
     const enemies = [];
     function spawnEnemy(x, y) {
@@ -229,33 +255,6 @@
       spawnEnemy(ex * tileSize, ey * tileSize);
     }
     
-    /****
-    for (let i = 0; i < 100; i++) {
-      let ex = Math.floor(Math.random() * (worldWidth - 20)) + 10;
-      let ey = 0;
-      for (let y = 0; y < worldHeight; y++) {
-        if (world[ex][y] !== 0) { ey = y - 1; break; }
-      }
-      spawnEnemy(ex * tileSize, ey * tileSize);
-    }
-    ****/
-   /****
-    // Periodically spawn new slime enemies (mostly in cave depths).
-    function updateSlimeSpawning() {
-      // Limit overall slime count.
-      if (enemies.length < 100) {
-        if (Math.random() < 0.01) {
-          // Spawn a slime in a cave region (y > ground height + 10)
-          const spawnX = Math.floor(Math.random() * worldWidth);
-          const spawnYStart = groundHeights[spawnX] + 10;
-          if (spawnYStart < worldHeight - 10) {
-            const spawnY = spawnYStart + Math.floor(Math.random() * (worldHeight - spawnYStart - 10));
-            spawnEnemy(spawnX * tileSize, spawnY * tileSize);
-          }
-        }
-      }
-    }
-    ****/
     
 
     /***** Crafting Setup *****/
@@ -380,6 +379,13 @@
         lastMousePos.y = e.clientY - rect.top;
         tryAttackEnemy();
       }
+    });
+    canvas.addEventListener("mousedown", function(e) {
+      if (isDead) {
+        respawnPlayer();
+        return;
+      }
+      // existing mining/attack logic...
     });
     canvas.addEventListener("mouseup", e => {
       if (!craftingMenuActive) {
@@ -543,6 +549,8 @@ function tryAttackEnemy() {
       if (enemy.health <= 0) {
         if (enemy.type === "slime") {
           player.inventory.gel += Math.floor(Math.random() * 2) + 1;
+          player.xp += 5;
+          if (player.xp > player.xpToNext) player.xp = player.xpToNext;
         }
         enemies.splice(i, 1);
       }
@@ -551,59 +559,7 @@ function tryAttackEnemy() {
   }
 }
     
-    /***** Enemy Update & Slime Drops *****/
-    function updateEnemies() {
-      for (let i = enemies.length - 1; i >= 0; i--) {
-        let enemy = enemies[i];
-        if (Math.abs(enemy.x - player.x) < 300) {
-          enemy.vx = enemy.x < player.x ? enemy.speed : -enemy.speed;
-        } else {
-          enemy.vx += (Math.random() - 0.5) * 0.2;
-          if (enemy.vx > enemy.speed) enemy.vx = enemy.speed;
-          if (enemy.vx < -enemy.speed) enemy.vx = -enemy.speed;
-        }
-        enemy.vy += 0.4;
-        updateEntityPhysics(enemy);
-        if (checkCollision(enemy, player)) {
-          player.health -= 0.2;
-        }
-        if (enemy.health <= 0) {
-          // If the enemy is a slime, drop 1–2 gel.
-          if (enemy.type === "slime") {
-            player.inventory.gel += Math.floor(Math.random() * 2) + 1;
-          }
-          enemies.splice(i, 1);
-        }
-      }
-    }
 
-        /***** Enemy Update & Slime Drops *****/
-   /****
-    function updateEnemies() {
-      for (let i = enemies.length - 1; i >= 0; i--) {
-        let enemy = enemies[i];
-        if (Math.abs(enemy.x - player.x) < 300) {
-          enemy.vx = enemy.x < player.x ? enemy.speed : -enemy.speed;
-        } else {
-          enemy.vx += (Math.random() - 0.5) * 0.2;
-          if (enemy.vx > enemy.speed) enemy.vx = enemy.speed;
-          if (enemy.vx < -enemy.speed) enemy.vx = -enemy.speed;
-        }
-        enemy.vy += 0.4;
-        updateEntityPhysics(enemy);
-        if (checkCollision(enemy, player)) {
-          player.health -= 0.2;
-        }
-        if (enemy.health <= 0) {
-          // If the enemy is a slime, drop 1–2 gel.
-          if (enemy.type === "slime") {
-            player.inventory.gel += Math.floor(Math.random() * 2) + 1;
-          }
-          enemies.splice(i, 1);
-        }
-      }
-    }
-****/
 
   function updateEnemies() {
   for (let i = enemies.length - 1; i >= 0; i--) {
@@ -627,12 +583,17 @@ function tryAttackEnemy() {
     // --- Damage player if touching ---
     if (checkCollision(enemy, player)) {
       player.health -= 0.5; // increase or decrease as needed
+      if (player.health <= 0 && !isDead) {
+        isDead = true;
+        handlePlayerDeath();
     }
 
     // --- Remove dead slimes and drop gel ---
     if (enemy.health <= 0) {
       if (enemy.type === "slime") {
         player.inventory.gel += Math.floor(Math.random() * 2) + 1;
+        player.xp += 5;
+        if (player.xp > player.xpToNext) player.xp = player.xpToNext;
       }
       enemies.splice(i, 1);
     }
@@ -655,21 +616,7 @@ function tryAttackEnemy() {
       }
     }
     // ----------- END SPAWN FUNCTION -----------
-    // Function to periodically spawn new slime enemies in cave areas.
-    /****
-    function updateSlimeSpawning() {
-      if (enemies.length < 10) {
-        if (Math.random() < 0.005) {
-          const spawnX = Math.floor(Math.random() * worldWidth);
-          const spawnYStart = groundHeights[spawnX] + 10;
-          if (spawnYStart < worldHeight - 10) {
-            const spawnY = spawnYStart + Math.floor(Math.random() * (worldHeight - spawnYStart - 10));
-            spawnEnemy(spawnX * tileSize, spawnY * tileSize);
-          }
-        }
-      }
-    }
-*****/
+    
     /***** Drawing Pixel Icons *****/
     function drawIcon(itemKey, x, y, size) {
       switch(itemKey) {
@@ -843,6 +790,12 @@ function tryAttackEnemy() {
           }
         }
       }
+
+      // Draw dropped items as icons
+      for (let drop of droppedItems) {
+        drawIcon(drop.key, drop.x * tileSize - cameraX, drop.y * tileSize - cameraY, tileSize);
+      }
+      
       // Draw player using the icon.
       ctx.drawImage(
         playerImg,
@@ -859,14 +812,34 @@ function tryAttackEnemy() {
         const handY = player.y + player.height * 0.5;
         drawIcon(selectedItem, handX - cameraX, handY - cameraY, tileSize);
       }
+    /****
       // Draw enemies.
       for (let enemy of enemies) {
         ctx.fillStyle = "green";
         ctx.fillRect(enemy.x - cameraX, enemy.y - cameraY, enemy.width, enemy.height);
       }
+****/
+       // Draw enemies.
+      for (let enemy of enemies) {
+        ctx.fillStyle = "green";
+        ctx.fillRect(enemy.x - cameraX, enemy.y - cameraY, enemy.width, enemy.height);
+
+        // Draw enemy (slime) health bar above it
+        let barWidth = enemy.width;
+        let barHeight = 4;
+        let hpFrac = Math.max(0, enemy.health / 20); // Assuming max health is 20
+        let bx = enemy.x - cameraX;
+        let by = enemy.y - cameraY - 8;
+        ctx.fillStyle = "#333";
+        ctx.fillRect(bx, by, barWidth, barHeight);
+        ctx.fillStyle = "#0f0";
+        ctx.fillRect(bx, by, barWidth * hpFrac, barHeight);
+        ctx.strokeStyle = "#000";
+        ctx.strokeRect(bx, by, barWidth, barHeight);
+      };
       ctx.fillStyle = "#000";
       ctx.font = "16px Courier New";
-      //ctx.fillText("Health: " + Math.floor(player.health), 10, 20);
+      
       // Draw player health bar
       const barX = 20, barY = 20, barWidth = 200, barHeight = 20;
       ctx.fillStyle = "#333";
@@ -902,6 +875,20 @@ function tryAttackEnemy() {
           }
         }
       }
+
+      // Draw XP bar (below health bar)
+      const xpBarX = barX, xpBarY = barY + barHeight + 8, xpBarWidth = 200, xpBarHeight = 10;
+      ctx.fillStyle = "#333";
+      ctx.fillRect(xpBarX, xpBarY, xpBarWidth, xpBarHeight);
+      ctx.fillStyle = "#00f";
+      let xpFrac = Math.max(0, player.xp / player.xpToNext);
+      ctx.fillRect(xpBarX, xpBarY, xpBarWidth * xpFrac, xpBarHeight);
+      ctx.strokeStyle = "#fff";
+      ctx.strokeRect(xpBarX, xpBarY, xpBarWidth, xpBarHeight);
+      ctx.fillStyle = "#fff";
+      ctx.font = "12px Courier New";
+      ctx.fillText("XP: " + Math.floor(player.xp) + "/" + player.xpToNext, xpBarX + xpBarWidth / 2, xpBarY + xpBarHeight - 2);
+      
       // Draw inventory hotbar.
       drawInventory();
       // If the crafting menu is active, draw it.
@@ -935,6 +922,19 @@ function tryAttackEnemy() {
       }
       player.vy += 0.4;
       updateEntityPhysics(player);
+      if (!isDead) {
+        for (let i = droppedItems.length - 1; i >= 0; i--) {
+          let drop = droppedItems[i];
+          let px = player.x + player.width / 2;
+          let py = player.y + player.height / 2;
+          let dx = drop.x * tileSize + tileSize / 2 - px;
+          let dy = drop.y * tileSize + tileSize / 2 - py;
+          if (Math.abs(dx) < tileSize && Math.abs(dy) < tileSize) {
+            player.inventory[drop.key] = (player.inventory[drop.key] || 0) + drop.amount;
+            droppedItems.splice(i, 1);
+          }
+        }
+      }
     }
     function updateEnemies() {
       for (let i = enemies.length - 1; i >= 0; i--) {
@@ -950,6 +950,9 @@ function tryAttackEnemy() {
         updateEntityPhysics(enemy);
         if (checkCollision(enemy, player)) {
           player.health -= 0.2;
+          if (player.health <= 0 && !isDead) {
+            isDead = true;
+            handlePlayerDeath();
         }
         if (enemy.health <= 0) {
           // If the enemy is a slime, drop 1-2 gel.
