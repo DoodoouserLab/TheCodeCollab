@@ -130,7 +130,7 @@ function getBlock(x, y) {
 
 /* ===== Lighting System (BRIGHTER) ===== */
 const LIGHT_SURFACE_Y = 15;
-const TORCH_LIGHT_RADIUS = 6; // Changed to 6 blocks
+const TORCH_LIGHT_RADIUS = 6; // 6 blocks
 let dynamicLightMap = [];
 function resetLightMap() {
   dynamicLightMap = [];
@@ -203,8 +203,9 @@ function updateHunger() {
     player.hunger -= 1;
     hungerTick = 0;
     if (player.hunger < 0) player.hunger = 0;
+    // Lose health if hunger is 0
     if (player.hunger === 0) {
-      player.health -= 0.6;
+      player.health -= 1.2; // Increased for effect, adjust as you wish
       if (player.health <= 0 && !isDead) {
         isDead = true;
         handlePlayerDeath();
@@ -822,6 +823,15 @@ function draw() {
 let isDead = false, droppedItems = [];
 function updatePlayer() {
   if (craftingMenuActive || isDead) return;
+
+  // Slower movement if hunger below 10
+  let originalSpeed = player.speed;
+  if (player.hunger < 10) {
+    player.speed = 1.5; // reduced speed
+  } else {
+    player.speed = 4; // normal speed
+  }
+
   if (keys["a"] || keys["ArrowLeft"]) player.vx = -player.speed;
   else if (keys["d"] || keys["ArrowRight"]) player.vx = player.speed;
   else player.vx = 0;
