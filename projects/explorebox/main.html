@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8">
-  <title>ExploreBox Enhanced</title>
+  <title>ExploreBox Terraria-Style Lighting</title>
   <style>
     html, body { margin:0; padding:0; overflow:hidden; background:#000; }
     canvas { display:block; image-rendering: pixelated; background: #000; }
@@ -11,7 +11,7 @@
 <body>
 <canvas id="game"></canvas>
 <script>
-/* ===== Canvas & FPS Meter ===== */
+/* ===== Canvas Setup ===== */
 const canvas = document.getElementById("game");
 const ctx = canvas.getContext("2d");
 function resizeCanvas() {
@@ -21,6 +21,7 @@ function resizeCanvas() {
 window.addEventListener("resize", resizeCanvas);
 resizeCanvas();
 
+/* ===== FPS Meter ===== */
 let frames = 0, fps = 0, lastFpsUpdate = performance.now();
 function updateFpsMeter() {
   frames++;
@@ -31,7 +32,7 @@ function updateFpsMeter() {
     lastFpsUpdate = now;
   }
 }
-function drawFpsMeter(ctx) {
+function drawFpsMeter() {
   ctx.font = "16px Courier New";
   ctx.fillStyle = "#fff";
   ctx.textAlign = "left";
@@ -95,7 +96,6 @@ for (let x = 5; x < worldWidth - 5; x++) {
     }
   }
 })();
-
 function findSurfaceY(x) {
   for (let y = 0; y < worldHeight; y++) if (world[x][y] !== 0) return y - 1;
   return worldHeight - 2;
@@ -118,30 +118,44 @@ function getBlock(x, y) {
   return world[x][y];
 }
 
-/* ===== Lighting System (fixed, no over-darkening) ===== */
+/* ===== Terraria-Style Lighting ===== */
 const LIGHT_SURFACE_Y = 15;
-const TORCH_LIGHT_RADIUS = 6;
+const TORCH_LIGHT_RADIUS = 8;
+const TORCH_LIGHT_STRENGTH = 1.0;
+const SURFACE_LIGHT_STRENGTH = 1.0;
+const MIN_LIGHT = 0.13;
+
 let dynamicLightMap = [];
 function resetLightMap() {
   dynamicLightMap = [];
   for (let x = 0; x < worldWidth; x++) {
     dynamicLightMap[x] = [];
     for (let y = 0; y < worldHeight; y++) {
-      dynamicLightMap[x][y] = (y < LIGHT_SURFACE_Y) ? 1 : 0.18; // underground is dim, not black
+      // Surface is fully lit, fades to dark with depth
+      if (y < LIGHT_SURFACE_Y) {
+        dynamicLightMap[x][y] = SURFACE_LIGHT_STRENGTH;
+      } else {
+        // Simple fade with depth, min is MIN_LIGHT
+        let factor = 1 - Math.min(1, (y - LIGHT_SURFACE_Y) / 20);
+        dynamicLightMap[x][y] = Math.max(MIN_LIGHT, factor);
+      }
     }
   }
 }
 function propagateTorchLight() {
   for (let x = 0; x < worldWidth; x++) {
     for (let y = 0; y < worldHeight; y++) {
-      if (world[x][y] === 6) {
+      if (world[x][y] === 6) { // torch
         for (let dx = -TORCH_LIGHT_RADIUS; dx <= TORCH_LIGHT_RADIUS; dx++) {
           for (let dy = -TORCH_LIGHT_RADIUS; dy <= TORCH_LIGHT_RADIUS; dy++) {
             let tx = x + dx, ty = y + dy;
             if (tx < 0 || tx >= worldWidth || ty < 0 || ty >= worldHeight) continue;
             let dist = Math.sqrt(dx * dx + dy * dy);
-            let strength = Math.max(0, 1 - dist / TORCH_LIGHT_RADIUS);
-            dynamicLightMap[tx][ty] = Math.max(dynamicLightMap[tx][ty], strength);
+            let strength = Math.max(0, TORCH_LIGHT_STRENGTH * (1 - dist / TORCH_LIGHT_RADIUS));
+            // Light does not pass through solid blocks, simple check
+            if (dist === 0 || getBlock(tx, ty) === 0 || !isSolid(getBlock(tx,ty))) {
+              dynamicLightMap[tx][ty] = Math.max(dynamicLightMap[tx][ty], strength);
+            }
           }
         }
       }
@@ -212,7 +226,7 @@ function tryEatGel() {
 
 /* ====== Enemies (Slimes) ====== */
 const enemies = [];
-const MAX_ENEMIES = 18;
+const MAX_ENEMIES = 16;
 const ENEMY_VISIBLE_RADIUS = 900;
 const SLIME_SIGHT_DISTANCE = tileSize * 17.75;
 function spawnEnemy(x, y) {
@@ -230,7 +244,7 @@ function spawnEnemy(x, y) {
     bounceCooldown: 0
   });
 }
-for (let i = 0; i < 8; i++) {
+for (let i = 0; i < 5; i++) {
   let ex = Math.floor(Math.random() * (worldWidth - 20)) + 10, ey = findSurfaceY(ex);
   spawnEnemy(ex * tileSize, ey * tileSize);
 }
@@ -273,7 +287,7 @@ function updateSlimeSpawning() {
     let dx = centerX - (player.x + player.width / 2), dy = centerY - (player.y + player.height / 2);
     if (Math.abs(dx) < ENEMY_VISIBLE_RADIUS && Math.abs(dy) < ENEMY_VISIBLE_RADIUS) onscreen++;
   }
-  if (onscreen < MAX_ENEMIES && Math.random() < 0.004) {
+  if (onscreen < MAX_ENEMIES && Math.random() < 0.003) {
     let attempts = 0, found = false, spawnX, spawnY;
     while (attempts < 10 && !found) {
       spawnX = Math.floor(player.x / tileSize) + Math.floor((Math.random() - 0.5) * 30);
@@ -285,7 +299,7 @@ function updateSlimeSpawning() {
       attempts++;
     }
     if (found) spawnEnemy(spawnX * tileSize, spawnY * tileSize);
-    else if (Math.random() < 0.11) {
+    else if (Math.random() < 0.13) {
       let ex = Math.floor(player.x / tileSize) + Math.floor((Math.random() - 0.5) * 40);
       ex = Math.max(3, Math.min(worldWidth - 3, ex));
       let ey = findSurfaceY(ex);
@@ -528,23 +542,29 @@ function draw() {
   const startCol = Math.floor(cameraX / tileSize) - 1, endCol = startCol + Math.ceil(canvas.width / tileSize) + 2;
   const startRow = Math.floor(cameraY / tileSize) - 1, endRow = startRow + Math.ceil(canvas.height / tileSize) + 2;
 
-  for (let x = startCol; x <= endCol; x++) for (let y = startRow; y <= endRow; y++)
-    if (x >= 0 && x < worldWidth && y >= 0 && y < worldHeight) {
-      const block = world[x][y];
-      if (block !== 0) {
-        const drawX = x * tileSize - cameraX, drawY = y * tileSize - cameraY;
-        let light = dynamicLightMap[x][y];
-        ctx.fillStyle = blockColors[block] || "#FFF";
-        ctx.fillRect(drawX, drawY, tileSize, tileSize);
-        ctx.strokeStyle = "rgba(0,0,0,0.3)"; ctx.lineWidth = 1; ctx.strokeRect(drawX, drawY, tileSize, tileSize);
-        if (light < 0.99) {
-          ctx.globalAlpha = 1 - Math.max(light, 0.18); // never fully black!
-          ctx.fillStyle = "#000";
+  for (let x = startCol; x <= endCol; x++) {
+    for (let y = startRow; y <= endRow; y++) {
+      if (x >= 0 && x < worldWidth && y >= 0 && y < worldHeight) {
+        const block = world[x][y];
+        if (block !== 0) {
+          const drawX = x * tileSize - cameraX, drawY = y * tileSize - cameraY;
+          let light = dynamicLightMap[x][y];
+          ctx.fillStyle = blockColors[block] || "#FFF";
           ctx.fillRect(drawX, drawY, tileSize, tileSize);
-          ctx.globalAlpha = 1.0;
+          ctx.strokeStyle = "rgba(0,0,0,0.3)"; ctx.lineWidth = 1; ctx.strokeRect(drawX, drawY, tileSize, tileSize);
+          // Terraria-style: fade out smoothly from light
+          // Light values: 1 = bright, MIN_LIGHT = darkest
+          // So overlay is (1 - light)
+          if (light < 0.99) {
+            ctx.globalAlpha = 1 - light;
+            ctx.fillStyle = "#000";
+            ctx.fillRect(drawX, drawY, tileSize, tileSize);
+            ctx.globalAlpha = 1.0;
+          }
         }
       }
     }
+  }
 
   for (let drop of droppedItems)
     drawIcon(drop.key, drop.x * tileSize - cameraX, drop.y * tileSize - cameraY, tileSize);
@@ -564,8 +584,8 @@ function draw() {
     let dx = centerX - (player.x + player.width / 2), dy = centerY - (player.y + player.height / 2);
     if (Math.abs(dx) > canvas.width / 2 + 100 || Math.abs(dy) > canvas.height / 2 + 100) continue;
     let tileX = Math.floor(enemy.x / tileSize), tileY = Math.floor(enemy.y / tileSize);
-    let light = (dynamicLightMap[tileX] && dynamicLightMap[tileX][tileY]) || 0.18;
-    ctx.globalAlpha = Math.max(light, 0.26); // slimes are always visible (but faded in the dark)
+    let light = (dynamicLightMap[tileX] && dynamicLightMap[tileX][tileY]) || MIN_LIGHT;
+    ctx.globalAlpha = Math.max(light, MIN_LIGHT); // slimes fade with darkness
     ctx.fillStyle = "green";
     ctx.fillRect(enemy.x - cameraX, enemy.y - cameraY, enemy.width, enemy.height);
     let barWidth = enemy.width, barHeight = 4, hpFrac = Math.max(0, enemy.health / 20),
@@ -614,7 +634,7 @@ function draw() {
       }
     }
   }
-  drawFpsMeter(ctx);
+  drawFpsMeter();
   drawInventory();
   if (craftingMenuActive) drawCraftingMenu();
   if (isDead) {
