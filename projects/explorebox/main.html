@@ -118,7 +118,7 @@ function getBlock(x, y) {
   return world[x][y];
 }
 
-/* ===== Lighting System ===== */
+/* ===== Lighting System (fixed, no over-darkening) ===== */
 const LIGHT_SURFACE_Y = 15;
 const TORCH_LIGHT_RADIUS = 6;
 let dynamicLightMap = [];
@@ -127,7 +127,7 @@ function resetLightMap() {
   for (let x = 0; x < worldWidth; x++) {
     dynamicLightMap[x] = [];
     for (let y = 0; y < worldHeight; y++) {
-      dynamicLightMap[x][y] = (y < LIGHT_SURFACE_Y) ? 1 : 0;
+      dynamicLightMap[x][y] = (y < LIGHT_SURFACE_Y) ? 1 : 0.18; // underground is dim, not black
     }
   }
 }
@@ -212,7 +212,7 @@ function tryEatGel() {
 
 /* ====== Enemies (Slimes) ====== */
 const enemies = [];
-const MAX_ENEMIES = 18; // <<<< HERE: Adjust for fewer slimes
+const MAX_ENEMIES = 18;
 const ENEMY_VISIBLE_RADIUS = 900;
 const SLIME_SIGHT_DISTANCE = tileSize * 17.75;
 function spawnEnemy(x, y) {
@@ -230,7 +230,7 @@ function spawnEnemy(x, y) {
     bounceCooldown: 0
   });
 }
-for (let i = 0; i < 8; i++) { // initial fewer slimes
+for (let i = 0; i < 8; i++) {
   let ex = Math.floor(Math.random() * (worldWidth - 20)) + 10, ey = findSurfaceY(ex);
   spawnEnemy(ex * tileSize, ey * tileSize);
 }
@@ -273,7 +273,7 @@ function updateSlimeSpawning() {
     let dx = centerX - (player.x + player.width / 2), dy = centerY - (player.y + player.height / 2);
     if (Math.abs(dx) < ENEMY_VISIBLE_RADIUS && Math.abs(dy) < ENEMY_VISIBLE_RADIUS) onscreen++;
   }
-  if (onscreen < MAX_ENEMIES && Math.random() < 0.004) { // <<<< HERE: Slower spawn
+  if (onscreen < MAX_ENEMIES && Math.random() < 0.004) {
     let attempts = 0, found = false, spawnX, spawnY;
     while (attempts < 10 && !found) {
       spawnX = Math.floor(player.x / tileSize) + Math.floor((Math.random() - 0.5) * 30);
@@ -534,17 +534,15 @@ function draw() {
       if (block !== 0) {
         const drawX = x * tileSize - cameraX, drawY = y * tileSize - cameraY;
         let light = dynamicLightMap[x][y];
-        ctx.save();
-        ctx.globalAlpha = 0.95;
         ctx.fillStyle = blockColors[block] || "#FFF";
         ctx.fillRect(drawX, drawY, tileSize, tileSize);
         ctx.strokeStyle = "rgba(0,0,0,0.3)"; ctx.lineWidth = 1; ctx.strokeRect(drawX, drawY, tileSize, tileSize);
-        if (light < 0.95) {
-          ctx.globalAlpha = 1 - light;
+        if (light < 0.99) {
+          ctx.globalAlpha = 1 - Math.max(light, 0.18); // never fully black!
           ctx.fillStyle = "#000";
           ctx.fillRect(drawX, drawY, tileSize, tileSize);
+          ctx.globalAlpha = 1.0;
         }
-        ctx.restore();
       }
     }
 
@@ -566,7 +564,8 @@ function draw() {
     let dx = centerX - (player.x + player.width / 2), dy = centerY - (player.y + player.height / 2);
     if (Math.abs(dx) > canvas.width / 2 + 100 || Math.abs(dy) > canvas.height / 2 + 100) continue;
     let tileX = Math.floor(enemy.x / tileSize), tileY = Math.floor(enemy.y / tileSize);
-    if (dynamicLightMap[tileX] && dynamicLightMap[tileX][tileY] < 0.1) continue;
+    let light = (dynamicLightMap[tileX] && dynamicLightMap[tileX][tileY]) || 0.18;
+    ctx.globalAlpha = Math.max(light, 0.26); // slimes are always visible (but faded in the dark)
     ctx.fillStyle = "green";
     ctx.fillRect(enemy.x - cameraX, enemy.y - cameraY, enemy.width, enemy.height);
     let barWidth = enemy.width, barHeight = 4, hpFrac = Math.max(0, enemy.health / 20),
@@ -574,6 +573,7 @@ function draw() {
     ctx.fillStyle = "#333"; ctx.fillRect(bx, by, barWidth, barHeight);
     ctx.fillStyle = "#0f0"; ctx.fillRect(bx, by, barWidth * hpFrac, barHeight);
     ctx.strokeStyle = "#000"; ctx.strokeRect(bx, by, barWidth, barHeight);
+    ctx.globalAlpha = 1.0;
   }
 
   const barX = 20, barY = 20, barWidth = 200, barHeight = 20;
