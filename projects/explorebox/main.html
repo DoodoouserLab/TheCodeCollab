@@ -20,12 +20,12 @@
 <body>
   <canvas id="game"></canvas>
   <script>
-    // ====== Globals ======
+    // ===== Globals & Constants =====
     let isDead = false;
     let droppedItems = [];
-    const MAX_ENEMIES = 35;
+    const MAX_ENEMIES = 25;
 
-    // ====== Canvas Setup ======
+    // ===== Canvas =====
     const canvas = document.getElementById("game");
     const ctx = canvas.getContext("2d");
     function resizeCanvas() {
@@ -35,62 +35,48 @@
     window.addEventListener("resize", resizeCanvas);
     resizeCanvas();
 
-    // ====== Load Player Image ======
+    // ===== Player Image =====
     const playerImg = new Image();
     playerImg.src = "assets/player.png";
     playerImg.onerror = function() {
-      alert("Failed to load assets/player.png! Add the image or use a colored rectangle for the player.");
-    }
+      alert("Failed to load assets/player.png! Add an image or use a colored rectangle for the player.");
+    };
 
-    // ====== World Generation ======
-    const worldWidth = 1000;
-    const worldHeight = 400;
-    const tileSize = 16;
-
-    // Block types: 0: Air, 1: Dirt, 2: Stone, 3: Grass, 4: Wood, 5: Leaves, 6: Torch
+    // ===== World =====
+    const worldWidth = 1000, worldHeight = 400, tileSize = 16;
     const blockColors = {
-      0: "#87CEEB",
-      1: "#8B4513",
-      2: "#808080",
-      3: "#228B22",
-      4: "#A0522D",
-      5: "#32CD32",
-      6: "#FFD700" // Torch
+      0: "#87CEEB", // air (not drawn)
+      1: "#8B4513", // dirt
+      2: "#808080", // stone
+      3: "#228B22", // grass
+      4: "#A0522D", // wood
+      5: "#32CD32", // leaves
+      6: "#FFD700"  // torch
     };
-    const blockDurability = {
-      1: 2, 2: 4, 3: 1, 4: 3, 5: 1, 6: 1
-    };
-
+    const blockDurability = { 1: 2, 2: 4, 3: 1, 4: 3, 5: 1, 6: 1 };
     const world = [];
-    const minGround = 20, maxGround = 80;
     const groundHeights = [];
     let currentGround = 50;
     for (let x = 0; x < worldWidth; x++) {
       currentGround += Math.floor(Math.random() * 5) - 2;
-      currentGround = Math.max(minGround, Math.min(maxGround, currentGround));
+      currentGround = Math.max(20, Math.min(80, currentGround));
       groundHeights[x] = currentGround;
     }
     for (let x = 0; x < worldWidth; x++) {
       world[x] = [];
       let ground = groundHeights[x];
       for (let y = 0; y < worldHeight; y++) {
-        if (y > ground) {
-          world[x][y] = (Math.random() < 0.2) ? 1 : 2;
-        } else if (y === ground) {
-          world[x][y] = 3;
-        } else {
-          world[x][y] = 0;
-        }
+        if (y > ground) world[x][y] = (Math.random() < 0.2) ? 1 : 2;
+        else if (y === ground) world[x][y] = 3;
+        else world[x][y] = 0;
       }
     }
-    // Tree generation
+    // Trees
     for (let x = 5; x < worldWidth - 5; x++) {
       for (let y = 0; y < worldHeight; y++) {
         if (world[x][y] === 3 && Math.random() < 0.03) {
           const treeHeight = 3 + Math.floor(Math.random() * 3);
-          for (let t = 1; t <= treeHeight; t++) {
-            if (y - t >= 0) world[x][y - t] = 4;
-          }
+          for (let t = 1; t <= treeHeight; t++) if (y - t >= 0) world[x][y - t] = 4;
           const topY = y - treeHeight;
           for (let dx = -1; dx <= 1; dx++) {
             for (let dy = -1; dy <= 1; dy++) {
@@ -102,17 +88,15 @@
         }
       }
     }
-    // Cave generation
+    // Caves
     function generateCaves() {
-      const numCaves = 30;
-      for (let i = 0; i < numCaves; i++) {
+      for (let i = 0; i < 30; i++) {
         let startX = Math.floor(Math.random() * worldWidth);
         let startY = groundHeights[startX] + 5 + Math.floor(Math.random() * 20);
         const length = Math.floor(Math.random() * 100) + 50;
         let angle = Math.random() * 2 * Math.PI;
         for (let j = 0; j < length; j++) {
-          const cx = Math.floor(startX);
-          const cy = Math.floor(startY);
+          const cx = Math.floor(startX), cy = Math.floor(startY);
           const radius = Math.floor(Math.random() * 2) + 1;
           for (let ax = -radius; ax <= radius; ax++)
             for (let ay = -radius; ay <= radius; ay++) {
@@ -153,7 +137,7 @@
       return world[x][y];
     }
 
-    // ====== Player Setup ======
+    // ===== Player =====
     const player = {
       x: 50 * tileSize,
       y: findSurfaceY(50) * tileSize,
@@ -166,22 +150,15 @@
       grounded: false,
       health: 100,
       inventory: {
-        wood: 20,
-        stone: 20,
-        gel: 10,
-        dirt: 0,
-        grass: 0,
-        leaves: 0,
-        wooden_pickaxe: 0,
-        wooden_sword: 0,
-        torch: 10
+        wood: 20, stone: 20, gel: 10,
+        dirt: 0, grass: 0, leaves: 0,
+        wooden_pickaxe: 0, wooden_sword: 0, torch: 10
       },
       xp: 0,
       xpToNext: 20,
       selectedSlot: 0
     };
     const inventoryOrder = ["wood", "stone", "gel", "dirt", "grass", "leaves", "wooden_pickaxe", "wooden_sword", "torch"];
-
     function handlePlayerDeath() {
       for (let key of inventoryOrder) {
         let amt = player.inventory[key] || 0;
@@ -203,12 +180,15 @@
       player.y = findSurfaceY(50) * tileSize;
     }
 
-    // ====== Enemy Setup ======
+    // ===== Enemies (Slimes) =====
     const enemies = [];
     function spawnEnemy(x, y) {
+      // Place above ground
+      let tileX = Math.floor(x / tileSize), tileY = Math.floor(y / tileSize);
+      while (tileY > 0 && getBlock(tileX, tileY) !== 0) tileY--;
       enemies.push({
-        x: x,
-        y: y,
+        x: tileX * tileSize,
+        y: tileY * tileSize,
         width: tileSize,
         height: tileSize,
         vx: 0,
@@ -219,27 +199,24 @@
         type: "slime"
       });
     }
-    // Initial spawn
     for (let i = 0; i < 10; i++) {
       let ex = Math.floor(Math.random() * (worldWidth - 20)) + 10;
       let ey = findSurfaceY(ex);
       spawnEnemy(ex * tileSize, ey * tileSize);
     }
-
     function updateEnemies() {
       for (let i = enemies.length - 1; i >= 0; i--) {
         let enemy = enemies[i];
-        // Slime AI: chase player if close, else wander
         let dx = player.x - enemy.x, dy = player.y - enemy.y;
         let dist = Math.sqrt(dx * dx + dy * dy);
+        // AI: chase player if close, wander otherwise
         if (dist < 300) {
-          enemy.vx = dx > 0 ? enemy.speed : -enemy.speed;
+          enemy.vx = (dx > 2) ? enemy.speed : (dx < -2 ? -enemy.speed : 0);
         } else {
-          enemy.vx += (Math.random() - 0.5) * 0.2;
+          enemy.vx += (Math.random() - 0.5) * 0.1;
           if (enemy.vx > enemy.speed) enemy.vx = enemy.speed;
           if (enemy.vx < -enemy.speed) enemy.vx = -enemy.speed;
         }
-        enemy.vy += 0.4; // gravity
         updateEntityPhysics(enemy);
         // Hurt player if touching
         if (checkCollision(enemy, player) && !isDead) {
@@ -249,32 +226,24 @@
             handlePlayerDeath();
           }
         }
-        // Remove dead enemy, drop gel/xp
+        // Remove dead
         if (enemy.health <= 0) {
-          if (enemy.type === "slime") {
-            player.inventory.gel += Math.floor(Math.random() * 2) + 1;
-            player.xp += 5;
-            if (player.xp > player.xpToNext) player.xp = player.xpToNext;
-          }
           enemies.splice(i, 1);
         }
       }
     }
-    // Slime spawning
     function updateSlimeSpawning() {
-      if (enemies.length < MAX_ENEMIES) {
-        if (Math.random() < 0.01) {
-          const spawnX = Math.floor(Math.random() * worldWidth);
-          const spawnYStart = groundHeights[spawnX] + 10;
-          if (spawnYStart < worldHeight - 10) {
-            const spawnY = spawnYStart + Math.floor(Math.random() * (worldHeight - spawnYStart - 10));
-            spawnEnemy(spawnX * tileSize, spawnY * tileSize);
-          }
+      if (enemies.length < MAX_ENEMIES && Math.random() < 0.01) {
+        let spawnX = Math.floor(Math.random() * worldWidth);
+        let spawnYStart = groundHeights[spawnX] + 10;
+        if (spawnYStart < worldHeight - 10) {
+          let spawnY = spawnYStart + Math.floor(Math.random() * (worldHeight - spawnYStart - 10));
+          spawnEnemy(spawnX * tileSize, spawnY * tileSize);
         }
       }
     }
 
-    // ====== Physics and Collision ======
+    // ===== Physics =====
     function checkCollision(a, b) {
       return (a.x < b.x + b.width &&
               a.x + a.width > b.x &&
@@ -284,38 +253,33 @@
     function isSolid(block) { return block !== 0; }
     function isColliding(entity) {
       const leftTile = Math.floor(entity.x / tileSize);
-      const rightTile = Math.floor((entity.x + entity.width) / tileSize);
+      const rightTile = Math.floor((entity.x + entity.width - 1) / tileSize);
       const topTile = Math.floor(entity.y / tileSize);
-      const bottomTile = Math.floor((entity.y + entity.height) / tileSize);
+      const bottomTile = Math.floor((entity.y + entity.height - 1) / tileSize);
       for (let x = leftTile; x <= rightTile; x++)
         for (let y = topTile; y <= bottomTile; y++)
           if (isSolid(getBlock(x, y))) return true;
       return false;
     }
     function updateEntityPhysics(entity) {
-      let steps = Math.ceil(Math.abs(entity.vx));
-      let moveX = (steps === 0) ? 0 : entity.vx / steps;
-      for (let i = 0; i < steps; i++) {
-        entity.x += moveX;
-        if (isColliding(entity)) {
-          entity.x -= moveX;
-          entity.vx = 0; break;
-        }
+      // Horizontal
+      entity.x += entity.vx;
+      if (isColliding(entity)) {
+        entity.x -= entity.vx;
+        entity.vx = 0;
       }
-      steps = Math.ceil(Math.abs(entity.vy));
-      let moveY = (steps === 0) ? 0 : entity.vy / steps;
+      // Gravity
+      entity.vy += 0.4;
+      entity.y += entity.vy;
       entity.grounded = false;
-      for (let i = 0; i < steps; i++) {
-        entity.y += moveY;
-        if (isColliding(entity)) {
-          entity.y -= moveY;
-          if (moveY > 0) entity.grounded = true;
-          entity.vy = 0; break;
-        }
+      if (isColliding(entity)) {
+        entity.y -= entity.vy;
+        if (entity.vy > 0) entity.grounded = true;
+        entity.vy = 0;
       }
     }
 
-    // ====== Mining ======
+    // ===== Mining =====
     let isMining = false, currentMiningTarget = null, lastMousePos = { x: 0, y: 0 };
     function getMiningMultiplier() {
       return player.inventory.wooden_pickaxe > 0 ? 2 : 0.5;
@@ -359,14 +323,9 @@
       }
     }
 
-    // ====== Block Placement ======
+    // ===== Block Placement =====
     const placeableMapping = {
-      "dirt": 1,
-      "stone": 2,
-      "grass": 3,
-      "wood": 4,
-      "leaves": 5,
-      "torch": 6
+      "dirt": 1, "stone": 2, "grass": 3, "wood": 4, "leaves": 5, "torch": 6
     };
     function canPlaceBlockAt(x, y) {
       if (getBlock(x, y) !== 0) return false;
@@ -374,9 +333,7 @@
       const deltas = [
         {dx: -1, dy: 0}, {dx: 1, dy: 0}, {dx: 0, dy: -1}, {dx: 0, dy: 1}
       ];
-      for (let d of deltas) {
-        if (getBlock(x + d.dx, y + d.dy) !== 0) return true;
-      }
+      for (let d of deltas) if (getBlock(x + d.dx, y + d.dy) !== 0) return true;
       return false;
     }
     function handleBlockPlacement(event) {
@@ -403,23 +360,11 @@
       return false;
     });
 
-    // ====== Crafting ======
+    // ===== Crafting =====
     const recipes = [
-      {
-        name: "Torch",
-        ingredients: { wood: 1, gel: 1 },
-        result: { key: "torch", amount: 3 }
-      },
-      {
-        name: "Wooden Pickaxe",
-        ingredients: { wood: 10, stone: 3 },
-        result: { key: "wooden_pickaxe", amount: 1 }
-      },
-      {
-        name: "Wooden Sword",
-        ingredients: { wood: 7 },
-        result: { key: "wooden_sword", amount: 1 }
-      }
+      { name: "Torch", ingredients: { wood: 1, gel: 1 }, result: { key: "torch", amount: 3 } },
+      { name: "Wooden Pickaxe", ingredients: { wood: 10, stone: 3 }, result: { key: "wooden_pickaxe", amount: 1 } },
+      { name: "Wooden Sword", ingredients: { wood: 7 }, result: { key: "wooden_sword", amount: 1 } }
     ];
     let craftingMenuActive = false, recipeMenuBoxes = [];
     function canCraft(recipe) {
@@ -444,7 +389,7 @@
       }
     }
 
-    // ====== Input Handling ======
+    // ===== Input =====
     const keys = {};
     window.addEventListener("keydown", e => {
       if (e.key === "c" || e.key === "C") craftingMenuActive = !craftingMenuActive;
@@ -508,7 +453,7 @@
       }
     }, { passive: false });
 
-    // ====== Combat ======
+    // ===== Combat =====
     function tryAttackEnemy() {
       const selectedItem = inventoryOrder[player.selectedSlot];
       if (selectedItem !== "wooden_sword" || player.inventory.wooden_sword <= 0) return;
@@ -521,11 +466,6 @@
         if (distance < 50) {
           enemy.health -= 10;
           if (enemy.health <= 0) {
-            if (enemy.type === "slime") {
-              player.inventory.gel += Math.floor(Math.random() * 2) + 1;
-              player.xp += 5;
-              if (player.xp > player.xpToNext) player.xp = player.xpToNext;
-            }
             enemies.splice(i, 1);
           }
           break;
@@ -533,7 +473,7 @@
       }
     }
 
-    // ====== UI Drawing ======
+    // ===== UI =====
     function drawIcon(itemKey, x, y, size) {
       switch (itemKey) {
         case "dirt": ctx.fillStyle = "#8B4513"; ctx.fillRect(x, y, size, size); break;
@@ -606,8 +546,6 @@
         });
       }
     }
-
-    // ====== Main Draw Function ======
     function draw() {
       // Sky background
       const grd = ctx.createLinearGradient(0, 0, 0, canvas.height);
@@ -719,7 +657,7 @@
       }
     }
 
-    // ====== Game Loop ======
+    // ===== Game Loop =====
     function updatePlayer() {
       if (craftingMenuActive || isDead) return;
       if (keys["a"] || keys["ArrowLeft"]) player.vx = -player.speed;
@@ -750,13 +688,8 @@
       draw();
       requestAnimationFrame(gameLoop);
     }
-    playerImg.onload = function() {
-      gameLoop();
-    }
-    // Fallback: if image is cached/loads instantly
-    if (playerImg.complete && playerImg.naturalWidth !== 0) {
-      gameLoop();
-    }
+    playerImg.onload = function() { gameLoop(); };
+    if (playerImg.complete && playerImg.naturalWidth !== 0) gameLoop();
   </script>
 </body>
 </html>
