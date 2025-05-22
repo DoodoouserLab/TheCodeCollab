@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8">
-  <title>ExploreBox v1.3.20</title>
+  <title>ExploreBox v1.4.0</title>
   <style>
     html, body { margin:0; padding:0; overflow:hidden; background:#141414; }
     canvas { display:block; image-rendering: pixelated; background: #222; }
@@ -50,12 +50,32 @@ const blockColors = {
   3: "#3ec14d", // grass
   4: "#ad814b", // wood
   5: "#62e05e", // leaves
-  6: "#ffe066"  // torch
+  6: "#ffe066", // torch
+  7: "#b5b5b5", // iron ore
+  8: "#1e90ff", // sapphire ore
+  9: "#FFD700", // gold ore
+ 10: "#a0522d", // copper ore
+ 11: "#ff7f50", // copper bar
+ 12: "#f0e68c", // gold bar
+ 13: "#aaaaff", // sapphire gem
+ 14: "#d8d8d8", // iron bar
 };
 const blockEdgeColors = {
-  1: "#9f682c", 2: "#8b8b8b", 3: "#2b8c34", 4: "#8c6431", 5: "#3e9045", 6: "#ffd700"
-}
-const blockDurability = { 1: 2, 2: 4, 3: 1, 4: 3, 5: 1, 6: 1 };
+  1: "#9f682c", 2: "#8b8b8b", 3: "#2b8c34", 4: "#8c6431", 5: "#3e9045", 6: "#ffd700",
+  7: "#888", 8: "#1860a7", 9: "#b89d00", 10: "#8b5a2b", 11: "#c96c43", 12: "#b1af68", 13: "#5e5ecf", 14: "#8b8b8b",
+};
+const blockDurability = {
+  1: 2,  // dirt
+  2: 4,  // stone
+  3: 1,  // grass
+  4: 3,  // wood
+  5: 1,  // leaves
+  6: 1,  // torch
+  7: 5,  // iron ore
+  8: 6,  // sapphire ore
+  9: 7,  // gold ore
+ 10: 4   // copper ore
+};
 const world = [], groundHeights = [];
 let currentGround = 50;
 for (let x = 0; x < worldWidth; x++) {
@@ -67,7 +87,15 @@ for (let x = 0; x < worldWidth; x++) {
   world[x] = [];
   let ground = groundHeights[x];
   for (let y = 0; y < worldHeight; y++) {
-    if (y > ground) world[x][y] = (Math.random() < 0.2) ? 1 : 2;
+    if (y > ground) {
+      let r = Math.random();
+      // Ores: deeper = more chance
+      if (y > ground + 18 && r < 0.008) world[x][y] = 9; // gold ore
+      else if (y > ground + 12 && r < 0.013) world[x][y] = 7; // iron ore
+      else if (y > ground + 10 && r < 0.012) world[x][y] = 10; // copper ore
+      else if (y > ground + 22 && r < 0.004) world[x][y] = 8; // sapphire ore
+      else world[x][y] = (Math.random() < 0.2) ? 1 : 2;
+    }
     else if (y == ground) world[x][y] = 3;
     else world[x][y] = 0;
   }
@@ -172,11 +200,23 @@ const player = {
   health: 100,
   hunger: 100,
   maxHunger: 100,
-  inventory: {wood:20,stone:20,gel:10,dirt:0,grass:0,leaves:0,wooden_pickaxe:0,wooden_sword:0,torch:10},
+  inventory: {
+    wood:20,stone:20,gel:10,dirt:0,grass:0,leaves:0,wooden_pickaxe:0,wooden_sword:0,torch:10,
+    copper_ore:0, iron_ore:0, gold_ore:0, sapphire_ore:0,
+    copper_bar:0, iron_bar:0, gold_bar:0, sapphire_gem:0,
+    iron_pickaxe:0, iron_sword:0, gold_pickaxe:0, sapphire_staff:0
+  },
   xp: 0, xpToNext: 20,
   selectedSlot: 0
 };
-const inventoryOrder = ["wood", "stone", "gel", "dirt", "grass", "leaves", "wooden_pickaxe", "wooden_sword", "torch"];
+// Add new inventory slots to inventoryOrder
+const inventoryOrder = [
+  "wood", "stone", "gel", "dirt", "grass", "leaves",
+  "wooden_pickaxe", "wooden_sword", "torch",
+  "copper_ore", "iron_ore", "gold_ore", "sapphire_ore",
+  "copper_bar", "iron_bar", "gold_bar", "sapphire_gem",
+  "iron_pickaxe", "iron_sword", "gold_pickaxe", "sapphire_staff"
+];
 function handlePlayerDeath() {
   for (let key of inventoryOrder) {
     let amt = player.inventory[key] || 0;
@@ -341,7 +381,7 @@ function updateSlimeSpawning() {
 function checkCollision(a, b) {
   return (a.x < b.x + b.width && a.x + a.width > b.x && a.y < b.y + b.height && a.y + a.height > b.y);
 }
-function isSolid(block) { return block !== 0; }
+function isSolid(block) { return block !== 0 && block !== 11 && block !== 12 && block !== 13 && block !== 14; } // bars/gems not solid
 function isColliding(entity) {
   const leftTile = Math.floor(entity.x / tileSize),
         rightTile = Math.floor((entity.x + entity.width - 1) / tileSize),
@@ -373,7 +413,13 @@ function updateEntityPhysics(entity) {
 
 /* ===== Mining ===== */
 let isMining = false, currentMiningTarget = null, lastMousePos = { x: 0, y: 0 };
-function getMiningMultiplier() { return player.inventory.wooden_pickaxe > 0 ? 2 : 0.5; }
+function getMiningMultiplier() {
+  // Pickaxe upgrades: wooden < iron < gold
+  if (player.inventory.gold_pickaxe > 0) return 3.5;
+  if (player.inventory.iron_pickaxe > 0) return 2.5;
+  if (player.inventory.wooden_pickaxe > 0) return 2;
+  return 0.5;
+}
 const miningDamage = 0.1;
 function updateMining() {
   if (!isMining || isDead) return;
@@ -401,13 +447,21 @@ function updateMining() {
       case 3: player.inventory.grass++; break;
       case 4: player.inventory.wood++; break;
       case 5: player.inventory.leaves++; break;
+      case 7: player.inventory.iron_ore++; break;
+      case 8: player.inventory.sapphire_ore++; break;
+      case 9: player.inventory.gold_ore++; break;
+      case 10: player.inventory.copper_ore++; break;
     }
     setBlock(targetX, targetY, 0); currentMiningTarget = null;
   }
 }
 
 /* ===== Block Placement ===== */
-const placeableMapping = {"dirt": 1, "stone": 2, "grass": 3, "wood": 4, "leaves": 5, "torch": 6};
+const placeableMapping = {
+  "dirt": 1, "stone": 2, "grass": 3, "wood": 4, "leaves": 5, "torch": 6,
+  "iron_ore": 7, "sapphire_ore": 8, "gold_ore": 9, "copper_ore": 10,
+  "copper_bar": 11, "gold_bar": 12, "sapphire_gem": 13, "iron_bar": 14
+};
 function canPlaceBlockAt(x, y) {
   if (getBlock(x, y) !== 0) return false;
   if (y === worldHeight - 1) return true;
@@ -438,10 +492,21 @@ function handleBlockPlacement(event) {
 canvas.addEventListener("contextmenu", function(e) { e.preventDefault(); handleBlockPlacement(e); return false; });
 
 /* ===== Crafting ===== */
+/* Terraria-inspired recipes */
 const recipes = [
   { name: "Torch", ingredients: { wood: 1, gel: 1 }, result: { key: "torch", amount: 3 }},
   { name: "Wooden Pickaxe", ingredients: { wood: 10, stone: 3 }, result: { key: "wooden_pickaxe", amount: 1 }},
-  { name: "Wooden Sword", ingredients: { wood: 7 }, result: { key: "wooden_sword", amount: 1 }}
+  { name: "Wooden Sword", ingredients: { wood: 7 }, result: { key: "wooden_sword", amount: 1 }},
+  // Smelting
+  { name: "Copper Bar", ingredients: { copper_ore: 3, wood: 1 }, result: { key: "copper_bar", amount: 1 }},
+  { name: "Iron Bar", ingredients: { iron_ore: 3, wood: 1 }, result: { key: "iron_bar", amount: 1 }},
+  { name: "Gold Bar", ingredients: { gold_ore: 3, wood: 1 }, result: { key: "gold_bar", amount: 1 }},
+  { name: "Sapphire Gem", ingredients: { sapphire_ore: 1 }, result: { key: "sapphire_gem", amount: 1 }},
+  // Tools/Weapons
+  { name: "Iron Pickaxe", ingredients: { iron_bar: 5, wood: 2 }, result: { key: "iron_pickaxe", amount: 1 }},
+  { name: "Iron Sword", ingredients: { iron_bar: 6, wood: 2 }, result: { key: "iron_sword", amount: 1 }},
+  { name: "Gold Pickaxe", ingredients: { gold_bar: 7, wood: 2 }, result: { key: "gold_pickaxe", amount: 1 }},
+  { name: "Sapphire Staff", ingredients: { sapphire_gem: 5, wood: 3 }, result: { key: "sapphire_staff", amount: 1 }},
 ];
 let craftingMenuActive = false, recipeMenuBoxes = [];
 function canCraft(recipe) {
@@ -501,12 +566,17 @@ canvas.addEventListener("touchend", e => {
 /* ===== Combat ===== */
 function tryAttackEnemy() {
   const selectedItem = inventoryOrder[player.selectedSlot];
-  if (selectedItem !== "wooden_sword" || player.inventory.wooden_sword <= 0) return;
+  // New: allow iron/gold sword and sapphire staff
+  const swords = ["wooden_sword", "iron_sword", "sapphire_staff"];
+  if (!swords.includes(selectedItem) || player.inventory[selectedItem] <= 0) return;
   const playerCenterX = player.x + player.width / 2, playerCenterY = player.y + player.height / 2;
   for (let i = enemies.length - 1; i >= 0; i--) {
     const enemy = enemies[i], enemyCenterX = enemy.x + enemy.width / 2, enemyCenterY = enemy.y + enemy.height / 2,
           dx = enemyCenterX - playerCenterX, dy = enemyCenterY - playerCenterY, distance = Math.sqrt(dx * dx + dy * dy);
-    if (distance < 50) { enemy.health -= 10; if (enemy.health <= 0) {
+    let damage = 10;
+    if (selectedItem === "iron_sword") damage = 17;
+    if (selectedItem === "sapphire_staff") damage = 22;
+    if (distance < 50) { enemy.health -= damage; if (enemy.health <= 0) {
       // Drop gel when killed (handled in updateEnemies)
     } break; }
   }
@@ -548,6 +618,63 @@ function drawIcon(itemKey, x, y, size) {
     case "wooden_sword":
       ctx.fillStyle = "#a7a7a7"; roundRect(ctx, x + size * 0.45, y + size * 0.1, size * 0.1, size * 0.6, 2); ctx.fill();
       ctx.fillStyle = "#ad814b"; roundRect(ctx, x + size * 0.4, y + size * 0.7, size * 0.2, size * 0.12, 2); ctx.fill();
+      break;
+    case "copper_ore":
+      ctx.fillStyle = "#a0522d"; roundRect(ctx, x, y, size, size, 5); ctx.fill();
+      ctx.strokeStyle = "#ff7f50"; ctx.lineWidth = 2;
+      roundRect(ctx, x+2, y+2, size-4, size-4, 5); ctx.stroke();
+      break;
+    case "iron_ore":
+      ctx.fillStyle = "#b5b5b5"; roundRect(ctx, x, y, size, size, 5); ctx.fill();
+      ctx.strokeStyle = "#888"; ctx.lineWidth = 2;
+      roundRect(ctx, x+2, y+2, size-4, size-4, 5); ctx.stroke();
+      break;
+    case "gold_ore":
+      ctx.fillStyle = "#FFD700"; roundRect(ctx, x, y, size, size, 5); ctx.fill();
+      ctx.strokeStyle = "#b89d00"; ctx.lineWidth = 2;
+      roundRect(ctx, x+2, y+2, size-4, size-4, 5); ctx.stroke();
+      break;
+    case "sapphire_ore":
+      ctx.fillStyle = "#1e90ff"; roundRect(ctx, x, y, size, size, 5); ctx.fill();
+      ctx.strokeStyle = "#1860a7"; ctx.lineWidth = 2;
+      roundRect(ctx, x+2, y+2, size-4, size-4, 5); ctx.stroke();
+      break;
+    case "copper_bar":
+      ctx.fillStyle = "#ff7f50"; roundRect(ctx, x, y+size*0.4, size, size*0.4, 4); ctx.fill();
+      ctx.strokeStyle = "#a0522d"; ctx.lineWidth = 1.5; ctx.strokeRect(x, y+size*0.4, size, size*0.4);
+      break;
+    case "iron_bar":
+      ctx.fillStyle = "#d8d8d8"; roundRect(ctx, x, y+size*0.4, size, size*0.4, 4); ctx.fill();
+      ctx.strokeStyle = "#888"; ctx.lineWidth = 1.5; ctx.strokeRect(x, y+size*0.4, size, size*0.4);
+      break;
+    case "gold_bar":
+      ctx.fillStyle = "#FFD700"; roundRect(ctx, x, y+size*0.4, size, size*0.4, 4); ctx.fill();
+      ctx.strokeStyle = "#b89d00"; ctx.lineWidth = 1.5; ctx.strokeRect(x, y+size*0.4, size, size*0.4);
+      break;
+    case "sapphire_gem":
+      ctx.fillStyle = "#aaaaff"; ctx.beginPath();
+      ctx.moveTo(x+size/2, y);
+      ctx.lineTo(x+size, y+size/2);
+      ctx.lineTo(x+size/2, y+size);
+      ctx.lineTo(x, y+size/2);
+      ctx.closePath(); ctx.fill();
+      ctx.strokeStyle = "#5e5ecf"; ctx.lineWidth = 2; ctx.stroke();
+      break;
+    case "iron_pickaxe":
+      ctx.fillStyle = "#d8d8d8"; roundRect(ctx, x + size * 0.35, y + size * 0.3, size * 0.1, size * 0.5, 2); ctx.fill();
+      ctx.fillStyle = "#888"; roundRect(ctx, x + size * 0.2, y + size * 0.2, size * 0.4, size * 0.12, 2); ctx.fill();
+      break;
+    case "iron_sword":
+      ctx.fillStyle = "#d8d8d8"; roundRect(ctx, x + size * 0.45, y + size * 0.1, size * 0.1, size * 0.6, 2); ctx.fill();
+      ctx.fillStyle = "#888"; roundRect(ctx, x + size * 0.4, y + size * 0.7, size * 0.2, size * 0.12, 2); ctx.fill();
+      break;
+    case "gold_pickaxe":
+      ctx.fillStyle = "#FFD700"; roundRect(ctx, x + size * 0.35, y + size * 0.3, size * 0.1, size * 0.5, 2); ctx.fill();
+      ctx.fillStyle = "#b89d00"; roundRect(ctx, x + size * 0.2, y + size * 0.2, size * 0.4, size * 0.12, 2); ctx.fill();
+      break;
+    case "sapphire_staff":
+      ctx.fillStyle = "#aaaaff"; roundRect(ctx, x + size * 0.47, y + size * 0.18, size * 0.07, size * 0.6, 2); ctx.fill();
+      ctx.fillStyle = "#5e5ecf"; ctx.beginPath(); ctx.arc(x + size * 0.5, y + size * 0.15, size * 0.13, 0, Math.PI * 2); ctx.fill();
       break;
     default: ctx.fillStyle = "#FFF"; roundRect(ctx, x, y, size, size, 5); ctx.fill();
   }
@@ -625,7 +752,7 @@ function drawCraftingMenu() {
     ctx.fillStyle = "#FFF"; ctx.font = "16px Courier New";
     ctx.fillText(recipes[i].name, boxX + 10, boxY + 20);
     let ingredText = "Requires: ";
-    for (let ingr in recipes[i].ingredients) ingredText += ingr + " x" + recipes[i].ingredients[ingr] + "  ";
+    for (let ingr in recipes[i].ingredients) ingredText += ingr.replace(/_/, " ") + " x" + recipes[i].ingredients[ingr] + "  ";
     ctx.font = "14px Courier New";
     ctx.fillText(ingredText, boxX + 10, boxY + 40);
     recipeMenuBoxes.push({recipe: recipes[i], x: boxX, y: boxY, width: recipeBoxWidth, height: recipeBoxHeight});
@@ -704,7 +831,8 @@ function draw() {
 
   // Draw selected item in hand
   const selectedItem = inventoryOrder[player.selectedSlot];
-  if (player.inventory[selectedItem] > 0 && ["wooden_pickaxe", "wooden_sword", "torch"].includes(selectedItem)) {
+  // All pickaxes/staff/sword in hand
+  if (player.inventory[selectedItem] > 0 && ["wooden_pickaxe", "wooden_sword", "iron_pickaxe", "iron_sword", "gold_pickaxe", "sapphire_staff", "torch"].includes(selectedItem)) {
     const handX = player.x + player.width, handY = player.y + player.height * 0.5;
     drawIcon(selectedItem, handX - cameraX, handY - cameraY, tileSize);
   }
