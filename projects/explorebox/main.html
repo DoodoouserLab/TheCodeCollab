@@ -130,7 +130,7 @@ function getBlock(x, y) {
 
 /* ===== Lighting System (BRIGHTER) ===== */
 const LIGHT_SURFACE_Y = 15;
-const TORCH_LIGHT_RADIUS = 6; // << 6 blocks
+const TORCH_LIGHT_RADIUS = 6; // Changed to 6 blocks
 let dynamicLightMap = [];
 function resetLightMap() {
   dynamicLightMap = [];
@@ -656,36 +656,28 @@ function draw() {
   const startCol = Math.floor(cameraX / tileSize) - 1, endCol = startCol + Math.ceil(canvas.width / tileSize) + 2;
   const startRow = Math.floor(cameraY / tileSize) - 1, endRow = startRow + Math.ceil(canvas.height / tileSize) + 2;
 
-  // Draw blocks with soft edges, rounded corners, and shadow
+  // === BLOCKY WORLD RENDERING ===
   for (let x = startCol; x <= endCol; x++) for (let y = startRow; y <= endRow; y++)
     if (x >= 0 && x < worldWidth && y >= 0 && y < worldHeight) {
       const block = world[x][y];
       if (block !== 0) {
         const drawX = x * tileSize - cameraX, drawY = y * tileSize - cameraY;
         let light = dynamicLightMap[x][y];
-
         ctx.save();
-        ctx.shadowColor = "#000";
-        ctx.shadowBlur = 7;
-        ctx.globalAlpha = 0.93;
+        // No shadow, no rounded corners, no alpha for "blocky" look
         ctx.fillStyle = blockColors[block] || "#FFF";
-        roundRect(ctx, drawX, drawY, tileSize, tileSize, 4);
-        ctx.fill();
-        ctx.shadowBlur = 0;
-        ctx.globalAlpha = 1;
+        ctx.fillRect(drawX, drawY, tileSize, tileSize);
 
-        // Draw inner border for blocks
+        // Simple edge/border for block separation (optional)
         ctx.strokeStyle = blockEdgeColors[block] || "rgba(0,0,0,0.2)";
         ctx.lineWidth = 1.4;
-        roundRect(ctx, drawX+0.5, drawY+0.5, tileSize-1, tileSize-1, 3);
-        ctx.stroke();
+        ctx.strokeRect(drawX + 0.5, drawY + 0.5, tileSize - 1, tileSize - 1);
 
-        // Dim if not fully lit
+        // Dim if not fully lit (keep this for lighting)
         if (light < 0.99) {
           ctx.globalAlpha = 1 - Math.max(light, 0.40);
           ctx.fillStyle = "#000";
-          roundRect(ctx, drawX, drawY, tileSize, tileSize, 4);
-          ctx.fill();
+          ctx.fillRect(drawX, drawY, tileSize, tileSize);
           ctx.globalAlpha = 1.0;
         }
         ctx.restore();
