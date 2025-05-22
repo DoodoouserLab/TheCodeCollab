@@ -201,6 +201,11 @@ function updateHunger() {
       }
     }
   }
+  // --- Healing if hunger > 80 and not full health ---
+  if (player.health < 100 && player.hunger > 80) {
+    player.health += 0.15;
+    if (player.health > 100) player.health = 100;
+  }
 }
 function tryEatGel() {
   if (player.inventory.gel > 0 && player.hunger < player.maxHunger) {
