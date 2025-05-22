@@ -596,9 +596,10 @@ function tryAttackEnemy() {
         if (player.xp > player.xpToNext) player.xp = player.xpToNext;
       }
       enemies.splice(i, 1);
+          }
+        }
+      }
     }
-  }
-}
     
     // ----------- ONLY ONE SLIME SPAWN FUNCTION -----------
     function updateSlimeSpawning() {
