@@ -145,6 +145,14 @@ function updateFpsMeter() {
     lastFpsUpdate = now;
   }
 }
+
+// --- FPS Multiplier ---
+const TARGET_FPS = 60;
+function getFpsMultiplier() {
+  // Avoid division by zero, clamp multiplier to reasonable range
+  return TARGET_FPS / Math.max(10, fps);
+}
+  
 function drawFpsMeter(ctx) {
   ctx.font = "16px Courier New";
   ctx.fillStyle = "#fff";
@@ -407,16 +415,16 @@ function updateEnemies() {
     enemy.bounceCooldown--;
     let pdx = player.x - enemy.x, pdist = Math.abs(pdx);
     if (pdist < SLIME_SIGHT_DISTANCE) {
-      if (pdx > 8) enemy.vx = Math.min(enemy.vx + 0.05, enemy.speed);
-      else if (pdx < -8) enemy.vx = Math.max(enemy.vx - 0.05, -enemy.speed);
+      if (pdx > 8) enemy.vx = Math.min(enemy.vx + 0.05 * getFpsMultiplier(), enemy.speed * getFpsMultiplier());
+      else if (pdx < -8) enemy.vx = Math.max(enemy.vx - 0.05 * getFpsMultiplier(), -enemy.speed * getFpsMultiplier());
       else enemy.vx *= 0.85;
     } else {
       if (Math.random() < 0.02) enemy.vx = (Math.random() - 0.5) * enemy.speed * 2;
-      else enemy.vx *= 0.98;
+      else enemy.vx *= Math.pow(0.98, getFpsMultiplier());
     }
     if (enemy.grounded && enemy.bounceCooldown <= 0) {
       enemy.vy = -2.2 - Math.random() * 0.8;
-      enemy.bounceCooldown = 50 + Math.floor(Math.random() * 30);
+      enemy.bounceCooldown = Math.round((50 + Math.floor(Math.random() * 30)) / getFpsMultiplier());
     }
     if (enemy.grounded) enemy.vx *= 0.80;
     updateEntityPhysics(enemy);
@@ -533,7 +541,7 @@ function updateMining() {
         playerCenterY = player.y + player.height / 2;
   const dx = blockCenterX - playerCenterX, dy = blockCenterY - playerCenterY, distance = Math.sqrt(dx * dx + dy * dy);
   if (distance > 90) return;
-  const effectiveDamage = miningDamage * getMiningMultiplier();
+  const effectiveDamage = miningDamage * getMiningMultiplier() * getFpsMultiplier();
   blockHealth[targetX][targetY] -= effectiveDamage;
   if (blockHealth[targetX][targetY] <= 0) {
     switch (block) {
