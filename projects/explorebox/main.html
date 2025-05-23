@@ -504,19 +504,19 @@ let FRICTION_GROUND = 0.8;
 let FRICTION_AIR = 0.96;
 function updateEntityPhysics(entity) {
   entity.x += entity.vx * deltaTime;
-  if (isColliding(entity)) { entity.x -= entity.vx; entity.vx = 0; }
-  entity.vy += GRAVITY * deltaTime;
+  if (isColliding(entity)) { entity.x -= entity.vx * deltaTime; entity.vx = 0; }
+
+  entity.vy += GRAVITY_PER_SECOND * deltaTime;
   entity.y += entity.vy * deltaTime;
   entity.grounded = false;
   if (isColliding(entity)) {
-    entity.y -= entity.vy;
+    entity.y -= entity.vy * deltaTime;
     if (entity.vy > 0) entity.grounded = true;
     entity.vy = 0;
   }
   if (entity.grounded) entity.vx *= Math.pow(FRICTION_GROUND_PER_SECOND, deltaTime);
   else entity.vx *= Math.pow(FRICTION_AIR_PER_SECOND, deltaTime);
 }
-
 /* ===== Mining ===== */
 let isMining = false, currentMiningTarget = null, lastMousePos = { x: 0, y: 0 };
 function getMiningMultiplier() {
