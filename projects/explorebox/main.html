@@ -2,13 +2,11 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8">
-  <title>ExploreBox v1.4.1</title>
+  <title>ExploreBox v1.4.2</title>
   <style>
     html, body { margin:0; padding:0; overflow:hidden; background:#141414; }
     canvas { display:block; image-rendering: pixelated; background: #222; }
-    /* Inventory/Panel UI for better appearance */
     #game::-webkit-scrollbar { display: none; }
-    /* Inventory Modal Styles */
     #extra-inventory-modal {
       position: fixed;
       top: 0; left: 0;
@@ -118,7 +116,7 @@
 <canvas id="game"></canvas>
 
 <!-- Extra Inventory Modal -->
-<div id="extra-inventory-modal">
+<div id="extra-inventory-modal" tabindex="-1">
   <div id="extra-inventory-content">
     <h2>Inventory</h2>
     <div class="extra-inventory-grid" id="extra-inventory-grid"></div>
@@ -203,7 +201,6 @@ for (let x = 0; x < worldWidth; x++) {
   for (let y = 0; y < worldHeight; y++) {
     if (y > ground) {
       let r = Math.random();
-      // Ores: deeper = more chance
       if (y > ground + 18 && r < 0.008) world[x][y] = 9; // gold ore
       else if (y > ground + 12 && r < 0.013) world[x][y] = 7; // iron ore
       else if (y > ground + 10 && r < 0.012) world[x][y] = 10; // copper ore
@@ -214,7 +211,6 @@ for (let x = 0; x < worldWidth; x++) {
     else world[x][y] = 0;
   }
 }
-// Trees
 for (let x = 5; x < worldWidth - 5; x++) {
   for (let y = 0; y < worldHeight; y++) {
     if (world[x][y] === 3 && Math.random() < 0.03) {
@@ -228,7 +224,6 @@ for (let x = 5; x < worldWidth - 5; x++) {
     }
   }
 }
-// Caves
 (function generateCaves() {
   for (let i = 0; i < 30; i++) {
     let startX = Math.floor(Math.random() * worldWidth);
@@ -272,7 +267,7 @@ function getBlock(x, y) {
 
 /* ===== Lighting System (BRIGHTER) ===== */
 const LIGHT_SURFACE_Y = 15;
-const TORCH_LIGHT_RADIUS = 6; // 6 blocks
+const TORCH_LIGHT_RADIUS = 6;
 let dynamicLightMap = [];
 function resetLightMap() {
   dynamicLightMap = [];
@@ -301,24 +296,24 @@ function propagateTorchLight() {
   }
 }
 
-/* ===== Player ===== */
+/* ===== Player & Inventory ===== */
 const mainInventoryOrder = [
   "wood", "stone", "gel", "dirt", "grass", "leaves", "wooden_pickaxe", "wooden_sword", "torch"
 ];
-// All other items go in extra inventory
 const extraInventoryOrder = [
   "copper_ore", "iron_ore", "gold_ore", "sapphire_ore",
   "copper_bar", "iron_bar", "gold_bar", "sapphire_gem",
   "iron_pickaxe", "iron_sword", "gold_pickaxe", "sapphire_staff"
 ];
+// Lowered player speed/jump for better feel
 const player = {
   x: 50 * tileSize,
   y: findSurfaceY(50) * tileSize,
   width: tileSize,
   height: tileSize * 1.8,
   vx: 0, vy: 0,
-  speed: 4,
-  jumpStrength: 12,
+  speed: 2,
+  jumpStrength: 7,
   grounded: false,
   health: 100,
   hunger: 100,
@@ -352,22 +347,20 @@ function respawnPlayer() {
 /* ===== Hunger System ===== */
 let hungerTick = 0;
 function updateHunger() {
-  if (isDead || craftingMenuActive) return;
+  if (isDead || craftingMenuActive || extraInventoryOpen) return;
   hungerTick++;
   if (hungerTick > 60) {
     player.hunger -= 1;
     hungerTick = 0;
     if (player.hunger < 0) player.hunger = 0;
-    // Lose health if hunger is 0
     if (player.hunger === 0) {
-      player.health -= 1.2; // Increased for effect, adjust as you wish
+      player.health -= 1.2;
       if (player.health <= 0 && !isDead) {
         isDead = true;
         handlePlayerDeath();
       }
     }
   }
-  // Healing if hunger > 80 and not full health
   if (player.health < 100 && player.hunger > 80) {
     player.health += 0.15;
     if (player.health > 100) player.health = 100;
@@ -386,7 +379,6 @@ const enemies = [];
 const MAX_ENEMIES = 3;
 const ENEMY_VISIBLE_RADIUS = 900;
 const SLIME_SIGHT_DISTANCE = tileSize * 17.75;
-
 function spawnEnemy(x, y) {
   let tileX = Math.floor(x / tileSize), tileY = Math.floor(y / tileSize);
   while (tileY > 0 && getBlock(tileX, tileY) !== 0) tileY--;
@@ -395,47 +387,41 @@ function spawnEnemy(x, y) {
     y: tileY * tileSize,
     width: tileSize,
     height: tileSize,
-    vx: 0, vy: 0, speed: 0.3,
+    vx: 0, vy: 0, speed: 0.13,
     grounded: false,
     health: 20,
     type: "slime",
     bounceCooldown: 0
   });
 }
-
-// Initial spawn
 for (let i = 0; i < 3; i++) {
   let ex = Math.floor(Math.random() * (worldWidth - 20)) + 10, ey = findSurfaceY(ex);
   spawnEnemy(ex * tileSize, ey * tileSize);
 }
-
 function updateEnemies() {
   for (let i = enemies.length - 1; i >= 0; i--) {
     let enemy = enemies[i];
     let centerX = enemy.x + enemy.width / 2, centerY = enemy.y + enemy.height / 2;
     let dx = centerX - (player.x + player.width / 2), dy = centerY - (player.y + player.height / 2);
     if (Math.abs(dx) > ENEMY_VISIBLE_RADIUS || Math.abs(dy) > ENEMY_VISIBLE_RADIUS) continue;
-
     enemy.bounceCooldown--;
     let pdx = player.x - enemy.x, pdist = Math.abs(pdx);
     if (pdist < SLIME_SIGHT_DISTANCE) {
-      if (pdx > 8) enemy.vx = Math.min(enemy.vx + 0.13, enemy.speed);
-      else if (pdx < -8) enemy.vx = Math.max(enemy.vx - 0.13, -enemy.speed);
+      if (pdx > 8) enemy.vx = Math.min(enemy.vx + 0.05, enemy.speed);
+      else if (pdx < -8) enemy.vx = Math.max(enemy.vx - 0.05, -enemy.speed);
       else enemy.vx *= 0.85;
     } else {
       if (Math.random() < 0.02) enemy.vx = (Math.random() - 0.5) * enemy.speed * 2;
       else enemy.vx *= 0.98;
     }
     if (enemy.grounded && enemy.bounceCooldown <= 0) {
-      enemy.vy = -4.5 - Math.random() * 1.3;
+      enemy.vy = -2.2 - Math.random() * 0.8;
       enemy.bounceCooldown = 50 + Math.floor(Math.random() * 30);
     }
     if (enemy.grounded) enemy.vx *= 0.80;
-
     updateEntityPhysics(enemy);
-
     if (checkCollision(enemy, player) && !isDead) {
-      player.health -= 0.4;
+      player.health -= 0.26;
       if (player.health <= 0 && !isDead) { isDead = true; handlePlayerDeath(); }
     }
     if (enemy.health <= 0) {
@@ -449,8 +435,6 @@ function updateEnemies() {
     }
   }
 }
-
-// Slime spawn prevention: No spawn in any torch radius
 function isInTorchLightRadius(x, y) {
   for (let tx = Math.max(0, x - TORCH_LIGHT_RADIUS); tx <= Math.min(worldWidth - 1, x + TORCH_LIGHT_RADIUS); tx++) {
     for (let ty = Math.max(0, y - TORCH_LIGHT_RADIUS); ty <= Math.min(worldHeight - 1, y + TORCH_LIGHT_RADIUS); ty++) {
@@ -462,7 +446,6 @@ function isInTorchLightRadius(x, y) {
   }
   return false;
 }
-
 function updateSlimeSpawning() {
   let onscreen = 0;
   for (let e of enemies) {
@@ -478,7 +461,6 @@ function updateSlimeSpawning() {
       let surfaceY = groundHeights[spawnX];
       spawnY = surfaceY + Math.floor(Math.random() * 35);
       spawnY = Math.min(worldHeight - 10, spawnY);
-      // Ensure not in torch radius
       if (!isInTorchLightRadius(spawnX, spawnY) && dynamicLightMap[spawnX] && dynamicLightMap[spawnX][spawnY] < 0.85) found = true;
       attempts++;
     }
@@ -496,7 +478,7 @@ function updateSlimeSpawning() {
 function checkCollision(a, b) {
   return (a.x < b.x + b.width && a.x + a.width > b.x && a.y < b.y + b.height && a.y + a.height > b.y);
 }
-function isSolid(block) { return block !== 0 && block !== 11 && block !== 12 && block !== 13 && block !== 14; } // bars/gems not solid
+function isSolid(block) { return block !== 0 && block !== 11 && block !== 12 && block !== 13 && block !== 14; }
 function isColliding(entity) {
   const leftTile = Math.floor(entity.x / tileSize),
         rightTile = Math.floor((entity.x + entity.width - 1) / tileSize),
@@ -507,10 +489,9 @@ function isColliding(entity) {
       if (isSolid(getBlock(x, y))) return true;
   return false;
 }
-const GRAVITY = 0.4;
+const GRAVITY = 0.18;
 const FRICTION_GROUND = 0.8;
 const FRICTION_AIR = 0.96;
-
 function updateEntityPhysics(entity) {
   entity.x += entity.vx;
   if (isColliding(entity)) { entity.x -= entity.vx; entity.vx = 0; }
@@ -529,7 +510,6 @@ function updateEntityPhysics(entity) {
 /* ===== Mining ===== */
 let isMining = false, currentMiningTarget = null, lastMousePos = { x: 0, y: 0 };
 function getMiningMultiplier() {
-  // Pickaxe upgrades: wooden < iron < gold
   if (player.inventory.gold_pickaxe > 0) return 3.5;
   if (player.inventory.iron_pickaxe > 0) return 2.5;
   if (player.inventory.wooden_pickaxe > 0) return 2;
@@ -537,7 +517,7 @@ function getMiningMultiplier() {
 }
 const miningDamage = 0.1;
 function updateMining() {
-  if (!isMining || isDead) return;
+  if (!isMining || isDead || craftingMenuActive || extraInventoryOpen) return;
   const cameraX = player.x - canvas.width / 2 + player.width / 2,
         cameraY = player.y - canvas.height / 2 + player.height / 2;
   let targetX = Math.floor((lastMousePos.x + cameraX) / tileSize),
@@ -585,7 +565,7 @@ function canPlaceBlockAt(x, y) {
   return false;
 }
 function handleBlockPlacement(event) {
-  if (isDead) return;
+  if (isDead || craftingMenuActive || extraInventoryOpen) return;
   const rect = canvas.getBoundingClientRect();
   let clientX = event.clientX || event.touches?.[0]?.clientX,
       clientY = event.clientY || event.touches?.[0]?.clientY;
@@ -607,24 +587,23 @@ function handleBlockPlacement(event) {
 canvas.addEventListener("contextmenu", function(e) { e.preventDefault(); handleBlockPlacement(e); return false; });
 
 /* ===== Crafting ===== */
-/* Terraria-inspired recipes */
 const recipes = [
   { name: "Torch", ingredients: { wood: 1, gel: 1 }, result: { key: "torch", amount: 3 }},
   { name: "Wooden Pickaxe", ingredients: { wood: 10, stone: 3 }, result: { key: "wooden_pickaxe", amount: 1 }},
   { name: "Wooden Sword", ingredients: { wood: 7 }, result: { key: "wooden_sword", amount: 1 }},
-  // Smelting
   { name: "Copper Bar", ingredients: { copper_ore: 3, wood: 1 }, result: { key: "copper_bar", amount: 1 }},
   { name: "Iron Bar", ingredients: { iron_ore: 3, wood: 1 }, result: { key: "iron_bar", amount: 1 }},
   { name: "Gold Bar", ingredients: { gold_ore: 3, wood: 1 }, result: { key: "gold_bar", amount: 1 }},
   { name: "Sapphire Gem", ingredients: { sapphire_ore: 1 }, result: { key: "sapphire_gem", amount: 1 }},
-  // Tools/Weapons
   { name: "Iron Pickaxe", ingredients: { iron_bar: 5, wood: 2 }, result: { key: "iron_pickaxe", amount: 1 }},
   { name: "Iron Sword", ingredients: { iron_bar: 6, wood: 2 }, result: { key: "iron_sword", amount: 1 }},
   { name: "Gold Pickaxe", ingredients: { gold_bar: 7, wood: 2 }, result: { key: "gold_pickaxe", amount: 1 }},
   { name: "Sapphire Staff", ingredients: { sapphire_gem: 5, wood: 3 }, result: { key: "sapphire_staff", amount: 1 }},
 ];
 let craftingMenuActive = false, recipeMenuBoxes = [];
-let craftingSearchQuery = ""; // for search bar
+let craftingSearchQuery = "";
+let craftingSearchBarClickableRect = null;
+let craftingSearchFocused = false;
 
 function canCraft(recipe) {
   for (let ingr in recipe.ingredients)
@@ -639,6 +618,18 @@ function craftItem(recipe) {
   }
 }
 function handleCraftingMenuClick(e) {
+  if (craftingSearchBarClickableRect) {
+    const rect = canvas.getBoundingClientRect();
+    let mx = e.clientX - rect.left, my = e.clientY - rect.top;
+    let b = craftingSearchBarClickableRect;
+    if (mx >= b.x && mx <= b.x + b.width && my >= b.y && my <= b.y + b.height) {
+      craftingSearchFocused = true;
+      e.preventDefault();
+      return;
+    } else {
+      craftingSearchFocused = false;
+    }
+  }
   const rect = canvas.getBoundingClientRect();
   let mx = e.clientX - rect.left, my = e.clientY - rect.top;
   for (let box of recipeMenuBoxes)
@@ -647,15 +638,53 @@ function handleCraftingMenuClick(e) {
 
 /* ===== Input ===== */
 const keys = {};
-window.addEventListener("keydown", e => {
-  // Inventory modal toggle - "e"
+let extraInventoryOpen = false;
+
+function toggleExtraInventory(forceState) {
+  const modal = document.getElementById("extra-inventory-modal");
+  if (typeof forceState === "boolean") extraInventoryOpen = forceState;
+  else extraInventoryOpen = !extraInventoryOpen;
+  if (extraInventoryOpen) {
+    renderExtraInventory();
+    modal.style.display = "flex";
+    setTimeout(() => {
+      document.getElementById("close-extra-inv").focus();
+    }, 16);
+  } else {
+    modal.style.display = "none";
+  }
+}
+
+window.addEventListener("keydown", function(e) {
+  // Prevent repeated input if modal is open
+  if (extraInventoryOpen) {
+    if (e.key === "e" || e.key === "E" || e.key === "Escape" || e.key === "Enter") {
+      toggleExtraInventory(false);
+      e.preventDefault();
+      return;
+    }
+    return;
+  }
+  // Crafting menu toggle - "c", but NOT if search focused
+  if ((e.key === "c" || e.key === "C")) {
+    if (craftingMenuActive && craftingSearchFocused) {
+      // Do NOT close if in search bar!
+      return;
+    }
+    craftingMenuActive = !craftingMenuActive;
+    if (!craftingMenuActive) {
+      craftingSearchQuery = "";
+      craftingSearchFocused = false;
+    }
+    e.preventDefault();
+    return;
+  }
+  // Inventory modal toggle - "e", only if not in crafting or dead
   if ((e.key === "e" || e.key === "E") && !craftingMenuActive && !isDead) {
     toggleExtraInventory();
     e.preventDefault();
     return;
   }
-  // Crafting menu toggle - "c"
-  if (e.key === "c" || e.key === "C") craftingMenuActive = !craftingMenuActive;
   // Main inventory hotbar selection
   if (!isNaN(e.key) && e.key !== "0") {
     const slot = parseInt(e.key) - 1;
@@ -665,6 +694,18 @@ window.addEventListener("keydown", e => {
   if (!craftingMenuActive && !extraInventoryOpen) keys[e.key] = true;
   // Move food-eating to F (or f)
   if (e.key === "f" || e.key === "F") tryEatGel();
+  // Crafting search bar input
+  if (craftingMenuActive && craftingSearchFocused) {
+    if (e.key.length === 1 && craftingSearchQuery.length < 32) {
+      craftingSearchQuery += e.key;
+    } else if (e.key === "Backspace") {
+      craftingSearchQuery = craftingSearchQuery.slice(0, -1);
+    } else if (e.key === "Escape") {
+      craftingSearchFocused = false;
+    }
+    e.preventDefault();
+    return false;
+  }
 });
 window.addEventListener("keyup", e => {
   if (!craftingMenuActive && !extraInventoryOpen) keys[e.key] = false;
@@ -676,7 +717,6 @@ canvas.addEventListener("mousemove", e => {
 });
 canvas.addEventListener("mousedown", e => {
   if (isDead) { respawnPlayer(); return; }
-  // Don't allow mining or attack when inventory modal open
   if (extraInventoryOpen) return;
   if (craftingMenuActive) { handleCraftingMenuClick(e); }
   else { isMining = true; const rect = canvas.getBoundingClientRect(); lastMousePos.x = e.clientX - rect.left; lastMousePos.y = e.clientY - rect.top; tryAttackEnemy(); }
@@ -695,10 +735,24 @@ canvas.addEventListener("touchend", e => {
   if (!craftingMenuActive && !extraInventoryOpen) { isMining = false; currentMiningTarget = null; }
 }, { passive: false });
 
+/* Crafting search bar focus handling */
+window.addEventListener("mousedown", function(e) {
+  if (craftingMenuActive && craftingSearchBarClickableRect) {
+    const rect = canvas.getBoundingClientRect();
+    let mx = e.clientX - rect.left, my = e.clientY - rect.top;
+    let b = craftingSearchBarClickableRect;
+    if (mx >= b.x && mx <= b.x + b.width && my >= b.y && my <= b.y + b.height) {
+      craftingSearchFocused = true;
+      e.preventDefault();
+    } else {
+      craftingSearchFocused = false;
+    }
+  }
+});
+
 /* ===== Combat ===== */
 function tryAttackEnemy() {
   const selectedItem = mainInventoryOrder[player.selectedSlot];
-  // New: allow iron/gold sword and sapphire staff
   const swords = ["wooden_sword", "iron_sword", "sapphire_staff"];
   if (!swords.includes(selectedItem) || player.inventory[selectedItem] <= 0) return;
   const playerCenterX = player.x + player.width / 2, playerCenterY = player.y + player.height / 2;
@@ -708,9 +762,7 @@ function tryAttackEnemy() {
     let damage = 10;
     if (selectedItem === "iron_sword") damage = 17;
     if (selectedItem === "sapphire_staff") damage = 22;
-    if (distance < 50) { enemy.health -= damage; if (enemy.health <= 0) {
-      // Drop gel when killed (handled in updateEnemies)
-    } break; }
+    if (distance < 50) { enemy.health -= damage; if (enemy.health <= 0) {} break; }
   }
 }
 
@@ -873,8 +925,7 @@ function drawCraftingMenu() {
   ctx.fillText("Crafting Station", canvas.width / 2, panelY + 40);
   ctx.font = "16px Courier New";
   ctx.fillText("Click a recipe box to craft. Press 'C' to exit.", canvas.width / 2, panelY + 70);
-
-  // Draw search bar
+  // Search bar
   const searchBarX = canvas.width / 2 - 160, searchBarY = panelY + 80, searchBarW = 320, searchBarH = 28;
   ctx.save();
   ctx.fillStyle = "#232b2b";
@@ -884,11 +935,7 @@ function drawCraftingMenu() {
   ctx.font = "15px Courier New"; ctx.fillStyle = "#ffe066"; ctx.textAlign = "left";
   ctx.fillText(craftingSearchQuery ? craftingSearchQuery : "Search recipes...", searchBarX + 10, searchBarY + 20);
   ctx.restore();
-
-  // Detect click in search bar for focusing search
   craftingSearchBarClickableRect = {x: searchBarX, y: searchBarY, width: searchBarW, height: searchBarH};
-
-  // Draw recipes (filtered)
   let filteredRecipes = recipes.filter(r =>
     r.name.toLowerCase().includes(craftingSearchQuery.toLowerCase()) ||
     Object.keys(r.ingredients).some(ingr => ingr.replace(/_/g," ").toLowerCase().includes(craftingSearchQuery.toLowerCase()))
@@ -909,61 +956,9 @@ function drawCraftingMenu() {
     ctx.fillText(ingredText, boxX + 10, boxY + 40);
     recipeMenuBoxes.push({recipe: filteredRecipes[i], x: boxX, y: boxY, width: recipeBoxWidth, height: recipeBoxHeight});
   }
-
   ctx.restore();
 }
 
-let craftingSearchBarClickableRect = null;
-let craftingSearchFocused = false;
-window.addEventListener("mousedown", function(e) {
-  if (craftingMenuActive && craftingSearchBarClickableRect) {
-    const rect = canvas.getBoundingClientRect();
-    let mx = e.clientX - rect.left, my = e.clientY - rect.top;
-    let b = craftingSearchBarClickableRect;
-    if (mx >= b.x && mx <= b.x + b.width && my >= b.y && my <= b.y + b.height) {
-      craftingSearchFocused = true;
-      e.preventDefault();
-    } else {
-      craftingSearchFocused = false;
-    }
-  }
-});
-window.addEventListener("keydown", function(e) {
-  if (craftingMenuActive && craftingSearchFocused) {
-    if (e.key.length === 1 && craftingSearchQuery.length < 32) {
-      craftingSearchQuery += e.key;
-    } else if (e.key === "Backspace") {
-      craftingSearchQuery = craftingSearchQuery.slice(0, -1);
-    } else if (e.key === "Escape") {
-      craftingSearchFocused = false;
-    }
-    e.preventDefault();
-    return false;
-  }
-  // Clear search on crafting menu close
-  if ((e.key === "c" || e.key === "C") && craftingMenuActive === false) {
-    craftingSearchQuery = "";
-    craftingSearchFocused = false;
-  }
-});
-
-/* ===== Extra Inventory Modal ===== */
-let extraInventoryOpen = false;
-function toggleExtraInventory(forceState) {
-  const modal = document.getElementById("extra-inventory-modal");
-  if (typeof forceState === "boolean") extraInventoryOpen = forceState;
-  else extraInventoryOpen = !extraInventoryOpen;
-  if (extraInventoryOpen) {
-    renderExtraInventory();
-    modal.style.display = "flex";
-    setTimeout(() => {
-      document.getElementById("close-extra-inv").focus();
-    }, 16);
-  } else {
-    modal.style.display = "none";
-  }
-  // Prevent input if modal is open
-}
 function renderExtraInventory() {
   const grid = document.getElementById("extra-inventory-grid");
   grid.innerHTML = "";
@@ -971,14 +966,12 @@ function renderExtraInventory() {
     const amt = player.inventory[item] || 0;
     const slot = document.createElement("div");
     slot.className = "extra-inventory-slot";
-    // Canvas for icon
     const iconCanvas = document.createElement("canvas");
     iconCanvas.width = 32;
     iconCanvas.height = 32;
     const iconCtx = iconCanvas.getContext("2d");
     drawIconToContext(item, iconCtx, 0, 0, 28);
     slot.appendChild(iconCanvas);
-    // Name
     const label = document.createElement("div");
     label.style.fontSize = "12px";
     label.style.color = "#ffe066";
@@ -986,17 +979,14 @@ function renderExtraInventory() {
     label.style.marginBottom = "1px";
     label.textContent = item.replace(/_/g, " ");
     slot.appendChild(label);
-    // Qty
     const qty = document.createElement("span");
     qty.className = "qty";
     qty.textContent = amt;
     slot.appendChild(qty);
-
     grid.appendChild(slot);
   });
 }
 function drawIconToContext(itemKey, iconCtx, x, y, size) {
-  // Same as drawIcon but for any 2D context
   iconCtx.save();
   iconCtx.shadowColor = "rgba(0,0,0,0.3)";
   iconCtx.shadowBlur = 2;
@@ -1094,26 +1084,16 @@ function drawIconToContext(itemKey, iconCtx, x, y, size) {
   iconCtx.restore();
 }
 document.getElementById("close-extra-inv").onclick = () => toggleExtraInventory(false);
-window.addEventListener("keydown", e => {
-  if (extraInventoryOpen && (e.key === "e" || e.key === "E" || e.key === "Escape" || e.key === "Enter")) {
-    toggleExtraInventory(false);
-    e.preventDefault();
-  }
-});
 document.getElementById("extra-inventory-modal").addEventListener("mousedown", e => {
   if (e.target === document.getElementById("extra-inventory-modal")) toggleExtraInventory(false);
 });
 
 /* ===== DRAW MAIN GAME ===== */
 function draw() {
-  // Sky gradient
   const grd = ctx.createLinearGradient(0, 0, 0, canvas.height);
   grd.addColorStop(0, "#5cbbff");
   grd.addColorStop(1, "#aee6ff");
-  ctx.fillStyle = grd;
-  ctx.fillRect(0, 0, canvas.width, canvas.height);
-
-  // Sun with glow
+  ctx.fillStyle = grd; ctx.fillRect(0, 0, canvas.width, canvas.height);
   ctx.save();
   ctx.shadowColor = "#ffef8e";
   ctx.shadowBlur = 40;
@@ -1129,8 +1109,6 @@ function draw() {
   const cameraX = player.x - canvas.width / 2 + player.width / 2, cameraY = player.y - canvas.height / 2 + player.height / 2;
   const startCol = Math.floor(cameraX / tileSize) - 1, endCol = startCol + Math.ceil(canvas.width / tileSize) + 2;
   const startRow = Math.floor(cameraY / tileSize) - 1, endRow = startRow + Math.ceil(canvas.height / tileSize) + 2;
-
-  // === BLOCKY WORLD RENDERING ===
   for (let x = startCol; x <= endCol; x++) for (let y = startRow; y <= endRow; y++)
     if (x >= 0 && x < worldWidth && y >= 0 && y < worldHeight) {
       const block = world[x][y];
@@ -1140,12 +1118,9 @@ function draw() {
         ctx.save();
         ctx.fillStyle = blockColors[block] || "#FFF";
         ctx.fillRect(drawX, drawY, tileSize, tileSize);
-
         ctx.strokeStyle = blockEdgeColors[block] || "rgba(0,0,0,0.2)";
         ctx.lineWidth = 1.4;
         ctx.strokeRect(drawX + 0.5, drawY + 0.5, tileSize - 1, tileSize - 1);
-
-        // Dim if not fully lit (keep this for lighting)
         if (light < 0.99) {
           ctx.globalAlpha = 1 - Math.max(light, 0.40);
           ctx.fillStyle = "#000";
@@ -1155,12 +1130,9 @@ function draw() {
         ctx.restore();
       }
     }
-
-  // Draw dropped items
   for (let drop of droppedItems)
     drawIcon(drop.key, drop.x * tileSize - cameraX, drop.y * tileSize - cameraY, tileSize);
 
-  // Draw player
   if (playerImg.complete && playerImg.naturalWidth > 0)
     ctx.drawImage(playerImg, player.x - cameraX, player.y - cameraY, player.width, player.height);
   else {
@@ -1172,16 +1144,11 @@ function draw() {
     ctx.fill();
     ctx.restore();
   }
-
-  // Draw selected item in hand
   const selectedItem = mainInventoryOrder[player.selectedSlot];
-  // All pickaxes/staff/sword in hand
   if (player.inventory[selectedItem] > 0 && ["wooden_pickaxe", "wooden_sword", "iron_pickaxe", "iron_sword", "gold_pickaxe", "sapphire_staff", "torch"].includes(selectedItem)) {
     const handX = player.x + player.width, handY = player.y + player.height * 0.5;
     drawIcon(selectedItem, handX - cameraX, handY - cameraY, tileSize);
   }
-
-  // Draw slimes
   for (let enemy of enemies) {
     let centerX = enemy.x + enemy.width / 2, centerY = enemy.y + enemy.height / 2;
     let dx = centerX - (player.x + player.width / 2), dy = centerY - (player.y + player.height / 2);
@@ -1196,11 +1163,9 @@ function draw() {
     roundRect(ctx, enemy.x - cameraX, enemy.y - cameraY, enemy.width, enemy.height, 6);
     ctx.fill();
     ctx.shadowBlur = 0;
-    // Slime eyes
     ctx.fillStyle = "#222";
     ctx.beginPath(); ctx.arc(enemy.x - cameraX + enemy.width*0.3, enemy.y - cameraY + enemy.height*0.5, 2.2, 0, Math.PI*2); ctx.fill();
     ctx.beginPath(); ctx.arc(enemy.x - cameraX + enemy.width*0.7, enemy.y - cameraY + enemy.height*0.5, 2.2, 0, Math.PI*2); ctx.fill();
-    // HP bar
     let barWidth = enemy.width, barHeight = 4, hpFrac = Math.max(0, enemy.health / 20),
         bx = enemy.x - cameraX, by = enemy.y - cameraY - 8;
     ctx.globalAlpha = 0.7;
@@ -1208,8 +1173,6 @@ function draw() {
     ctx.fillStyle = "#1fff00"; roundRect(ctx, bx, by, barWidth * hpFrac, barHeight, 2); ctx.fill();
     ctx.restore();
   }
-
-  // Health bar
   const barX = 20, barY = 20, barWidth = 200, barHeight = 20;
   ctx.save();
   ctx.shadowColor = "#ff4444";
@@ -1226,7 +1189,6 @@ function draw() {
   ctx.fillText("Health: " + Math.floor(player.health), barX + barWidth / 2, barY + barHeight - 4);
   ctx.restore();
 
-  // Hunger bar
   const hungerBarX = barX, hungerBarY = barY + barHeight + 10, hungerBarWidth = 200, hungerBarHeight = 10;
   ctx.save();
   ctx.shadowColor = "#ffb900";
@@ -1242,7 +1204,6 @@ function draw() {
   ctx.fillText("Hunger: " + Math.floor(player.hunger) + "/" + player.maxHunger, hungerBarX + hungerBarWidth / 2, hungerBarY + hungerBarHeight - 2);
   ctx.restore();
 
-  // XP bar
   const xpBarX = barX, xpBarY = hungerBarY + hungerBarHeight + 8, xpBarWidth = 200, xpBarHeight = 10;
   ctx.save();
   ctx.shadowColor = "#00bbff";
@@ -1258,7 +1219,6 @@ function draw() {
   ctx.fillText("XP: " + Math.floor(player.xp) + "/" + player.xpToNext, xpBarX + xpBarWidth / 2, xpBarY + xpBarHeight - 2);
   ctx.restore();
 
-  // Mining progress
   if (currentMiningTarget) {
     const tx = currentMiningTarget.x, ty = currentMiningTarget.y;
     if (tx >= 0 && tx < worldWidth && ty >= 0 && ty < worldHeight) {
@@ -1295,15 +1255,11 @@ function draw() {
 let isDead = false, droppedItems = [];
 function updatePlayer() {
   if (craftingMenuActive || isDead || extraInventoryOpen) return;
-
-  // Slower movement if hunger below 10
-  let originalSpeed = player.speed;
   if (player.hunger < 10) {
-    player.speed = 1.5; // reduced speed
+    player.speed = 1.0;
   } else {
-    player.speed = 4; // normal speed
+    player.speed = 2.0;
   }
-
   if (keys["a"] || keys["ArrowLeft"]) player.vx = -player.speed;
   else if (keys["d"] || keys["ArrowRight"]) player.vx = player.speed;
   else player.vx = 0;
