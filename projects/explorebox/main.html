@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8">
-  <title>ExploreBox v1.4.4</title>
+  <title>ExploreBox v1.4.5</title>
   <style>
     html, body { margin:0; padding:0; overflow:hidden; background:#141414; }
     canvas { display:block; image-rendering: pixelated; background: #222; }
@@ -87,20 +87,6 @@
       background: #ffe066;
       color: #232b2b;
     }
-    #crafting-search-bar {
-      margin-bottom: 15px;
-      width: 90%;
-      max-width: 350px;
-      padding: 7px 10px;
-      font-size: 16px;
-      border-radius: 7px;
-      border: 1.6px solid #ffe066;
-      background: #232b2b;
-      color: #ffe066;
-      outline: none;
-      font-family: "Courier New", monospace;
-      box-shadow: 0 2px 7px #0003;
-    }
     @media (max-width: 500px) {
       #extra-inventory-content {
         min-width: 88vw;
@@ -146,28 +132,16 @@ function updateFpsMeter() {
 const tileSize = 16;
 const worldWidth = 1000, worldHeight = 400;
 const blockColors = {
-  0: "#87CEEB", // sky
-  1: "#ba7a3a", // dirt
-  2: "#a7a7a7", // stone
-  3: "#3ec14d", // grass
-  4: "#ad814b", // wood
-  5: "#62e05e", // leaves
-  6: "#ffe066", // torch
-  7: "#b5b5b5", // iron ore
-  8: "#1e90ff", // sapphire ore
-  9: "#FFD700", // gold ore
- 10: "#a0522d", // copper ore
- 11: "#ff7f50", // copper bar
- 12: "#f0e68c", // gold bar
- 13: "#aaaaff", // sapphire gem
- 14: "#d8d8d8", // iron bar
+  0: "#87CEEB", 1: "#ba7a3a", 2: "#a7a7a7", 3: "#3ec14d", 4: "#ad814b", 5: "#62e05e",
+  6: "#ffe066", 7: "#b5b5b5", 8: "#1e90ff", 9: "#FFD700", 10: "#a0522d",
+  11: "#ff7f50", 12: "#f0e68c", 13: "#aaaaff", 14: "#d8d8d8"
 };
 const blockEdgeColors = {
   1: "#9f682c", 2: "#8b8b8b", 3: "#2b8c34", 4: "#8c6431", 5: "#3e9045", 6: "#ffd700",
-  7: "#888", 8: "#1860a7", 9: "#b89d00", 10: "#8b5a2b", 11: "#c96c43", 12: "#b1af68", 13: "#5e5ecf", 14: "#8b8b8b",
+  7: "#888", 8: "#1860a7", 9: "#b89d00", 10: "#8b5a2b", 11: "#c96c43", 12: "#b1af68", 13: "#5e5ecf", 14: "#8b8b8b"
 };
 const blockDurability = {
-  1: 2,  2: 4, 3: 1, 4: 3, 5: 1, 6: 1, 7: 5, 8: 6, 9: 7, 10: 4
+  1: 2, 2: 4, 3: 1, 4: 3, 5: 1, 6: 1, 7: 5, 8: 6, 9: 7, 10: 4
 };
 const world = [], groundHeights = [];
 let currentGround = 50;
@@ -731,259 +705,6 @@ function tryAttackEnemy() {
     if (distance < 50) { enemy.health -= damage; if (enemy.health <= 0) {} break; }
   }
 }
-
-/* ===== UI ===== */
-function drawIcon(itemKey, x, y, size) {
-  ctx.save();
-  ctx.shadowColor = "rgba(0,0,0,0.3)";
-  ctx.shadowBlur = 2;
-  switch (itemKey) {
-    case "dirt":
-      ctx.fillStyle = "#ba7a3a"; roundRect(ctx, x, y, size, size, 5); ctx.fill();
-      break;
-    case "stone":
-      ctx.fillStyle = "#a7a7a7"; roundRect(ctx, x, y, size, size, 5); ctx.fill();
-      break;
-    case "grass":
-      ctx.fillStyle = "#3ec14d"; roundRect(ctx, x, y, size, size * 0.4, 5); ctx.fill();
-      ctx.fillStyle = "#ba7a3a"; roundRect(ctx, x, y + size * 0.4, size, size * 0.6, 5); ctx.fill();
-      break;
-    case "wood":
-      ctx.fillStyle = "#ad814b"; roundRect(ctx, x, y, size, size, 5); ctx.fill();
-      break;
-    case "leaves":
-      ctx.fillStyle = "#62e05e"; roundRect(ctx, x, y, size, size, 5); ctx.fill();
-      break;
-    case "gel":
-      ctx.fillStyle = "#7FFFD4"; roundRect(ctx, x, y, size, size, 5); ctx.fill();
-      break;
-    case "torch":
-      ctx.fillStyle = "#ffe066"; roundRect(ctx, x + size*0.35, y + size*0.2, size*0.3, size*0.6, 4); ctx.fill();
-      ctx.fillStyle = "#dca700"; roundRect(ctx, x + size*0.42, y + size*0.18, size*0.16, size*0.18, 2); ctx.fill();
-      break;
-    case "wooden_pickaxe":
-      ctx.fillStyle = "#ad814b"; roundRect(ctx, x + size * 0.35, y + size * 0.3, size * 0.1, size * 0.5, 2); ctx.fill();
-      ctx.fillStyle = "#a7a7a7"; roundRect(ctx, x + size * 0.2, y + size * 0.2, size * 0.4, size * 0.12, 2); ctx.fill();
-      break;
-    case "wooden_sword":
-      ctx.fillStyle = "#a7a7a7"; roundRect(ctx, x + size * 0.45, y + size * 0.1, size * 0.1, size * 0.6, 2); ctx.fill();
-      ctx.fillStyle = "#ad814b"; roundRect(ctx, x + size * 0.4, y + size * 0.7, size * 0.2, size * 0.12, 2); ctx.fill();
-      break;
-    case "copper_ore":
-      ctx.fillStyle = "#a0522d"; roundRect(ctx, x, y, size, size, 5); ctx.fill();
-      ctx.strokeStyle = "#ff7f50"; ctx.lineWidth = 2;
-      roundRect(ctx, x+2, y+2, size-4, size-4, 5); ctx.stroke();
-      break;
-    case "iron_ore":
-      ctx.fillStyle = "#b5b5b5"; roundRect(ctx, x, y, size, size, 5); ctx.fill();
-      ctx.strokeStyle = "#888"; ctx.lineWidth = 2;
-      roundRect(ctx, x+2, y+2, size-4, size-4, 5); ctx.stroke();
-      break;
-    case "gold_ore":
-      ctx.fillStyle = "#FFD700"; roundRect(ctx, x, y, size, size, 5); ctx.fill();
-      ctx.strokeStyle = "#b89d00"; ctx.lineWidth = 2;
-      roundRect(ctx, x+2, y+2, size-4, size-4, 5); ctx.stroke();
-      break;
-    case "sapphire_ore":
-      ctx.fillStyle = "#1e90ff"; roundRect(ctx, x, y, size, size, 5); ctx.fill();
-      ctx.strokeStyle = "#1860a7"; ctx.lineWidth = 2;
-      roundRect(ctx, x+2, y+2, size-4, size-4, 5); ctx.stroke();
-      break;
-    case "copper_bar":
-      ctx.fillStyle = "#ff7f50"; roundRect(ctx, x, y+size*0.4, size, size*0.4, 4); ctx.fill();
-      ctx.strokeStyle = "#a0522d"; ctx.lineWidth = 1.5; ctx.strokeRect(x, y+size*0.4, size, size*0.4);
-      break;
-    case "iron_bar":
-      ctx.fillStyle = "#d8d8d8"; roundRect(ctx, x, y+size*0.4, size, size*0.4, 4); ctx.fill();
-      ctx.strokeStyle = "#888"; ctx.lineWidth = 1.5; ctx.strokeRect(x, y+size*0.4, size, size*0.4);
-      break;
-    case "gold_bar":
-      ctx.fillStyle = "#FFD700"; roundRect(ctx, x, y+size*0.4, size, size*0.4, 4); ctx.fill();
-      ctx.strokeStyle = "#b89d00"; ctx.lineWidth = 1.5; ctx.strokeRect(x, y+size*0.4, size, size*0.4);
-      break;
-    case "sapphire_gem":
-      ctx.fillStyle = "#aaaaff"; ctx.beginPath();
-      ctx.moveTo(x+size/2, y);
-      ctx.lineTo(x+size, y+size/2);
-      ctx.lineTo(x+size/2, y+size);
-      ctx.lineTo(x, y+size/2);
-      ctx.closePath(); ctx.fill();
-      ctx.strokeStyle = "#5e5ecf"; ctx.lineWidth = 2; ctx.stroke();
-      break;
-    case "iron_pickaxe":
-      ctx.fillStyle = "#d8d8d8"; roundRect(ctx, x + size * 0.35, y + size * 0.3, size * 0.1, size * 0.5, 2); ctx.fill();
-      ctx.fillStyle = "#888"; roundRect(ctx, x + size * 0.2, y + size * 0.2, size * 0.4, size * 0.12, 2); ctx.fill();
-      break;
-    case "iron_sword":
-      ctx.fillStyle = "#d8d8d8"; roundRect(ctx, x + size * 0.45, y + size * 0.1, size * 0.1, size * 0.6, 2); ctx.fill();
-      ctx.fillStyle = "#888"; roundRect(ctx, x + size * 0.4, y + size * 0.7, size * 0.2, size * 0.12, 2); ctx.fill();
-      break;
-    case "gold_pickaxe":
-      ctx.fillStyle = "#FFD700"; roundRect(ctx, x + size * 0.35, y + size * 0.3, size * 0.1, size * 0.5, 2); ctx.fill();
-      ctx.fillStyle = "#b89d00"; roundRect(ctx, x + size * 0.2, y + size * 0.2, size * 0.4, size * 0.12, 2); ctx.fill();
-      break;
-    case "sapphire_staff":
-      ctx.fillStyle = "#aaaaff"; roundRect(ctx, x + size * 0.47, y + size * 0.18, size * 0.07, size * 0.6, 2); ctx.fill();
-      ctx.fillStyle = "#5e5ecf"; ctx.beginPath(); ctx.arc(x + size * 0.5, y + size * 0.15, size * 0.13, 0, Math.PI * 2); ctx.fill();
-      break;
-    default: ctx.fillStyle = "#FFF"; roundRect(ctx, x, y, size, size, 5); ctx.fill();
-  }
-  ctx.restore();
-}
-function roundRect(ctx, x, y, w, h, r) {
-  ctx.beginPath();
-  ctx.moveTo(x+r, y);
-  ctx.lineTo(x+w-r, y);
-  ctx.quadraticCurveTo(x+w, y, x+w, y+r);
-  ctx.lineTo(x+w, y+h-r);
-  ctx.quadraticCurveTo(x+w, y+h, x+w-r, y+h);
-  ctx.lineTo(x+r, y+h);
-  ctx.quadraticCurveTo(x, y+h, x, y+h-r);
-  ctx.lineTo(x, y+r);
-  ctx.quadraticCurveTo(x, y, x+r, y);
-  ctx.closePath();
-}
-function drawInventory() {
-  const invSize = 50, gap = 4, totalWidth = mainInventoryOrder.length * (invSize + gap) - gap;
-  const startX = (canvas.width - totalWidth) / 2, y = canvas.height - invSize - 10;
-  for (let i = 0; i < mainInventoryOrder.length; i++) {
-    const item = mainInventoryOrder[i], x = startX + i * (invSize + gap);
-    ctx.save();
-    ctx.shadowColor = "#000";
-    ctx.shadowBlur = 10;
-    ctx.fillStyle = "#232b2b";
-    roundRect(ctx, x, y, invSize, invSize, 10);
-    ctx.fill();
-    if (i === player.selectedSlot) {
-      ctx.strokeStyle = "#ffff5e";
-      ctx.lineWidth = 4;
-    } else {
-      ctx.strokeStyle = "#AAAAAA";
-      ctx.lineWidth = 2;
-    }
-    roundRect(ctx, x, y, invSize, invSize, 10);
-    ctx.stroke();
-    ctx.restore();
-    drawIcon(item, x + 10, y + 10, invSize - 20);
-    ctx.fillStyle = "#FFF";
-    ctx.font = "bold 13px Courier New";
-    ctx.textAlign = "right";
-    ctx.fillText(player.inventory[item] || 0, x + invSize - 4, y + invSize - 6);
-  }
-}
-function drawCraftingMenu() {
-  ctx.save();
-  ctx.shadowColor = "#000";
-  ctx.shadowBlur = 30;
-  ctx.fillStyle = "rgba(30,20,10,0.92)";
-  ctx.fillRect(0, 0, canvas.width, canvas.height);
-  const panelWidth = canvas.width * 0.8, panelHeight = canvas.height * 0.6;
-  const panelX = (canvas.width - panelWidth) / 2, panelY = (canvas.height - panelHeight) / 2;
-  ctx.fillStyle = "#473622";
-  roundRect(ctx, panelX, panelY, panelWidth, panelHeight, 20);
-  ctx.fill();
-  ctx.strokeStyle = "#ffe066";
-  ctx.lineWidth = 5;
-  roundRect(ctx, panelX, panelY, panelWidth, panelHeight, 20);
-  ctx.stroke();
-  ctx.font = "26px Courier New";
-  ctx.textAlign = "center"; ctx.fillStyle = "#FFF";
-  ctx.fillText("Crafting Station", canvas.width / 2, panelY + 40);
-  ctx.font = "16px Courier New";
-  ctx.fillText("Click a recipe box to craft. Press 'C' to exit.", canvas.width / 2, panelY + 70);
-  const searchBarX = canvas.width / 2 - 160, searchBarY = panelY + 80, searchBarW = 320, searchBarH = 28;
-  ctx.save();
-  ctx.fillStyle = "#232b2b";
-  roundRect(ctx, searchBarX, searchBarY, searchBarW, searchBarH, 7); ctx.fill();
-  ctx.strokeStyle = "#ffe066"; ctx.lineWidth = 2;
-  roundRect(ctx, searchBarX, searchBarY, searchBarW, searchBarH, 7); ctx.stroke();
-  ctx.font = "15px Courier New"; ctx.fillStyle = "#ffe066"; ctx.textAlign = "left";
-  ctx.fillText(craftingSearchQuery ? craftingSearchQuery : "Search recipes...", searchBarX + 10, searchBarY + 20);
-  ctx.restore();
-  craftingSearchBarClickableRect = {x: searchBarX, y: searchBarY, width: searchBarW, height: searchBarH};
-  let filteredRecipes = recipes.filter(r =>
-    r.name.toLowerCase().includes(craftingSearchQuery.toLowerCase()) ||
-    Object.keys(r.ingredients).some(ingr => ingr.replace(/_/g," ").toLowerCase().includes(craftingSearchQuery.toLowerCase()))
-  );
-  const recipeBoxWidth = panelWidth * 0.9, recipeBoxHeight = 60, gap = 15;
-  recipeMenuBoxes = []; ctx.textAlign = "left";
-  for (let i = 0; i < filteredRecipes.length; i++) {
-    const boxX = panelX + (panelWidth - recipeBoxWidth) / 2, boxY = panelY + 120 + i * (recipeBoxHeight + gap);
-    ctx.fillStyle = canCraft(filteredRecipes[i]) ? "#8fd14f" : "#555";
-    roundRect(ctx, boxX, boxY, recipeBoxWidth, recipeBoxHeight, 12); ctx.fill();
-    ctx.strokeStyle = "#FFF"; ctx.lineWidth = 2;
-    roundRect(ctx, boxX, boxY, recipeBoxWidth, recipeBoxHeight, 12); ctx.stroke();
-    ctx.fillStyle = "#FFF"; ctx.font = "16px Courier New";
-    ctx.fillText(filteredRecipes[i].name, boxX + 10, boxY + 20);
-    let ingredText = "Requires: ";
-    for (let ingr in filteredRecipes[i].ingredients) ingredText += ingr.replace(/_/, " ") + " x" + filteredRecipes[i].ingredients[ingr] + "  ";
-    ctx.font = "14px Courier New";
-    ctx.fillText(ingredText, boxX + 10, boxY + 40);
-    recipeMenuBoxes.push({recipe: filteredRecipes[i], x: boxX, y: boxY, width: recipeBoxWidth, height: recipeBoxHeight});
-  }
-  ctx.restore();
-}
-function renderExtraInventory() {
-  const grid = document.getElementById("extra-inventory-grid");
-  grid.innerHTML = "";
-  extraInventoryOrder.forEach(item => {
-    const amt = player.inventory[item] || 0;
-    const slot = document.createElement("div");
-    slot.className = "extra-inventory-slot";
-    const iconCanvas = document.createElement("canvas");
-    iconCanvas.width = 32;
-    iconCanvas.height = 32;
-    const iconCtx = iconCanvas.getContext("2d");
-    drawIconToContext(item, iconCtx, 0, 0, 28);
-    slot.appendChild(iconCanvas);
-    const label = document.createElement("div");
-    label.style.fontSize = "12px";
-    label.style.color = "#ffe066";
-    label.style.marginTop = "-1px";
-    label.style.marginBottom = "1px";
-    label.textContent = item.replace(/_/g, " ");
-    slot.appendChild(label);
-    const qty = document.createElement("span");
-    qty.className = "qty";
-    qty.textContent = amt;
-    slot.appendChild(qty);
-    grid.appendChild(slot);
-  });
-}
-function drawIconToContext(itemKey, iconCtx, x, y, size) {
-  iconCtx.save();
-  iconCtx.shadowColor = "rgba(0,0,0,0.3)";
-  iconCtx.shadowBlur = 2;
-  switch (itemKey) {
-    case "dirt": iconCtx.fillStyle = "#ba7a3a"; roundRect(iconCtx, x, y, size, size, 5); iconCtx.fill(); break;
-    case "stone": iconCtx.fillStyle = "#a7a7a7"; roundRect(iconCtx, x, y, size, size, 5); iconCtx.fill(); break;
-    case "grass": iconCtx.fillStyle = "#3ec14d"; roundRect(iconCtx, x, y, size, size * 0.4, 5); iconCtx.fill(); iconCtx.fillStyle = "#ba7a3a"; roundRect(iconCtx, x, y + size * 0.4, size, size * 0.6, 5); iconCtx.fill(); break;
-    case "wood": iconCtx.fillStyle = "#ad814b"; roundRect(iconCtx, x, y, size, size, 5); iconCtx.fill(); break;
-    case "leaves": iconCtx.fillStyle = "#62e05e"; roundRect(iconCtx, x, y, size, size, 5); iconCtx.fill(); break;
-    case "gel": iconCtx.fillStyle = "#7FFFD4"; roundRect(iconCtx, x, y, size, size, 5); iconCtx.fill(); break;
-    case "torch": iconCtx.fillStyle = "#ffe066"; roundRect(iconCtx, x + size*0.35, y + size*0.2, size*0.3, size*0.6, 4); iconCtx.fill(); iconCtx.fillStyle = "#dca700"; roundRect(iconCtx, x + size*0.42, y + size*0.18, size*0.16, size*0.18, 2); iconCtx.fill(); break;
-    case "wooden_pickaxe": iconCtx.fillStyle = "#ad814b"; roundRect(iconCtx, x + size * 0.35, y + size * 0.3, size * 0.1, size * 0.5, 2); iconCtx.fill(); iconCtx.fillStyle = "#a7a7a7"; roundRect(iconCtx, x + size * 0.2, y + size * 0.2, size * 0.4, size * 0.12, 2); iconCtx.fill(); break;
-    case "wooden_sword": iconCtx.fillStyle = "#a7a7a7"; roundRect(iconCtx, x + size * 0.45, y + size * 0.1, size * 0.1, size * 0.6, 2); iconCtx.fill(); iconCtx.fillStyle = "#ad814b"; roundRect(iconCtx, x + size * 0.4, y + size * 0.7, size * 0.2, size * 0.12, 2); iconCtx.fill(); break;
-    case "copper_ore": iconCtx.fillStyle = "#a0522d"; roundRect(iconCtx, x, y, size, size, 5); iconCtx.fill(); iconCtx.strokeStyle = "#ff7f50"; iconCtx.lineWidth = 2; roundRect(iconCtx, x+2, y+2, size-4, size-4, 5); iconCtx.stroke(); break;
-    case "iron_ore": iconCtx.fillStyle = "#b5b5b5"; roundRect(iconCtx, x, y, size, size, 5); iconCtx.fill(); iconCtx.strokeStyle = "#888"; iconCtx.lineWidth = 2; roundRect(iconCtx, x+2, y+2, size-4, size-4, 5); iconCtx.stroke(); break;
-    case "gold_ore": iconCtx.fillStyle = "#FFD700"; roundRect(iconCtx, x, y, size, size, 5); iconCtx.fill(); iconCtx.strokeStyle = "#b89d00"; iconCtx.lineWidth = 2; roundRect(iconCtx, x+2, y+2, size-4, size-4, 5); iconCtx.stroke(); break;
-    case "sapphire_ore": iconCtx.fillStyle = "#1e90ff"; roundRect(iconCtx, x, y, size, size, 5); iconCtx.fill(); iconCtx.strokeStyle = "#1860a7"; iconCtx.lineWidth = 2; roundRect(iconCtx, x+2, y+2, size-4, size-4, 5); iconCtx.stroke(); break;
-    case "copper_bar": iconCtx.fillStyle = "#ff7f50"; roundRect(iconCtx, x, y+size*0.4, size, size*0.4, 4); iconCtx.fill(); iconCtx.strokeStyle = "#a0522d"; iconCtx.lineWidth = 1.5; iconCtx.strokeRect(x, y+size*0.4, size, size*0.4); break;
-    case "iron_bar": iconCtx.fillStyle = "#d8d8d8"; roundRect(iconCtx, x, y+size*0.4, size, size*0.4, 4); iconCtx.fill(); iconCtx.strokeStyle = "#888"; iconCtx.lineWidth = 1.5; iconCtx.strokeRect(x, y+size*0.4, size, size*0.4); break;
-    case "gold_bar": iconCtx.fillStyle = "#FFD700"; roundRect(iconCtx, x, y+size*0.4, size, size*0.4, 4); iconCtx.fill(); iconCtx.strokeStyle = "#b89d00"; iconCtx.lineWidth = 1.5; iconCtx.strokeRect(x, y+size*0.4, size, size*0.4); break;
-    case "sapphire_gem": iconCtx.fillStyle = "#aaaaff"; iconCtx.beginPath(); iconCtx.moveTo(x+size/2, y); iconCtx.lineTo(x+size, y+size/2); iconCtx.lineTo(x+size/2, y+size); iconCtx.lineTo(x, y+size/2); iconCtx.closePath(); iconCtx.fill(); iconCtx.strokeStyle = "#5e5ecf"; iconCtx.lineWidth = 2; iconCtx.stroke(); break;
-    case "iron_pickaxe": iconCtx.fillStyle = "#d8d8d8"; roundRect(iconCtx, x + size * 0.35, y + size * 0.3, size * 0.1, size * 0.5, 2); iconCtx.fill(); iconCtx.fillStyle = "#888"; roundRect(iconCtx, x + size * 0.2, y + size * 0.2, size * 0.4, size * 0.12, 2); iconCtx.fill(); break;
-    case "iron_sword": iconCtx.fillStyle = "#d8d8d8"; roundRect(iconCtx, x + size * 0.45, y + size * 0.1, size * 0.1, size * 0.6, 2); iconCtx.fill(); iconCtx.fillStyle = "#888"; roundRect(iconCtx, x + size * 0.4, y + size * 0.7, size * 0.2, size * 0.12, 2); iconCtx.fill(); break;
-    case "gold_pickaxe": iconCtx.fillStyle = "#FFD700"; roundRect(iconCtx, x + size * 0.35, y + size * 0.3, size * 0.1, size * 0.5, 2); iconCtx.fill(); iconCtx.fillStyle = "#b89d00"; roundRect(iconCtx, x + size * 0.2, y + size * 0.2, size * 0.4, size * 0.12, 2); iconCtx.fill(); break;
-    case "sapphire_staff": iconCtx.fillStyle = "#aaaaff"; roundRect(iconCtx, x + size * 0.47, y + size * 0.18, size * 0.07, size * 0.6, 2); iconCtx.fill(); iconCtx.fillStyle = "#5e5ecf"; iconCtx.beginPath(); iconCtx.arc(x + size * 0.5, y + size * 0.15, size * 0.13, 0, Math.PI * 2); iconCtx.fill(); break;
-    default: iconCtx.fillStyle = "#FFF"; roundRect(iconCtx, x, y, size, size, 5); iconCtx.fill();
-  }
-  iconCtx.restore();
-}
-document.getElementById("close-extra-inv").onclick = () => toggleExtraInventory(false);
-document.getElementById("extra-inventory-modal").addEventListener("mousedown", e => {
-  if (e.target === document.getElementById("extra-inventory-modal")) toggleExtraInventory(false);
-});
 
 /* ===== DRAW MAIN GAME ===== */
 function draw() {
