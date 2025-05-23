@@ -212,7 +212,7 @@ for (let x = 0; x < worldWidth; x++) {
       if (y > ground + 18 && r < 0.008) world[x][y] = 9; // gold ore
       else if (y > ground + 12 && r < 0.013) world[x][y] = 7; // iron ore
       else if (y > ground + 10 && r < 0.012) world[x][y] = 10; // copper ore
-      else if (y > ground + 22 && r < 0.004) world[x][y] = 8; // sapphire ore
+      else if (y > ground + 18 && r < 0.006) world[x][y] = 8; // sapphire ore
       else world[x][y] = (Math.random() < 0.2) ? 1 : 2;
     }
     else if (y == ground) world[x][y] = 3;
@@ -429,7 +429,7 @@ function updateEnemies() {
     if (enemy.grounded) enemy.vx *= 0.80;
     updateEntityPhysics(enemy);
     if (checkCollision(enemy, player) && !isDead) {
-      player.health -= 0.26;
+      player.health -= 0.26 * getFpsMultiplier();
       if (player.health <= 0 && !isDead) { isDead = true; handlePlayerDeath(); }
     }
     if (enemy.health <= 0) {
