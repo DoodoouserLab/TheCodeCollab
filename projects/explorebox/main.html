@@ -358,11 +358,11 @@ function updateHunger() {
   if (isDead || craftingMenuActive || extraInventoryOpen) return;
   hungerTick++;
   if (hungerTick > 60) {
-    player.hunger -= 1;
+    player.hunger -= 1 * getFpsMultiplier;
     hungerTick = 0;
     if (player.hunger < 0) player.hunger = 0;
     if (player.hunger === 0) {
-      player.health -= 1.2;
+      player.health -= 1.2 * getFpsMultiplier();
       if (player.health <= 0 && !isDead) {
         isDead = true;
         handlePlayerDeath();
@@ -377,7 +377,7 @@ function updateHunger() {
 function tryEatGel() {
   if (player.inventory.gel > 0 && player.hunger < player.maxHunger) {
     player.inventory.gel--;
-    player.hunger += 30;
+    player.hunger += 40;
     if (player.hunger > player.maxHunger) player.hunger = player.maxHunger;
   }
 }
@@ -497,9 +497,9 @@ function isColliding(entity) {
       if (isSolid(getBlock(x, y))) return true;
   return false;
 }
-const GRAVITY = 0.18;
-const FRICTION_GROUND = 0.8;
-const FRICTION_AIR = 0.96;
+let GRAVITY = 0.18 * getFpsMultiplier();
+const FRICTION_GROUND = 0.8 * getFpsMultiplier();
+const FRICTION_AIR = 0.96 * getFpsMultiplier();
 function updateEntityPhysics(entity) {
   entity.x += entity.vx;
   if (isColliding(entity)) { entity.x -= entity.vx; entity.vx = 0; }
