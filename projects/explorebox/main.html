@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8">
-  <title>ExploreBox v1.4.20</title>
+  <title>ExploreBox v1.4.21</title>
   <style>
     html, body { margin:0; padding:0; overflow:hidden; background:#141414; }
     canvas { display:block; image-rendering: pixelated; background: #222; }
@@ -358,11 +358,11 @@ function updateHunger() {
   if (isDead || craftingMenuActive || extraInventoryOpen) return;
   hungerTick++;
   if (hungerTick > 60) {
-    player.hunger -= 1;
+    player.hunger -= 1 * getFpsMultiplier();
     hungerTick = 0;
     if (player.hunger < 0) player.hunger = 0;
     if (player.hunger === 0) {
-      player.health -= 1.2;
+      player.health -= 1.2 * getFpsMultiplier();
       if (player.health <= 0 && !isDead) {
         isDead = true;
         handlePlayerDeath();
@@ -377,7 +377,7 @@ function updateHunger() {
 function tryEatGel() {
   if (player.inventory.gel > 0 && player.hunger < player.maxHunger) {
     player.inventory.gel--;
-    player.hunger += 30;
+    player.hunger += 40;
     if (player.hunger > player.maxHunger) player.hunger = player.maxHunger;
   }
 }
