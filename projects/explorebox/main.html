@@ -125,6 +125,8 @@
 </div>
 
 <script>
+let lastFrameTime = performance.now();
+let deltaTime = 1 / 60; // Default to 1/60th second
 /* ===== Canvas & FPS Meter ===== */
 const canvas = document.getElementById("game");
 const ctx = canvas.getContext("2d");
@@ -497,22 +499,22 @@ function isColliding(entity) {
       if (isSolid(getBlock(x, y))) return true;
   return false;
 }
-let GRAVITY = 0.18 * (1 / getFpsMultiplier());
-let FRICTION_GROUND = 0.8 * (1 / getFpsMultiplier());
-let FRICTION_AIR = 0.96 * (1 / getFpsMultiplier());
+let GRAVITY = 0.18;
+let FRICTION_GROUND = 0.8;
+let FRICTION_AIR = 0.96;
 function updateEntityPhysics(entity) {
-  entity.x += entity.vx;
+  entity.x += entity.vx * deltaTime;
   if (isColliding(entity)) { entity.x -= entity.vx; entity.vx = 0; }
-  entity.vy += GRAVITY;
-  entity.y += entity.vy;
+  entity.vy += GRAVITY * deltaTime;
+  entity.y += entity.vy * deltaTime;
   entity.grounded = false;
   if (isColliding(entity)) {
     entity.y -= entity.vy;
     if (entity.vy > 0) entity.grounded = true;
     entity.vy = 0;
   }
-  if (entity.grounded) entity.vx *= FRICTION_GROUND;
-  else entity.vx *= FRICTION_AIR;
+  if (entity.grounded) entity.vx *= Math.pow(FRICTION_GROUND_PER_SECOND, deltaTime);
+  else entity.vx *= Math.pow(FRICTION_AIR_PER_SECOND, deltaTime);
 }
 
 /* ===== Mining ===== */
@@ -1285,6 +1287,9 @@ function updatePlayer() {
   }
 }
 function gameLoop() {
+  let now = performance.now();
+  deltaTime = (now - lastFrameTime) / 1000; // in seconds
+  lastFrameTime = now;
   updateFpsMeter();
   updatePlayer();
   updateHunger();
