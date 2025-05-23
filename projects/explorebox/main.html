@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8">
-  <title>ExploreBox v1.4.2</title>
+  <title>ExploreBox v1.4.20</title>
   <style>
     html, body { margin:0; padding:0; overflow:hidden; background:#141414; }
     canvas { display:block; image-rendering: pixelated; background: #222; }
@@ -1268,11 +1268,11 @@ function updatePlayer() {
   } else {
     player.speed = 2.0;
   }
-  if (keys["a"] || keys["ArrowLeft"]) player.vx = -player.speed;
-  else if (keys["d"] || keys["ArrowRight"]) player.vx = player.speed;
+  if (keys["a"] || keys["ArrowLeft"]) player.vx = -player.speed * getFpsMultiplier();
+  else if (keys["d"] || keys["ArrowRight"]) player.vx = player.speed * getFpsMultiplier();
   else player.vx = 0;
   if ((keys["w"] || keys["ArrowUp"] || keys[" "]) && player.grounded) {
-    player.vy = -player.jumpStrength; player.grounded = false;
+    player.vy = -player.jumpStrength * getFpsMultiplier(); player.grounded = false;
   }
   updateEntityPhysics(player);
   for (let i = droppedItems.length - 1; i >= 0; i--) {
