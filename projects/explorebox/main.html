@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8">
-  <title>ExploreBox v1.4.2</title>
+  <title>ExploreBox v1.4.4</title>
   <style>
     html, body { margin:0; padding:0; overflow:hidden; background:#141414; }
     canvas { display:block; image-rendering: pixelated; background: #222; }
@@ -87,7 +87,6 @@
       background: #ffe066;
       color: #232b2b;
     }
-    /* Crafting Search Styles */
     #crafting-search-bar {
       margin-bottom: 15px;
       width: 90%;
@@ -114,8 +113,6 @@
 </head>
 <body>
 <canvas id="game"></canvas>
-
-<!-- Extra Inventory Modal -->
 <div id="extra-inventory-modal" tabindex="-1">
   <div id="extra-inventory-content">
     <h2>Inventory</h2>
@@ -123,7 +120,6 @@
     <button id="close-extra-inv" tabindex="0">Close [E]</button>
   </div>
 </div>
-
 <script>
 /* ===== Canvas & FPS Meter ===== */
 const canvas = document.getElementById("game");
@@ -144,12 +140,6 @@ function updateFpsMeter() {
     frames = 0;
     lastFpsUpdate = now;
   }
-}
-function drawFpsMeter(ctx) {
-  ctx.font = "16px Courier New";
-  ctx.fillStyle = "#fff";
-  ctx.textAlign = "left";
-  ctx.fillText("FPS: " + fps, 12, 24);
 }
 
 /* ===== World Generation ===== */
@@ -177,16 +167,7 @@ const blockEdgeColors = {
   7: "#888", 8: "#1860a7", 9: "#b89d00", 10: "#8b5a2b", 11: "#c96c43", 12: "#b1af68", 13: "#5e5ecf", 14: "#8b8b8b",
 };
 const blockDurability = {
-  1: 2,  // dirt
-  2: 4,  // stone
-  3: 1,  // grass
-  4: 3,  // wood
-  5: 1,  // leaves
-  6: 1,  // torch
-  7: 5,  // iron ore
-  8: 6,  // sapphire ore
-  9: 7,  // gold ore
- 10: 4   // copper ore
+  1: 2,  2: 4, 3: 1, 4: 3, 5: 1, 6: 1, 7: 5, 8: 6, 9: 7, 10: 4
 };
 const world = [], groundHeights = [];
 let currentGround = 50;
@@ -201,10 +182,10 @@ for (let x = 0; x < worldWidth; x++) {
   for (let y = 0; y < worldHeight; y++) {
     if (y > ground) {
       let r = Math.random();
-      if (y > ground + 18 && r < 0.008) world[x][y] = 9; // gold ore
-      else if (y > ground + 12 && r < 0.013) world[x][y] = 7; // iron ore
-      else if (y > ground + 10 && r < 0.012) world[x][y] = 10; // copper ore
-      else if (y > ground + 22 && r < 0.004) world[x][y] = 8; // sapphire ore
+      if (y > ground + 18 && r < 0.008) world[x][y] = 9;
+      else if (y > ground + 12 && r < 0.013) world[x][y] = 7;
+      else if (y > ground + 10 && r < 0.012) world[x][y] = 10;
+      else if (y > ground + 22 && r < 0.004) world[x][y] = 8;
       else world[x][y] = (Math.random() < 0.2) ? 1 : 2;
     }
     else if (y == ground) world[x][y] = 3;
@@ -242,7 +223,6 @@ for (let x = 5; x < worldWidth - 5; x++) {
     }
   }
 })();
-
 function findSurfaceY(x) {
   for (let y = 0; y < worldHeight; y++) if (world[x][y] !== 0) return y - 1;
   return worldHeight - 2;
@@ -265,7 +245,7 @@ function getBlock(x, y) {
   return world[x][y];
 }
 
-/* ===== Lighting System (BRIGHTER) ===== */
+/* ===== Lighting System ===== */
 const LIGHT_SURFACE_Y = 15;
 const TORCH_LIGHT_RADIUS = 6;
 let dynamicLightMap = [];
@@ -305,7 +285,6 @@ const extraInventoryOrder = [
   "copper_bar", "iron_bar", "gold_bar", "sapphire_gem",
   "iron_pickaxe", "iron_sword", "gold_pickaxe", "sapphire_staff"
 ];
-// Lowered player speed/jump for better feel
 const player = {
   x: 50 * tileSize,
   y: findSurfaceY(50) * tileSize,
@@ -604,7 +583,6 @@ let craftingMenuActive = false, recipeMenuBoxes = [];
 let craftingSearchQuery = "";
 let craftingSearchBarClickableRect = null;
 let craftingSearchFocused = false;
-
 function canCraft(recipe) {
   for (let ingr in recipe.ingredients)
     if (!player.inventory[ingr] || player.inventory[ingr] < recipe.ingredients[ingr]) return false;
@@ -639,7 +617,6 @@ function handleCraftingMenuClick(e) {
 /* ===== Input ===== */
 const keys = {};
 let extraInventoryOpen = false;
-
 function toggleExtraInventory(forceState) {
   const modal = document.getElementById("extra-inventory-modal");
   if (typeof forceState === "boolean") extraInventoryOpen = forceState;
@@ -654,9 +631,7 @@ function toggleExtraInventory(forceState) {
     modal.style.display = "none";
   }
 }
-
 window.addEventListener("keydown", function(e) {
-  // Prevent repeated input if modal is open
   if (extraInventoryOpen) {
     if (e.key === "e" || e.key === "E" || e.key === "Escape" || e.key === "Enter") {
       toggleExtraInventory(false);
@@ -665,10 +640,8 @@ window.addEventListener("keydown", function(e) {
     }
     return;
   }
-  // Crafting menu toggle - "c", but NOT if search focused
   if ((e.key === "c" || e.key === "C")) {
     if (craftingMenuActive && craftingSearchFocused) {
-      // Do NOT close if in search bar!
       return;
     }
     craftingMenuActive = !craftingMenuActive;
@@ -679,22 +652,17 @@ window.addEventListener("keydown", function(e) {
     e.preventDefault();
     return;
   }
-  // Inventory modal toggle - "e", only if not in crafting or dead
   if ((e.key === "e" || e.key === "E") && !craftingMenuActive && !isDead) {
     toggleExtraInventory();
     e.preventDefault();
     return;
   }
-  // Main inventory hotbar selection
   if (!isNaN(e.key) && e.key !== "0") {
     const slot = parseInt(e.key) - 1;
     if (slot < mainInventoryOrder.length) player.selectedSlot = slot;
   }
-  // Only allow movement/attack if not in modal or crafting
   if (!craftingMenuActive && !extraInventoryOpen) keys[e.key] = true;
-  // Move food-eating to F (or f)
   if (e.key === "f" || e.key === "F") tryEatGel();
-  // Crafting search bar input
   if (craftingMenuActive && craftingSearchFocused) {
     if (e.key.length === 1 && craftingSearchQuery.length < 32) {
       craftingSearchQuery += e.key;
@@ -734,8 +702,6 @@ canvas.addEventListener("touchend", e => {
   e.preventDefault();
   if (!craftingMenuActive && !extraInventoryOpen) { isMining = false; currentMiningTarget = null; }
 }, { passive: false });
-
-/* Crafting search bar focus handling */
 window.addEventListener("mousedown", function(e) {
   if (craftingMenuActive && craftingSearchBarClickableRect) {
     const rect = canvas.getBoundingClientRect();
@@ -925,7 +891,6 @@ function drawCraftingMenu() {
   ctx.fillText("Crafting Station", canvas.width / 2, panelY + 40);
   ctx.font = "16px Courier New";
   ctx.fillText("Click a recipe box to craft. Press 'C' to exit.", canvas.width / 2, panelY + 70);
-  // Search bar
   const searchBarX = canvas.width / 2 - 160, searchBarY = panelY + 80, searchBarW = 320, searchBarH = 28;
   ctx.save();
   ctx.fillStyle = "#232b2b";
@@ -958,7 +923,6 @@ function drawCraftingMenu() {
   }
   ctx.restore();
 }
-
 function renderExtraInventory() {
   const grid = document.getElementById("extra-inventory-grid");
   grid.innerHTML = "";
@@ -991,94 +955,27 @@ function drawIconToContext(itemKey, iconCtx, x, y, size) {
   iconCtx.shadowColor = "rgba(0,0,0,0.3)";
   iconCtx.shadowBlur = 2;
   switch (itemKey) {
-    case "dirt":
-      iconCtx.fillStyle = "#ba7a3a"; roundRect(iconCtx, x, y, size, size, 5); iconCtx.fill();
-      break;
-    case "stone":
-      iconCtx.fillStyle = "#a7a7a7"; roundRect(iconCtx, x, y, size, size, 5); iconCtx.fill();
-      break;
-    case "grass":
-      iconCtx.fillStyle = "#3ec14d"; roundRect(iconCtx, x, y, size, size * 0.4, 5); iconCtx.fill();
-      iconCtx.fillStyle = "#ba7a3a"; roundRect(iconCtx, x, y + size * 0.4, size, size * 0.6, 5); iconCtx.fill();
-      break;
-    case "wood":
-      iconCtx.fillStyle = "#ad814b"; roundRect(iconCtx, x, y, size, size, 5); iconCtx.fill();
-      break;
-    case "leaves":
-      iconCtx.fillStyle = "#62e05e"; roundRect(iconCtx, x, y, size, size, 5); iconCtx.fill();
-      break;
-    case "gel":
-      iconCtx.fillStyle = "#7FFFD4"; roundRect(iconCtx, x, y, size, size, 5); iconCtx.fill();
-      break;
-    case "torch":
-      iconCtx.fillStyle = "#ffe066"; roundRect(iconCtx, x + size*0.35, y + size*0.2, size*0.3, size*0.6, 4); iconCtx.fill();
-      iconCtx.fillStyle = "#dca700"; roundRect(iconCtx, x + size*0.42, y + size*0.18, size*0.16, size*0.18, 2); iconCtx.fill();
-      break;
-    case "wooden_pickaxe":
-      iconCtx.fillStyle = "#ad814b"; roundRect(iconCtx, x + size * 0.35, y + size * 0.3, size * 0.1, size * 0.5, 2); iconCtx.fill();
-      iconCtx.fillStyle = "#a7a7a7"; roundRect(iconCtx, x + size * 0.2, y + size * 0.2, size * 0.4, size * 0.12, 2); iconCtx.fill();
-      break;
-    case "wooden_sword":
-      iconCtx.fillStyle = "#a7a7a7"; roundRect(iconCtx, x + size * 0.45, y + size * 0.1, size * 0.1, size * 0.6, 2); iconCtx.fill();
-      iconCtx.fillStyle = "#ad814b"; roundRect(iconCtx, x + size * 0.4, y + size * 0.7, size * 0.2, size * 0.12, 2); iconCtx.fill();
-      break;
-    case "copper_ore":
-      iconCtx.fillStyle = "#a0522d"; roundRect(iconCtx, x, y, size, size, 5); iconCtx.fill();
-      iconCtx.strokeStyle = "#ff7f50"; iconCtx.lineWidth = 2;
-      roundRect(iconCtx, x+2, y+2, size-4, size-4, 5); iconCtx.stroke();
-      break;
-    case "iron_ore":
-      iconCtx.fillStyle = "#b5b5b5"; roundRect(iconCtx, x, y, size, size, 5); iconCtx.fill();
-      iconCtx.strokeStyle = "#888"; iconCtx.lineWidth = 2;
-      roundRect(iconCtx, x+2, y+2, size-4, size-4, 5); iconCtx.stroke();
-      break;
-    case "gold_ore":
-      iconCtx.fillStyle = "#FFD700"; roundRect(iconCtx, x, y, size, size, 5); iconCtx.fill();
-      iconCtx.strokeStyle = "#b89d00"; iconCtx.lineWidth = 2;
-      roundRect(iconCtx, x+2, y+2, size-4, size-4, 5); iconCtx.stroke();
-      break;
-    case "sapphire_ore":
-      iconCtx.fillStyle = "#1e90ff"; roundRect(iconCtx, x, y, size, size, 5); iconCtx.fill();
-      iconCtx.strokeStyle = "#1860a7"; iconCtx.lineWidth = 2;
-      roundRect(iconCtx, x+2, y+2, size-4, size-4, 5); iconCtx.stroke();
-      break;
-    case "copper_bar":
-      iconCtx.fillStyle = "#ff7f50"; roundRect(iconCtx, x, y+size*0.4, size, size*0.4, 4); iconCtx.fill();
-      iconCtx.strokeStyle = "#a0522d"; iconCtx.lineWidth = 1.5; iconCtx.strokeRect(x, y+size*0.4, size, size*0.4);
-      break;
-    case "iron_bar":
-      iconCtx.fillStyle = "#d8d8d8"; roundRect(iconCtx, x, y+size*0.4, size, size*0.4, 4); iconCtx.fill();
-      iconCtx.strokeStyle = "#888"; iconCtx.lineWidth = 1.5; iconCtx.strokeRect(x, y+size*0.4, size, size*0.4);
-      break;
-    case "gold_bar":
-      iconCtx.fillStyle = "#FFD700"; roundRect(iconCtx, x, y+size*0.4, size, size*0.4, 4); iconCtx.fill();
-      iconCtx.strokeStyle = "#b89d00"; iconCtx.lineWidth = 1.5; iconCtx.strokeRect(x, y+size*0.4, size, size*0.4);
-      break;
-    case "sapphire_gem":
-      iconCtx.fillStyle = "#aaaaff"; iconCtx.beginPath();
-      iconCtx.moveTo(x+size/2, y);
-      iconCtx.lineTo(x+size, y+size/2);
-      iconCtx.lineTo(x+size/2, y+size);
-      iconCtx.lineTo(x, y+size/2);
-      iconCtx.closePath(); iconCtx.fill();
-      iconCtx.strokeStyle = "#5e5ecf"; iconCtx.lineWidth = 2; iconCtx.stroke();
-      break;
-    case "iron_pickaxe":
-      iconCtx.fillStyle = "#d8d8d8"; roundRect(iconCtx, x + size * 0.35, y + size * 0.3, size * 0.1, size * 0.5, 2); iconCtx.fill();
-      iconCtx.fillStyle = "#888"; roundRect(iconCtx, x + size * 0.2, y + size * 0.2, size * 0.4, size * 0.12, 2); iconCtx.fill();
-      break;
-    case "iron_sword":
-      iconCtx.fillStyle = "#d8d8d8"; roundRect(iconCtx, x + size * 0.45, y + size * 0.1, size * 0.1, size * 0.6, 2); iconCtx.fill();
-      iconCtx.fillStyle = "#888"; roundRect(iconCtx, x + size * 0.4, y + size * 0.7, size * 0.2, size * 0.12, 2); iconCtx.fill();
-      break;
-    case "gold_pickaxe":
-      iconCtx.fillStyle = "#FFD700"; roundRect(iconCtx, x + size * 0.35, y + size * 0.3, size * 0.1, size * 0.5, 2); iconCtx.fill();
-      iconCtx.fillStyle = "#b89d00"; roundRect(iconCtx, x + size * 0.2, y + size * 0.2, size * 0.4, size * 0.12, 2); iconCtx.fill();
-      break;
-    case "sapphire_staff":
-      iconCtx.fillStyle = "#aaaaff"; roundRect(iconCtx, x + size * 0.47, y + size * 0.18, size * 0.07, size * 0.6, 2); iconCtx.fill();
-      iconCtx.fillStyle = "#5e5ecf"; iconCtx.beginPath(); iconCtx.arc(x + size * 0.5, y + size * 0.15, size * 0.13, 0, Math.PI * 2); iconCtx.fill();
-      break;
+    case "dirt": iconCtx.fillStyle = "#ba7a3a"; roundRect(iconCtx, x, y, size, size, 5); iconCtx.fill(); break;
+    case "stone": iconCtx.fillStyle = "#a7a7a7"; roundRect(iconCtx, x, y, size, size, 5); iconCtx.fill(); break;
+    case "grass": iconCtx.fillStyle = "#3ec14d"; roundRect(iconCtx, x, y, size, size * 0.4, 5); iconCtx.fill(); iconCtx.fillStyle = "#ba7a3a"; roundRect(iconCtx, x, y + size * 0.4, size, size * 0.6, 5); iconCtx.fill(); break;
+    case "wood": iconCtx.fillStyle = "#ad814b"; roundRect(iconCtx, x, y, size, size, 5); iconCtx.fill(); break;
+    case "leaves": iconCtx.fillStyle = "#62e05e"; roundRect(iconCtx, x, y, size, size, 5); iconCtx.fill(); break;
+    case "gel": iconCtx.fillStyle = "#7FFFD4"; roundRect(iconCtx, x, y, size, size, 5); iconCtx.fill(); break;
+    case "torch": iconCtx.fillStyle = "#ffe066"; roundRect(iconCtx, x + size*0.35, y + size*0.2, size*0.3, size*0.6, 4); iconCtx.fill(); iconCtx.fillStyle = "#dca700"; roundRect(iconCtx, x + size*0.42, y + size*0.18, size*0.16, size*0.18, 2); iconCtx.fill(); break;
+    case "wooden_pickaxe": iconCtx.fillStyle = "#ad814b"; roundRect(iconCtx, x + size * 0.35, y + size * 0.3, size * 0.1, size * 0.5, 2); iconCtx.fill(); iconCtx.fillStyle = "#a7a7a7"; roundRect(iconCtx, x + size * 0.2, y + size * 0.2, size * 0.4, size * 0.12, 2); iconCtx.fill(); break;
+    case "wooden_sword": iconCtx.fillStyle = "#a7a7a7"; roundRect(iconCtx, x + size * 0.45, y + size * 0.1, size * 0.1, size * 0.6, 2); iconCtx.fill(); iconCtx.fillStyle = "#ad814b"; roundRect(iconCtx, x + size * 0.4, y + size * 0.7, size * 0.2, size * 0.12, 2); iconCtx.fill(); break;
+    case "copper_ore": iconCtx.fillStyle = "#a0522d"; roundRect(iconCtx, x, y, size, size, 5); iconCtx.fill(); iconCtx.strokeStyle = "#ff7f50"; iconCtx.lineWidth = 2; roundRect(iconCtx, x+2, y+2, size-4, size-4, 5); iconCtx.stroke(); break;
+    case "iron_ore": iconCtx.fillStyle = "#b5b5b5"; roundRect(iconCtx, x, y, size, size, 5); iconCtx.fill(); iconCtx.strokeStyle = "#888"; iconCtx.lineWidth = 2; roundRect(iconCtx, x+2, y+2, size-4, size-4, 5); iconCtx.stroke(); break;
+    case "gold_ore": iconCtx.fillStyle = "#FFD700"; roundRect(iconCtx, x, y, size, size, 5); iconCtx.fill(); iconCtx.strokeStyle = "#b89d00"; iconCtx.lineWidth = 2; roundRect(iconCtx, x+2, y+2, size-4, size-4, 5); iconCtx.stroke(); break;
+    case "sapphire_ore": iconCtx.fillStyle = "#1e90ff"; roundRect(iconCtx, x, y, size, size, 5); iconCtx.fill(); iconCtx.strokeStyle = "#1860a7"; iconCtx.lineWidth = 2; roundRect(iconCtx, x+2, y+2, size-4, size-4, 5); iconCtx.stroke(); break;
+    case "copper_bar": iconCtx.fillStyle = "#ff7f50"; roundRect(iconCtx, x, y+size*0.4, size, size*0.4, 4); iconCtx.fill(); iconCtx.strokeStyle = "#a0522d"; iconCtx.lineWidth = 1.5; iconCtx.strokeRect(x, y+size*0.4, size, size*0.4); break;
+    case "iron_bar": iconCtx.fillStyle = "#d8d8d8"; roundRect(iconCtx, x, y+size*0.4, size, size*0.4, 4); iconCtx.fill(); iconCtx.strokeStyle = "#888"; iconCtx.lineWidth = 1.5; iconCtx.strokeRect(x, y+size*0.4, size, size*0.4); break;
+    case "gold_bar": iconCtx.fillStyle = "#FFD700"; roundRect(iconCtx, x, y+size*0.4, size, size*0.4, 4); iconCtx.fill(); iconCtx.strokeStyle = "#b89d00"; iconCtx.lineWidth = 1.5; iconCtx.strokeRect(x, y+size*0.4, size, size*0.4); break;
+    case "sapphire_gem": iconCtx.fillStyle = "#aaaaff"; iconCtx.beginPath(); iconCtx.moveTo(x+size/2, y); iconCtx.lineTo(x+size, y+size/2); iconCtx.lineTo(x+size/2, y+size); iconCtx.lineTo(x, y+size/2); iconCtx.closePath(); iconCtx.fill(); iconCtx.strokeStyle = "#5e5ecf"; iconCtx.lineWidth = 2; iconCtx.stroke(); break;
+    case "iron_pickaxe": iconCtx.fillStyle = "#d8d8d8"; roundRect(iconCtx, x + size * 0.35, y + size * 0.3, size * 0.1, size * 0.5, 2); iconCtx.fill(); iconCtx.fillStyle = "#888"; roundRect(iconCtx, x + size * 0.2, y + size * 0.2, size * 0.4, size * 0.12, 2); iconCtx.fill(); break;
+    case "iron_sword": iconCtx.fillStyle = "#d8d8d8"; roundRect(iconCtx, x + size * 0.45, y + size * 0.1, size * 0.1, size * 0.6, 2); iconCtx.fill(); iconCtx.fillStyle = "#888"; roundRect(iconCtx, x + size * 0.4, y + size * 0.7, size * 0.2, size * 0.12, 2); iconCtx.fill(); break;
+    case "gold_pickaxe": iconCtx.fillStyle = "#FFD700"; roundRect(iconCtx, x + size * 0.35, y + size * 0.3, size * 0.1, size * 0.5, 2); iconCtx.fill(); iconCtx.fillStyle = "#b89d00"; roundRect(iconCtx, x + size * 0.2, y + size * 0.2, size * 0.4, size * 0.12, 2); iconCtx.fill(); break;
+    case "sapphire_staff": iconCtx.fillStyle = "#aaaaff"; roundRect(iconCtx, x + size * 0.47, y + size * 0.18, size * 0.07, size * 0.6, 2); iconCtx.fill(); iconCtx.fillStyle = "#5e5ecf"; iconCtx.beginPath(); iconCtx.arc(x + size * 0.5, y + size * 0.15, size * 0.13, 0, Math.PI * 2); iconCtx.fill(); break;
     default: iconCtx.fillStyle = "#FFF"; roundRect(iconCtx, x, y, size, size, 5); iconCtx.fill();
   }
   iconCtx.restore();
@@ -1251,15 +1148,14 @@ function draw() {
   }
 }
 
-/* ====== Game Loop ====== */
+/* ====== Game Loop with 60 FPS Cap ====== */
 let isDead = false, droppedItems = [];
+let lastFrameTime = 0;
+const FRAME_DURATION = 1000 / 60;
 function updatePlayer() {
   if (craftingMenuActive || isDead || extraInventoryOpen) return;
-  if (player.hunger < 10) {
-    player.speed = 1.0;
-  } else {
-    player.speed = 2.0;
-  }
+  if (player.hunger < 10) player.speed = 1.0;
+  else player.speed = 2.0;
   if (keys["a"] || keys["ArrowLeft"]) player.vx = -player.speed;
   else if (keys["d"] || keys["ArrowRight"]) player.vx = player.speed;
   else player.vx = 0;
@@ -1276,7 +1172,13 @@ function updatePlayer() {
     }
   }
 }
-function gameLoop() {
+function gameLoop(now) {
+  if (!now) now = performance.now();
+  if (now - lastFrameTime < FRAME_DURATION) {
+    requestAnimationFrame(gameLoop);
+    return;
+  }
+  lastFrameTime = now;
   updateFpsMeter();
   updatePlayer();
   updateHunger();
@@ -1288,8 +1190,8 @@ function gameLoop() {
 }
 const playerImg = new Image();
 playerImg.src = "assets/player.png";
-playerImg.onload = function() { gameLoop(); };
-if (playerImg.complete && playerImg.naturalWidth !== 0) gameLoop();
+playerImg.onload = function() { requestAnimationFrame(gameLoop); };
+if (playerImg.complete && playerImg.naturalWidth !== 0) requestAnimationFrame(gameLoop);
 
 </script>
 </body>
