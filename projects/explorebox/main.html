@@ -203,6 +203,7 @@ for (let x = 0; x < worldWidth; x++) {
   currentGround = Math.max(20, Math.min(80, currentGround));
   groundHeights[x] = currentGround;
 }
+let VALUE = 0;
 for (let x = 0; x < worldWidth; x++) {
   world[x] = [];
   let ground = groundHeights[x];
@@ -212,9 +213,10 @@ for (let x = 0; x < worldWidth; x++) {
       if (y > ground + 18 && r < 0.008) world[x][y] = 9; // gold ore
       else if (y > ground + 12 && r < 0.013) world[x][y] = 7; // iron ore
       else if (y > ground + 10 && r < 0.012) world[x][y] = 10; // copper ore
-      else if (y > ground + 18 && r < 0.04) {
+      else if (y > ground + 20 && r < 0.01) {
         world[x][y] = 8; // sapphire ore
-        alert("x");
+        VALUE += 1;
+        alert("value:" + VALUE);
       }
       else world[x][y] = (Math.random() < 0.2) ? 1 : 2;
     }
