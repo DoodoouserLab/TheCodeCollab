@@ -204,6 +204,7 @@ for (let x = 0; x < worldWidth; x++) {
   groundHeights[x] = currentGround;
 }
 let VALUE = 0;
+let TEST = 0;
 for (let x = 0; x < worldWidth; x++) {
   world[x] = [];
   let ground = groundHeights[x];
@@ -216,6 +217,7 @@ for (let x = 0; x < worldWidth; x++) {
       else if (y > ground + 20 && r < 0.01) {
         world[x][y] = 8; // sapphire ore
         VALUE += 1;
+        TEST += 1;
       }
       else world[x][y] = (Math.random() < 0.2) ? 1 : 2;
     }
@@ -224,6 +226,7 @@ for (let x = 0; x < worldWidth; x++) {
   }
 }
 alert("value:" + VALUE);
+alert("test" + TEST);
 for (let x = 5; x < worldWidth - 5; x++) {
   for (let y = 0; y < worldHeight; y++) {
     if (world[x][y] === 3 && Math.random() < 0.03) {
