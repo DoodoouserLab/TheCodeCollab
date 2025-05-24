@@ -212,7 +212,10 @@ for (let x = 0; x < worldWidth; x++) {
       if (y > ground + 18 && r < 0.008) world[x][y] = 9; // gold ore
       else if (y > ground + 12 && r < 0.013) world[x][y] = 7; // iron ore
       else if (y > ground + 10 && r < 0.012) world[x][y] = 10; // copper ore
-      else if (y > ground + 22 && r < 0.004) world[x][y] = 8; // sapphire ore
+      else if (y > ground + 18 && r < 0.04) {
+        world[x][y] = 8; // sapphire ore
+        alert("x");
+      }
       else world[x][y] = (Math.random() < 0.2) ? 1 : 2;
     }
     else if (y == ground) world[x][y] = 3;
