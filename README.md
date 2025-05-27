@@ -1,5 +1,7 @@
 # 🚀 Welcome to **TheCodeCollab**
 
+![](https://img.shields.io/badge/Current%20Project%3A-ExploreBox-009dc6?style=for-the-badge&logo=html5)
+
 > 🎮 **Building together, innovating together!**
 > This is a collaborative initiative between **DoodoouserLab** and **pixelproductionz**, where creativity meets code to develop exciting projects and games from scratch.
 > 💡 We welcome new collaborators eager to **build, remix, and innovate** alongside us!
