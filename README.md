@@ -1,4 +1,4 @@
-# 🚀 Welcome to **TheCodeCollab**
+# 🚀 Welcome to **TheCodeCollab** | ![Current Watchers](https://img.shields.io/github/watchers/DoodoouserLab/TheCodeCollab)
 
 ![](https://img.shields.io/badge/Current%20Project%3A-ExploreBox-009dc6?style=for-the-badge&logo=html5)
 ![](https://img.shields.io/badge/Project%20Status%3A-Alpha-red?style=for-the-badge)
