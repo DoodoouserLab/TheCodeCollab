@@ -11,13 +11,14 @@ Participants in this community should:
 - Help foster an inclusive and supportive atmosphere.
 - Give credit where it's due and acknowledge the contributions of others.
 
-## Unacceptable Behavior
-We do not tolerate:
-- Harassment, discrimination, or hate speech.
-- Personal attacks, insults, or threats.
-- Spamming or disruptive conduct that hinders discussion.
-- Dismissive behavior that discourages participation.
-- Any action that intentionally harms the integrity of the community.
+> [!CAUTION]
+> ## Unacceptable Behavior
+> We do not tolerate:
+> - Harassment, discrimination, or hate speech.
+> - Personal attacks, insults, or threats.
+> - Spamming or disruptive conduct that hinders discussion.
+> - Dismissive behavior that discourages participation.
+> - Any action that intentionally harms the integrity of the community.
 
 ## Reporting Concerns
 If you experience or witness misconduct, please report it to us. Reports will be reviewed promptly and handled appropriately to protect affected individuals.
@@ -28,5 +29,6 @@ Violations may result in actions such as:
 - Temporary or permanent removal from participation.
 - Other necessary measures to maintain community integrity.
 
-## Acknowledgment
-By contributing to this repository, you agree to uphold this Code of Conduct and contribute to a respectful and inclusive environment.
+> [!NOTE]
+> ## Acknowledgment
+> By contributing to this repository, you agree to uphold this Code of Conduct and contribute to a respectful and inclusive environment.
