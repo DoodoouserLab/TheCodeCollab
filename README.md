@@ -53,7 +53,7 @@ Happy coding! 💡✨
 > This is a note.
 
 > [!TIP]
-> This is a tip.
+> This is a helpful tip. It doesn't hurt to read it.
 
 > [!IMPORTANT]
 > This is important information. We suggest that you don't skip over this.
