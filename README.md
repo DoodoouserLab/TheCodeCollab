@@ -47,3 +47,19 @@ Keep up with announcements, updates, and new features by following our work and 
 
 🚀 **Let’s build something amazing together!**
 Happy coding! 💡✨
+
+## Alert Reference
+> [!NOTE]
+> This is a note.
+
+> [!TIP]
+> This is a tip.
+
+> [!IMPORTANT]
+> This is important information. We suggest that you don't skip over this.
+
+> [!CAUTION]
+> This is an explanation of an action that could lead to harmful consequences.
+
+> [!WARNING]
+> This is a warning.
