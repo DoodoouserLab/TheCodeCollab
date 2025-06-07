@@ -26,6 +26,9 @@ We are looking for enthusiastic coders, designers, and problem-solvers to be par
 ✅ **Start discussions** to brainstorm ideas or collaborate on new projects.
 ✅ **Showcase your work**—if you’ve built something cool, we’d love to see it!
 
+>[!WARNING]
+>All file names should be lowercase, and spaces should be replaced with underscores.
+
 ## 📜 How to Contribute
 Ready to **become a collaborator**? Follow these steps:
 1. **Fork the repository** to get your own copy.
