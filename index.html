@@ -237,46 +237,53 @@
 
 		<!-- Footer -->
 			<div id="footer">
-				<div class="container medium">
-
-					<header class="major last">
-						<h2>Questions or Comments</h2>
-					</header>
-
-					<p>Not Functional Yet (In Progress)</p>
-
-					<form method="post" action="#">
-						<div class="row">
-							<div class="col-6 col-12-mobilep">
-								<input type="text" name="name" placeholder="Name" />
-							</div>
-							<div class="col-6 col-12-mobilep">
-								<input type="email" name="email" placeholder="Email" />
-							</div>
-							<div class="col-12">
-								<textarea name="message" placeholder="Message" rows="6"></textarea>
-							</div>
-							<div class="col-12">
-								<ul class="actions special">
-									<li><input type="submit" value="Send Message" /></li>
-								</ul>
-							</div>
-						</div>
-					</form>
-
-					<ul class="icons">
-						<li><a href="#" class="icon brands fa-twitter"><span class="label">Twitter</span></a></li>
-						<li><a href="#" class="icon brands fa-facebook-f"><span class="label">Facebook</span></a></li>
-						<li><a href="#" class="icon brands fa-instagram"><span class="label">Instagram</span></a></li>
-						<li><a href="https://github.com/DoodoouserLab/TheCodeCollab" class="icon brands fa-github"><span class="label">Github</span></a></li>
-						<li><a href="#" class="icon brands fa-dribbble"><span class="label">Dribbble</span></a></li>
-					</ul>
-
-					<ul class="copyright">
-						<li>&copy; TheCodeCollab. All rights reserved.</li><li>Design: <a href="http://html5up.net">HTML5 UP</a></li>
-					</ul>
-
-				</div>
+			    <div class="container medium">
+			        <header class="major last">
+			            <h2>Questions or Comments</h2>
+			        </header>
+			
+			        <?php
+			        // Display errors if they exist
+			        session_start();
+			        if (isset($_SESSION['form_errors'])) {
+			            echo '<div class="error-message" style="color: #ff0000; margin-bottom: 20px;">';
+			            foreach ($_SESSION['form_errors'] as $error) {
+			                echo "<p>$error</p>";
+			            }
+			            echo '</div>';
+			            
+			            // Clear errors after displaying
+			            unset($_SESSION['form_errors']);
+			        }
+			        
+			        // Get previous form data if it exists
+			        $form_data = $_SESSION['form_data'] ?? [];
+			        unset($_SESSION['form_data']);
+			        ?>
+			
+			        <form method="post" action="process_form.php">
+			            <div class="row">
+			                <div class="col-6 col-12-mobilep">
+			                    <input type="text" name="name" placeholder="Name" value="<?php echo htmlspecialchars($form_data['name'] ?? ''); ?>" />
+			                </div>
+			                <div class="col-6 col-12-mobilep">
+			                    <input type="email" name="email" placeholder="Email" value="<?php echo htmlspecialchars($form_data['email'] ?? ''); ?>" />
+			                </div>
+			                <div class="col-12">
+			                    <textarea name="message" placeholder="Message" rows="6"><?php echo htmlspecialchars($form_data['message'] ?? ''); ?></textarea>
+			                </div>
+			                <!-- Add a simple honeypot field for spam protection -->
+			                <div style="position: absolute; left: -5000px;">
+			                    <input type="text" name="honeypot" tabindex="-1" />
+			                </div>
+			                <div class="col-12">
+			                    <ul class="actions special">
+			                        <li><input type="submit" value="Send Message" /></li>
+			                    </ul>
+			                </div>
+			            </div>
+			        </form>
+			    </div>
 			</div>
 
 		<!-- Scripts -->
@@ -288,6 +295,7 @@
 
 	</body>
 </html>
+
 
 
 
