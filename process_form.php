@@ -29,7 +29,7 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
     
     // If no errors, process the form
     if (empty($errors)) {
-        $recipient = "your-email@example.com"; // REPLACE WITH YOUR EMAIL
+        $recipient = "fyodortraskin@outlook.com"; // REPLACE WITH YOUR EMAIL
         $subject = "New Contact Form Submission from $name";
         
         // Build email content
