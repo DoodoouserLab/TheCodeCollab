@@ -26,7 +26,7 @@ function draw() {
 }
 
 // Event listeners for dragging
-canvas.addEventListener('mousedown', (e) => {
+canvas.addEventListener('touchstart', (e) => {
   const rect = canvas.getBoundingClientRect();
   const mouseX = e.clientX - rect.left;
   const mouseY = e.clientY - rect.top;
@@ -38,7 +38,7 @@ canvas.addEventListener('mousedown', (e) => {
   }
 });
 
-canvas.addEventListener('mousemove', (e) => {
+canvas.addEventListener('touchmove', (e) => {
   if (isDragging) {
     const rect = canvas.getBoundingClientRect();
     const mouseX = e.clientX - rect.left;
@@ -50,6 +50,6 @@ canvas.addEventListener('mousemove', (e) => {
   }
 });
 
-canvas.addEventListener('mouseup', () => {
+canvas.addEventListener('touchend', () => {
   isDragging = false;
 });
