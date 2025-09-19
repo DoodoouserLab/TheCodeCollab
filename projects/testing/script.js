@@ -6,7 +6,7 @@ let imageY = 0;
 let isDragging = false;
 
 const movingImage = new Image();
-movingImage.src = 'your-image.png'; // Replace with your PNG file
+movingImage.src = 'image.png'; // Replace with your PNG file
 
 // Object to store the image's state
 let imageState = {
