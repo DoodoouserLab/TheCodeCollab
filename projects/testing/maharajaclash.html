@@ -1,21 +1,46 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Move Image on Canvas</title>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Draggable Image</title>
   <style>
-    canvas {
-      border: 1px solid black;
+    /* Allow free movement and disable native touch scrolling */
+    #draggable {
+      position: absolute;
+      top: 50px;
+      left: 50px;
+      touch-action: none;
+      width: 150px;
+      height: auto;
     }
   </style>
 </head>
 <body>
-  <h1>Move Image on Canvas</h1>
-  <canvas id="myCanvas" width="800" height="600"></canvas>
-  <br>
-  <button onclick="moveImageTo(20, 50)">Move to (20, 50)</button>
-  <button onclick="moveImageTo(200, 300)">Move to (200, 300)</button>
-  <script src="script.js"></script>
+  <img id="draggable" src="image.png" alt="Drag me" />
+
+  <script>
+    const img = document.getElementById('draggable');
+    let offsetX = 0;
+    let offsetY = 0;
+
+    img.addEventListener('touchstart', e => {
+      const touch = e.touches[0];
+      const rect = img.getBoundingClientRect();
+      offsetX = touch.clientX - rect.left;
+      offsetY = touch.clientY - rect.top;
+    });
+
+    document.addEventListener('touchmove', e => {
+      e.preventDefault(); // prevent scrolling
+      const touch = e.touches[0];
+      img.style.left = (touch.clientX - offsetX) + 'px';
+      img.style.top = (touch.clientY - offsetY) + 'px';
+    });
+
+    document.addEventListener('touchend', () => {
+      // touch interaction finished
+    });
+  </script>
 </body>
 </html>
