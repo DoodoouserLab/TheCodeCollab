@@ -1,55 +1,27 @@
 const canvas = document.getElementById('myCanvas');
 const ctx = canvas.getContext('2d');
 
-let imageX = 0;
-let imageY = 0;
-let isDragging = false;
+let imageX = 0; // Initial X position
+let imageY = 0; // Initial Y position
 
 const movingImage = new Image();
-movingImage.src = 'image.png'; // Replace with your PNG file
+movingImage.src = 'iamge.png'; // Replace with your PNG file
 
-// Object to store the image's state
-let imageState = {
-  x: 50,
-  y: 50,
-  width: 100,
-  height: 100,
-};
-
+// Wait for the image to load before drawing
 movingImage.onload = function() {
   draw();
 };
 
 function draw() {
+  // Clear the entire canvas
   ctx.clearRect(0, 0, canvas.width, canvas.height);
-  ctx.drawImage(movingImage, imageState.x, imageState.y, imageState.width, imageState.height);
+
+  // Draw the image at its current position
+  ctx.drawImage(movingImage, imageX, imageY);
 }
 
-// Event listeners for dragging
-canvas.addEventListener('touchstart', (e) => {
-  const rect = canvas.getBoundingClientRect();
-  const mouseX = e.clientX - rect.left;
-  const mouseY = e.clientY - rect.top;
-
-  // Check if the mouse is inside the image
-  if (mouseX >= imageState.x && mouseX <= imageState.x + imageState.width &&
-      mouseY >= imageState.y && mouseY <= imageState.y + imageState.height) {
-    isDragging = true;
-  }
-});
-
-canvas.addEventListener('touchmove', (e) => {
-  if (isDragging) {
-    const rect = canvas.getBoundingClientRect();
-    const mouseX = e.clientX - rect.left;
-    const mouseY = e.clientY - rect.top;
-
-    imageState.x = mouseX - imageState.width / 2;
-    imageState.y = mouseY - imageState.height / 2;
-    draw(); // Redraw the canvas
-  }
-});
-
-canvas.addEventListener('touchend', () => {
-  isDragging = false;
-});
+function moveImageTo(x, y) {
+  imageX = x; // Update the image's X coordinate
+  imageY = y; // Update the image's Y coordinate
+  draw(); // Redraw the canvas with the new position
+}
