@@ -1,86 +1,134 @@
 <!DOCTYPE html>
 <html>
 <head>
-<style>
-  #map {
-    position: relative;
-    width: 500px;
-    height: 400px;
-    border: 2px solid #333;
-    background: #eee;
-  }
-  .point {
-    position: absolute;
-    width: 30px;
-    height: 30px;
-    background: orange;
-    border-radius: 50%;
-    color: white;
-    font-weight: bold;
-    text-align: center;
-    line-height: 30px;
-    cursor: grab;
-    user-select: none;
-  }
-</style>
+  <meta charset="UTF-8">
+  <title>Interactive Point Map</title>
+  <style>
+    body {
+      font-family: sans-serif;
+      padding: 20px;
+    }
+    label {
+      margin-right: 10px;
+    }
+    #mapCanvas {
+      border: 2px solid #333;
+      cursor: pointer;
+      display: block;
+      margin-top: 20px;
+    }
+  </style>
 </head>
 <body>
 
-<div id="map"></div>
+  <label>
+    Label:
+    <input id="pointLabel" type="text" placeholder="Enter point label" />
+  </label>
+  <button id="addPointBtn">Add Point</button>
+  <button id="deletePointBtn">Delete Selected Point</button>
 
-<button onclick="addPoint(50, 50, 1)">Add Type 1</button>
-<button onclick="addPoint(150, 100, 3)">Add Type 3</button>
+  <canvas id="mapCanvas" width="500" height="400"></canvas>
 
-<script>
-let points = []; // store all point objects
+  <script>
+    const canvas = document.getElementById('mapCanvas');
+    const ctx = canvas.getContext('2d');
 
-function Point(x, y, type) {
-  this.x = x;
-  this.y = y;
-  this.type = type;
+    let points = [];
+    let selectedPoint = null;
+    let draggingPoint = null;
+    let dragOffsetX = 0;
+    let dragOffsetY = 0;
+    const POINT_RADIUS = 15;
 
-  // Create HTML element
-  this.el = document.createElement('div');
-  this.el.className = 'point';
-  this.el.textContent = type; // show type number
-  this.el.style.left = x + 'px';
-  this.el.style.top = y + 'px';
+    function draw() {
+      ctx.clearRect(0, 0, canvas.width, canvas.height);
 
-  // Drag handling
-  let offsetX, offsetY;
-  const onMouseMove = (e) => {
-    this.x = e.clientX - offsetX;
-    this.y = e.clientY - offsetY;
-    this.el.style.left = this.x + 'px';
-    this.el.style.top = this.y + 'px';
-  };
-  const onMouseUp = () => {
-    document.removeEventListener('mousemove', onMouseMove);
-    document.removeEventListener('mouseup', onMouseUp);
-  };
-  this.el.addEventListener('mousedown', (e) => {
-    offsetX = e.clientX - this.x;
-    offsetY = e.clientY - this.y;
-    document.addEventListener('mousemove', onMouseMove);
-    document.addEventListener('mouseup', onMouseUp);
-  });
+      points.forEach(p => {
+        ctx.beginPath();
+        ctx.arc(p.x, p.y, POINT_RADIUS, 0, Math.PI * 2);
+        ctx.fillStyle = p === selectedPoint ? '#e74c3c' : '#f39c12';
+        ctx.fill();
+        ctx.strokeStyle = '#333';
+        ctx.stroke();
 
-  // Right-click to delete
-  this.el.addEventListener('contextmenu', (e) => {
-    e.preventDefault();
-    this.el.remove();
-    points = points.filter(p => p !== this);
-  });
+        ctx.fillStyle = '#fff';
+        ctx.font = '12px sans-serif';
+        ctx.textAlign = 'center';
+        ctx.textBaseline = 'middle';
+        ctx.fillText(p.label, p.x, p.y);
+      });
+    }
 
-  document.getElementById('map').appendChild(this.el);
-}
+    function addPoint() {
+      const input = document.getElementById('pointLabel');
+      const label = input.value.trim();
+      if (!label) {
+        alert('Please enter a label.');
+        return;
+      }
+      const pt = { x: 100, y: 100, label };
+      points.push(pt);
+      selectedPoint = pt;
+      input.value = '';
+      draw();
+    }
 
-// Helper to add a point
-function addPoint(x, y, type) {
-  const p = new Point(x, y, type);
-  points.push(p);
-}
-</script>
+    function deletePoint() {
+      if (!selectedPoint) return;
+      points = points.filter(p => p !== selectedPoint);
+      selectedPoint = null;
+      draw();
+    }
+
+    function getPointAt(x, y) {
+      for (let i = points.length - 1; i >= 0; i--) {
+        const p = points[i];
+        const dx = x - p.x;
+        const dy = y - p.y;
+        if (Math.hypot(dx, dy) <= POINT_RADIUS) {
+          return p;
+        }
+      }
+      return null;
+    }
+
+    canvas.addEventListener('mousedown', e => {
+      const rect = canvas.getBoundingClientRect();
+      const mx = e.clientX - rect.left;
+      const my = e.clientY - rect.top;
+      const hit = getPointAt(mx, my);
+
+      if (hit) {
+        draggingPoint = hit;
+        selectedPoint = hit;
+        dragOffsetX = mx - hit.x;
+        dragOffsetY = my - hit.y;
+      } else {
+        selectedPoint = null;
+      }
+      draw();
+    });
+
+    canvas.addEventListener('mousemove', e => {
+      if (!draggingPoint) return;
+      const rect = canvas.getBoundingClientRect();
+      draggingPoint.x = e.clientX - rect.left - dragOffsetX;
+      draggingPoint.y = e.clientY - rect.top - dragOffsetY;
+      draw();
+    });
+
+    ['mouseup', 'mouseleave'].forEach(evt =>
+      canvas.addEventListener(evt, () => {
+        draggingPoint = null;
+      })
+    );
+
+    document.getElementById('addPointBtn').addEventListener('click', addPoint);
+    document.getElementById('deletePointBtn').addEventListener('click', deletePoint);
+
+    draw();
+  </script>
 
 </body>
 </html>
