@@ -93,7 +93,7 @@
       return null;
     }
 
-    canvas.addEventListener('mousedown', e => {
+    canvas.addEventListener('touchdown', e => {
       const rect = canvas.getBoundingClientRect();
       const mx = e.clientX - rect.left;
       const my = e.clientY - rect.top;
@@ -110,7 +110,7 @@
       draw();
     });
 
-    canvas.addEventListener('mousemove', e => {
+    canvas.addEventListener('touchmove', e => {
       if (!draggingPoint) return;
       const rect = canvas.getBoundingClientRect();
       draggingPoint.x = e.clientX - rect.left - dragOffsetX;
@@ -118,7 +118,7 @@
       draw();
     });
 
-    ['mouseup', 'mouseleave'].forEach(evt =>
+    ['mouseup', 'touchend'].forEach(evt =>
       canvas.addEventListener(evt, () => {
         draggingPoint = null;
       })
@@ -132,3 +132,4 @@
 
 </body>
 </html>
+
