@@ -90,11 +90,25 @@
     
     ];
 
-    function newClan(type, x, y, damage, health, speed) {
-      map.set(type, { x: x, y: y, damage: damage, speed: speed});
-      typeimg = "'" + type + "'";
-      const type = new Image();
-      type.src = typeimg;
+    function newClan(typeThis, xCord, yCord, damageThis, healthThis, speedThis) {
+      this.type = typeThis
+      this.x = xCord;
+      this.y = yCord;
+      this.damage = damageThis;
+      this.health = healthThis;
+      this.speed = speedThis;
+      
+      map.set(this.type,{ 
+                     x: this.x,
+                     y: this.y,
+                     damage: this.damage,
+                     speed: this.speed
+                    }
+             );
+      
+      this.typeimg = ;
+      const typeimg = new Image();
+      this.typeimg.src = `./images/${this.type}.png`;;
     }
     
   </script>
