@@ -92,7 +92,7 @@
 
     function newClan(type, x, y, damage, health, speed) {
       map.set(type, { x: x, y: y, damage: damage, speed: speed});
-      typeimg =
+      typeimg = "'" + type + "'";
       const type = new Image();
       type.src = typeimg;
     }
