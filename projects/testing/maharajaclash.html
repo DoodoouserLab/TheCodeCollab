@@ -86,11 +86,14 @@
 
     let enemyClash = new Map();
 
-    function Clan(typeThis, xCord, yCord, damageThis, healthThis, speedThis) {
+    function Clan(typeThis, xCord, yCord, damageThis, healthThis, speedThis, targetX, targetY, range) {
       this.type = typeThis;
       this.x = xCord;
       this.y = yCord;
+      this.tx = targetX;
+      this.ty = targetY;
       this.damage = damageThis;
+      this.range = range;
       this.health = healthThis;
       this.speed = speedThis;
       
@@ -98,7 +101,9 @@
                      x: this.x,
                      y: this.y,
                      damage: this.damage,
-                     speed: this.speed
+                     speed: this.speed,
+                     health: this.health,
+                     type: this.type
                     }
              );
       
