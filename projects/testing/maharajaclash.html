@@ -20,14 +20,17 @@
   </style>
 </head>
 <body>
-  <canvas id="canvas"></canvas>
+  <canvas id="gameCanvas"></canvas>
 
   <script>
 
     const canvas = document.getElementById("gameCanvas");
     const ctx = canvas.getContext("2d");
 
+    canvas.width  = window.innerWidth;
+    canvas.height = window.innerHeight;
 
+    
     let yourClash = new Map();
 
     let enemyClash = new Map();
@@ -84,7 +87,11 @@
       // Draw your units
       for (const clan of yourClash.values()) {
         if (clan.image && clan.image.complete) {
-          ctx.drawImage(clan.image, clan.x, clan.y);
+          ctx.drawImage(clan.image,
+            clan.x - clan.image.width  / 2,
+            clan.y - clan.image.height / 2
+          );
+
         } else {
           // fallback: draw a circle
           ctx.fillStyle = "#3aa";
@@ -97,7 +104,10 @@
       // Draw enemies
       for (const enemy of enemyClash.values()) {
         if (enemy.image && enemy.image.complete) {
-          ctx.drawImage(enemy.image, enemy.x, enemy.y);
+          ctx.drawImage(enemy.image,
+              enemy.x - clan.image.width / 2,
+              enemy.y - clan.image.height / 2
+          );
         } else {
           ctx.fillStyle = "#a33";
           ctx.beginPath();
@@ -177,8 +187,12 @@
       gameTick(ctx, canvas);
       requestAnimationFrame(loop);
     }
-    loop();
-    
+
+    Promise.all(
+      [...yourClash.values(), ...enemyClash.values()]
+        .map(u => new Promise(r => u.image.onload = r))
+    ).then(() => loop());
+
 
     
   </script>
