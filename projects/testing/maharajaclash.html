@@ -187,11 +187,15 @@
       gameTick(ctx, canvas);
       requestAnimationFrame(loop);
     }
-
+    
     Promise.all(
       [...yourClash.values(), ...enemyClash.values()]
-        .map(u => new Promise(r => u.image.onload = r))
+        .map(u => new Promise(r => {
+          u.image.onload = r;
+          u.image.onerror = r;
+        }))
     ).then(() => loop());
+
 
     function resize() {
       canvas.width  = window.innerWidth;
