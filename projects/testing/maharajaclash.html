@@ -58,11 +58,13 @@
     }
     
     function moveToward(myClan, target, step) {
+      
       const dx = target.enemy.x - myClan.x;
       const dy = target.enemy.y - myClan.y;
       const distance = Math.sqrt(dx * dx + dy * dy); // fixed parenthesis
     
       if (distance > step) {
+        if (myClan.x > 20 || myClan.x
         myClan.x += (dx / distance) * step;
         myClan.y += (dy / distance) * step;
       } else {
