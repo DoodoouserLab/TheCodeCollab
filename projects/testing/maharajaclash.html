@@ -86,7 +86,57 @@
 
     let enemyClash = new Map();
 
-    function Clan(typeThis, xCord, yCord, damageThis, healthThis, speedThis, targetX, targetY, range, whichClash) {
+    function getDistance(x1, y1, x2, y2) {
+      let dx = x1 - x2;
+      let dy = y1 - y2;
+      return Math.sqrt(dx * dx + dy * dy);
+    }
+
+    function findClosestEnemy(myX, myY) {
+      let closest = null;
+      let minDistance = Infinity;
+
+      for(let [name, enemy] of enemyClash.entries()) {
+        let distance = getDistance(myX, myY, enemy.x, enemy.y);
+        if (distance < minDistance) {
+          minDistance = distance;
+          closest = { name, ...enemy, distance: distance };
+        }
+      }
+        return closest;
+    }
+
+    function moveToward(myClan, target, step) {
+      let dx = target.x - myClan.x;
+      let dy = target.y - myClan.y;
+      let distance = target.distance;
+    
+      if (distance > step) {
+        myClan.x += (dx / distance) * step;
+        myClan.y += (dy / distance) * step;
+      } else {
+        myClan.x = target.x;
+        myClan.y = target.y;
+      }
+    }
+
+    function checkDamage(myClan) {
+      for (let enemy of enemyClash.values()) {
+        let dist = getDistance(myClan.x, myClan.y, enemy.x, enemy.y);
+        if (dist <= enemy.range) {
+          myClan.health -= enemy.damage;
+        }
+      }
+    }
+
+    
+    let closest = findClosestEnemy(x, y);
+    if (closest) {
+      
+
+      
+    
+    function newClan(typeThis, xCord, yCord, damageThis, healthThis, speedThis, targetX, targetY, range, whichClash) {
       this.type = typeThis;
       this.x = xCord;
       this.y = yCord;
@@ -97,7 +147,7 @@
       this.health = healthThis;
       this.speed = speedThis;
 
-      if (whichClash = your) {
+      if (whichClash === "your") {
         yourClash.set(this.type,{ 
                        x: this.x,
                        y: this.y,
@@ -116,8 +166,11 @@
       }
 
       
-      const this.image = new Image();
+      this.image = new Image();
       this.image.src = `./images/${this.type}.png`;
+
+
+      
     }
     
   </script>
