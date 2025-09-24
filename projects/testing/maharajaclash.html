@@ -86,7 +86,7 @@
 
     let enemyClash = new Map();
 
-    function Clan(typeThis, xCord, yCord, damageThis, healthThis, speedThis, targetX, targetY, range) {
+    function Clan(typeThis, xCord, yCord, damageThis, healthThis, speedThis, targetX, targetY, range, whichClash) {
       this.type = typeThis;
       this.x = xCord;
       this.y = yCord;
@@ -96,16 +96,25 @@
       this.range = range;
       this.health = healthThis;
       this.speed = speedThis;
-      
-      yourClash.set(this.type,{ 
-                     x: this.x,
-                     y: this.y,
-                     damage: this.damage,
-                     speed: this.speed,
-                     health: this.health,
-                     type: this.type
-                    }
-             );
+
+      if (whichClash = your) {
+        yourClash.set(this.type,{ 
+                       x: this.x,
+                       y: this.y,
+                       damage: this.damage,
+                       range: this.range
+                      }
+               );
+      } else {
+        enemyClash.set(this.type,{ 
+                       x: this.x,
+                       y: this.y,
+                       damage: this.damage,
+                       range: this.range
+                      }
+               );
+      }
+
       
       const this.image = new Image();
       this.image.src = `./images/${this.type}.png`;
