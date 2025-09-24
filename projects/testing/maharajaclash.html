@@ -145,28 +145,28 @@
 
       
     
-    function newClan(typeThis, xCord, yCord, damageThis, healthThis, speedThis, targetX, targetY, range, whichClash) {
+    let unitCounter = 0;
+    
+    function Clan(typeThis, xCord, yCord, damageThis, healthThis, speedThis, range, whichClash) {
+      this.id = typeThis + "_" + (++unitCounter); // unique key
       this.type = typeThis;
       this.x = xCord;
       this.y = yCord;
-      this.tx = targetX;
-      this.ty = targetY;
       this.damage = damageThis;
       this.range = range;
       this.health = healthThis;
       this.speed = speedThis;
-
+    
       if (whichClash === "your") {
-        yourClash.set(this.type, this);
+        yourClash.set(this.id, this);
       } else {
-        enemyClash.set(this.type, this);
+        enemyClash.set(this.id, this);
       }
+    
       this.image = new Image();
       this.image.src = `./images/${this.type}.png`;
-
-
-      
     }
+
     
   </script>
 </body>
