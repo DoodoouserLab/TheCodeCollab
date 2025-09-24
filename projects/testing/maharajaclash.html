@@ -130,8 +130,17 @@
     }
 
     
-    let closest = findClosestEnemy(x, y);
-    if (closest) {
+    function gameTick() {
+      for (let [name, myClan] of yourClash.entries()) {
+        let closest = findClosestEnemy(myClan.x, myClan.y);
+        if (closest) {
+          moveToward(myClan, closest, myClan.speed);
+        }
+        checkDamage(myClan);
+        yourClash.set(name, myClan);
+      }
+    }
+
       
 
       
@@ -148,24 +157,10 @@
       this.speed = speedThis;
 
       if (whichClash === "your") {
-        yourClash.set(this.type,{ 
-                       x: this.x,
-                       y: this.y,
-                       damage: this.damage,
-                       range: this.range
-                      }
-               );
+        yourClash.set(this.type, this);
       } else {
-        enemyClash.set(this.type,{ 
-                       x: this.x,
-                       y: this.y,
-                       damage: this.damage,
-                       range: this.range
-                      }
-               );
+        enemyClash.set(this.type, this);
       }
-
-      
       this.image = new Image();
       this.image.src = `./images/${this.type}.png`;
 
