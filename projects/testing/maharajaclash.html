@@ -100,16 +100,16 @@
         let distance = getDistance(myX, myY, enemy.x, enemy.y);
         if (distance < minDistance) {
           minDistance = distance;
-          closest = { name, ...enemy, distance: distance };
+          closest = { name, enemy, distance: distance };
         }
       }
         return closest;
     }
 
     function moveToward(myClan, target, step) {
-      let dx = target.x - myClan.x;
-      let dy = target.y - myClan.y;
-      let distance = target.distance;
+      let dx = target.enemy.x - myClan.x;
+      let dy = target.enemy.y - myClan.y;
+      let distance = Math.sqrt(dx * dx + dy * dy;
     
       if (distance > step) {
         myClan.x += (dx / distance) * step;
@@ -127,6 +127,38 @@
           myClan.health -= enemy.damage;
         }
       }
+    }
+
+    function render(ctx, canvas) {
+      ctx.clearRect(0, 0, canvas.width, canvas.height);
+      for (let clan of yourClash.values()) {
+        ctx.drawImage(clan.image, clan.x, clan.y);
+      }
+      for (let enemy of enemyClash.values()) {
+        ctx.drawImage(enemy.image, enemy.x, enemy.y);
+      }
+    }
+
+    function gameTick(ctx, canvas) {
+      for (let [name, myClan] of yourClash.entries()) {
+        let closest = findClosestEnemy(myClan.x, myClan.y);
+        if (closest) {
+          moveToward(myClan, closest, myClan.speed);
+        }
+        checkDamage(myClan);
+        yourClash.set(name, myClan);
+      }
+
+      for (let [name, notMyClan] of enemyClash.entries()) {
+        let closest = findClosestEnemy(notMyClan.x, notMyClan.y);
+        if (closest) {
+          moveToward(notMyClan, closest, notMyClan.speed);
+        }
+        checkDamage(notMyClan);
+        enemyClash.set(name, notMyClan);
+      }
+    
+      render(ctx, canvas);
     }
 
     
@@ -148,7 +180,7 @@
     let unitCounter = 0;
     
     function Clan(typeThis, xCord, yCord, damageThis, healthThis, speedThis, range, whichClash) {
-      this.id = typeThis + "_" + (++unitCounter); // unique key
+      this.id = typeThis + "_" + (++unitCounter);
       this.type = typeThis;
       this.x = xCord;
       this.y = yCord;
