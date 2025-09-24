@@ -105,8 +105,8 @@
       for (const enemy of enemyClash.values()) {
         if (enemy.image && enemy.image.complete) {
           ctx.drawImage(enemy.image,
-              enemy.x - clan.image.width / 2,
-              enemy.y - clan.image.height / 2
+              enemy.x - enemy.image.width / 2,
+              enemy.y - enemy.image.height / 2
           );
         } else {
           ctx.fillStyle = "#a33";
@@ -193,6 +193,12 @@
         .map(u => new Promise(r => u.image.onload = r))
     ).then(() => loop());
 
+    function resize() {
+      canvas.width  = window.innerWidth;
+      canvas.height = window.innerHeight;
+    }
+    window.addEventListener("resize", resize);
+    resize();
 
     
   </script>
