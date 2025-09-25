@@ -95,10 +95,15 @@
       // Draw your units
       for (const clan of yourClash.values()) {
         if (clan.image && clan.image.complete) {
+          const ox = clan.naturalwidth;
+          const oy = clan.naturalHeight;
+          const rx = ox / drawingratio.x;
+          const ry = ox / drawingratio.x;
           ctx.drawImage(clan.image,
             clan.x - clan.image.width  / 2,
             clan.y - clan.image.height / 2,
-            
+            rx,
+            ry
           );
 
         } else {
