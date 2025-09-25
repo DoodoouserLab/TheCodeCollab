@@ -69,7 +69,7 @@
       const distance = Math.sqrt(dx * dx + dy * dy); // fixed parenthesis
     
       if (distance > step) {
-        if (myClan.x > 20 || myClan.x
+        if (myClan.x < 20 || myClan.x > 0) {
         myClan.x += (dx / distance) * step;
         myClan.y += (dy / distance) * step;
       } else {
@@ -100,7 +100,7 @@
           const rx = ox / drawingratio.x;
           const ry = ox / drawingratio.x;
           ctx.drawImage(clan.image,
-            clan.x - clan.image.width  / 2,
+            clan.x - rx / 2,
             clan.y - clan.image.height / 2,
             rx,
             ry
@@ -118,9 +118,13 @@
       // Draw enemies
       for (const enemy of enemyClash.values()) {
         if (enemy.image && enemy.image.complete) {
+          const oex = enemy.naturalwidth;
+          const oey = enemy.naturalHeight;
+          const rex = ox / drawingratio.x;
+          const rey = ox / drawingratio.x;
           ctx.drawImage(enemy.image,
-              enemy.x - enemy.image.width / 2,
-              enemy.y - enemy.image.height / 2
+              enemy.x - rex / 2,
+              enemy.y - rey / 2
           );
         } else {
           ctx.fillStyle = "#a33";
