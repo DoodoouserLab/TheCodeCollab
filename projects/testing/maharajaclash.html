@@ -69,7 +69,7 @@
       const distance = Math.sqrt(dx * dx + dy * dy); // fixed parenthesis
     
       if (distance > step) {
-        if (myClan.x < 20 || myClan.x > 0) {
+        if (myClan.x < 20 && myClan.x > 0 && myClan.y < 40 && myClan.y > 0) {
         myClan.x += (dx / distance) * step;
         myClan.y += (dy / distance) * step;
       } else {
@@ -195,10 +195,10 @@
     }
 
     
-    new Clan("knight", 50, 50, 10, 100, 3, 30, "your");
-    new Clan("knight", 80, 80, 6, 80, 4, 60, "your");
-    new Clan("knight", 300, 200, 8, 90, 2, 40, "enemy");
-    new Clan("knight", 350, 260, 5, 60, 3, 30, "enemy");
+    new Clan("knight", 0, 5, 10, 100, 3, 30, "your");
+    new Clan("knight", 8, 8, 6, 80, 4, 60, "your");
+    new Clan("knight", 12, 20, 8, 90, 2, 40, "enemy");
+    new Clan("knight", 16, 26, 5, 60, 3, 30, "enemy");
 
 
     function loop() {
