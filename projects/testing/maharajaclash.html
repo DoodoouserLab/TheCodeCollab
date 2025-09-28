@@ -35,11 +35,6 @@
     const GRID_W = 20; // horizontal
     const GRID_H = 30; // vertical
 
-    targetArena.y = canvas.height * 0.8;
-    targetArena.x = targetArena.y * (GRID_W / GRID_H); // 0.75
-    drawingRatio.x = targetArena.x / GRID_W * 3;
-    drawingRatio.y = targetArena.y / GRID_H * 3;
-
     function toCanvasXY(gx, gy) {
       return {
         x: (canvas.width - targetArena.x)/2 + gx * drawingRatio.x,
@@ -126,8 +121,8 @@
           ctx.drawImage(clan.image,
             px - rx/2, 
             py - ry/2, 
-            rx, 
-            ry
+            rx *3, 
+            ry * 3
           );
         } else {
           ctx.fillStyle = "#3aa";
@@ -146,8 +141,8 @@
           ctx.drawImage(enemy.image,
             px - rx/2, 
             py - ry/2, 
-            rx, 
-            ry
+            rx * 3, 
+            ry * 3
           );
         } else {
           ctx.fillStyle = "#a33";
@@ -219,10 +214,10 @@
     }
 
     
-    new Clan("knight", 0, 5, 10, 100, 0.3, 0.03, "your");
-    new Clan("knight", 8, 8, 6, 80, 0.4, 0.06, "your");
-    new Clan("knight", 12, 20, 8, 90, 0.02, 4, "enemy");
-    new Clan("knight", 16, 26, 5, 60, 0.03, 3, "enemy");
+    new Clan("knight", 0, 5, 10, 100, 0.3, 0.01, "your");
+    new Clan("knight", 8, 8, 6, 80, 0.4, 0.01, "your");
+    new Clan("knight", 12, 20, 8, 90, 0.01, 4, "enemy");
+    new Clan("knight", 16, 26, 5, 60, 0.01, 3, "enemy");
 
 
     function loop() {
@@ -251,8 +246,11 @@
       canvas.height = window.innerHeight;
       targetArena.y = canvas.height * 0.8;
       targetArena.x = targetArena.y * (GRID_W / GRID_H);
-      drawingRatio.x = targetArena.x / GRID_W * 3;
-      drawingRatio.y = targetArena.y / GRID_H * 3;
+      drawingRatio.x = targetArena.x / GRID_W;
+      drawingRatio.y = targetArena.y / GRID_H;
+      canvas.style.width  = canvas.width  + "px";
+      canvas.style.height = canvas.height + "px";
+
     }
 
     window.addEventListener("resize", resize);
