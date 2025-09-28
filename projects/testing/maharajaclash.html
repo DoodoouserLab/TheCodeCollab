@@ -43,7 +43,7 @@
     function toCanvasXY(gx, gy) {
       return {
         x: (canvas.width - targetArena.x)/2 + gx * drawingRatio.x,
-        y:    0.2 * canvas.height   + gy * drawingRatio.y
+        y:    0.1 * canvas.height   + gy * drawingRatio.y
       };
     }
 
@@ -111,7 +111,7 @@
     function render(ctx, canvas) {
       ctx.clearRect(0, 0, canvas.width, canvas.height);
       const ax = (canvas.width - targetArena.x) / 2; 
-      const ay = 0.2 * canvas.height;
+      const ay = 0.1 * canvas.height;
       const aw = targetArena.x;
       const ah = targetArena.y;
     
