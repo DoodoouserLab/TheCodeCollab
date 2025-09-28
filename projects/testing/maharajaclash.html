@@ -30,12 +30,22 @@
     canvas.width  = window.innerWidth;
     canvas.height = window.innerHeight;
 
-    let targetArena.y = canvas.height * 0.8;
-    let targetArena.x = targetArena.y * 0.75;
-    let drawingRatio.x = targetArena.x / 20;
-    let drawingRatio.y = targetarena.y / 30;
+    const targetArena = { x: 0, y: 0 };
+    const drawingRatio = { x: 0, y: 0 };
+    const GRID_W = 20; // horizontal
+    const GRID_H = 30; // vertical
 
-    
+    targetArena.y = canvas.height * 0.8;
+    targetArena.x = targetArena.y * (GRID_W / GRID_H); // 0.75
+    drawingRatio.x = targetArena.x / GRID_W;
+    drawingRatio.y = targetArena.y / GRID_H;
+
+    function toCanvasXY(gx, gy) {
+      const px = gx * drawingRatio.x;
+      const py = gy * drawingRatio.y;
+      return { x: px, y: py };
+    }
+
     
     let yourClash = new Map();
 
@@ -63,21 +73,25 @@
     }
     
     function moveToward(myClan, target, step) {
-      
       const dx = target.enemy.x - myClan.x;
       const dy = target.enemy.y - myClan.y;
-      const distance = Math.sqrt(dx * dx + dy * dy); // fixed parenthesis
-    
+      const distance = Math.sqrt(dx * dx + dy * dy);
+      
       if (distance > step) {
-        if (myClan.x < 20 && myClan.x > 0 && myClan.y < 40 && myClan.y > 0) {
-        myClan.x += (dx / distance) * step;
-        myClan.y += (dy / distance) * step;
+      myClan.x += (dx / distance) * step;
+      myClan.y += (dy / distance) * step;
       } else {
-        // snap to target position
         myClan.x = target.enemy.x;
         myClan.y = target.enemy.y;
       }
+      
+        // clamp to grid bounds
+      if (myClan.x < 0) myClan.x = 0;
+      if (myClan.y < 0) myClan.y = 0;
+      if (myClan.x > GRID_W) myClan.x = GRID_W;
+      if (myClan.y > GRID_H) myClan.y = GRID_H;
     }
+
     
     function checkDamageFromMap(myClan, attackersMap) {
       for (const attacker of attackersMap.values()) {
@@ -92,47 +106,36 @@
     function render(ctx, canvas) {
       ctx.clearRect(0, 0, canvas.width, canvas.height);
     
-      // Draw your units
       for (const clan of yourClash.values()) {
+        const { x: px, y: py } = toCanvasXY(clan.x, clan.y);
+      
         if (clan.image && clan.image.complete) {
-          const ox = clan.naturalwidth;
-          const oy = clan.naturalHeight;
-          const rx = ox / drawingratio.x;
-          const ry = ox / drawingratio.x;
-          ctx.drawImage(clan.image,
-            clan.x - rx / 2,
-            clan.y - ry / 2,
-            rx,
-            ry
-          );
-
+          const rx = drawingRatio.x;
+          const ry = drawingRatio.y;
+          ctx.drawImage(clan.image, px - rx / 2, py - ry / 2, rx, ry);
         } else {
-          // fallback: draw a circle
           ctx.fillStyle = "#3aa";
           ctx.beginPath();
-          ctx.arc(clan.x, clan.y, 8, 0, Math.PI * 2);
+          ctx.arc(px, py, Math.min(drawingRatio.x, drawingRatio.y) * 0.35, 0, Math.PI * 2);
           ctx.fill();
         }
       }
-    
-      // Draw enemies
+
       for (const enemy of enemyClash.values()) {
+        const { x: px, y: py } = toCanvasXY(enemy.x, enemy.y);
+      
         if (enemy.image && enemy.image.complete) {
-          const oex = enemy.naturalwidth;
-          const oey = enemy.naturalHeight;
-          const rex = ox / drawingratio.x;
-          const rey = ox / drawingratio.x;
-          ctx.drawImage(enemy.image,
-              enemy.x - rex / 2,
-              enemy.y - rey / 2
-          );
+          const rx = drawingRatio.x;
+          const ry = drawingRatio.y;
+          ctx.drawImage(enemy.image, px - rx / 2, py - ry / 2, rx, ry);
         } else {
           ctx.fillStyle = "#a33";
           ctx.beginPath();
-          ctx.arc(enemy.x, enemy.y, 8, 0, Math.PI * 2);
+          ctx.arc(px, py, Math.min(drawingRatio.x, drawingRatio.y) * 0.35, 0, Math.PI * 2);
           ctx.fill();
         }
       }
+
     }
 
     
@@ -195,10 +198,10 @@
     }
 
     
-    new Clan("knight", 0, 5, 10, 100, 3, 30, "your");
-    new Clan("knight", 8, 8, 6, 80, 4, 60, "your");
-    new Clan("knight", 12, 20, 8, 90, 2, 40, "enemy");
-    new Clan("knight", 16, 26, 5, 60, 3, 30, "enemy");
+    new Clan("knight", 0, 5, 10, 100, 0.3, 30, "your");
+    new Clan("knight", 8, 8, 6, 80, 0.4, 60, "your");
+    new Clan("knight", 12, 20, 8, 90, 0.2, 40, "enemy");
+    new Clan("knight", 16, 26, 5, 60, 0.3, 30, "enemy");
 
 
     function loop() {
@@ -214,15 +217,15 @@
         }))
     ).then(() => loop());
 
-
     function resize() {
       canvas.width  = window.innerWidth;
       canvas.height = window.innerHeight;
       targetArena.y = canvas.height * 0.8;
-      targetArena.x = targetArena.y * 0.75;
-      drawingRatio.x = targetArena.x / 20;
-      drawingRatio.y = targetarena.y / 30;
+      targetArena.x = targetArena.y * (GRID_W / GRID_H);
+      drawingRatio.x = targetArena.x / GRID_W;
+      drawingRatio.y = targetArena.y / GRID_H;
     }
+
     window.addEventListener("resize", resize);
     resize();
 
