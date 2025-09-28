@@ -37,8 +37,8 @@
 
     targetArena.y = canvas.height * 0.8;
     targetArena.x = targetArena.y * (GRID_W / GRID_H); // 0.75
-    drawingRatio.x = targetArena.x / GRID_W;
-    drawingRatio.y = targetArena.y / GRID_H;
+    drawingRatio.x = targetArena.x / GRID_W * 3;
+    drawingRatio.y = targetArena.y / GRID_H * 3;
 
     function toCanvasXY(gx, gy) {
       return {
@@ -251,8 +251,8 @@
       canvas.height = window.innerHeight;
       targetArena.y = canvas.height * 0.8;
       targetArena.x = targetArena.y * (GRID_W / GRID_H);
-      drawingRatio.x = targetArena.x / GRID_W;
-      drawingRatio.y = targetArena.y / GRID_H;
+      drawingRatio.x = targetArena.x / GRID_W * 3;
+      drawingRatio.y = targetArena.y / GRID_H * 3;
     }
 
     window.addEventListener("resize", resize);
