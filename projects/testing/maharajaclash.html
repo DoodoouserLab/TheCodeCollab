@@ -229,11 +229,21 @@
       gameTick(ctx, canvas);
       requestAnimationFrame(loop);
     }
-    
     Promise.all([
-      …[...yourClash, …enemyClash].map(…),
-      new Promise(r => { arenaImage.onload = r; arenaImage.onerror = r; })
-    ]).then(() => loop());
+      // all unit images
+      ...[...yourClash.values(), ...enemyClash.values()].map(u =>
+        new Promise(res => {
+          u.image.onload  = res;
+          u.image.onerror = res;
+        })
+      ),
+      // the arena background
+      new Promise(res => {
+        arenaImage.onload  = res;
+        arenaImage.onerror = res;
+      })
+    ]).then(loop);
+
 
 
     function resize() {
