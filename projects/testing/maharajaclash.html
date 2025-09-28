@@ -41,10 +41,15 @@
     drawingRatio.y = targetArena.y / GRID_H;
 
     function toCanvasXY(gx, gy) {
-      const px = gx * drawingRatio.x;
-      const py = gy * drawingRatio.y;
-      return { x: px, y: py };
+      return {
+        x: (canvas.width - targetArena.x)/2 + gx * drawingRatio.x,
+        y:    0.2 * canvas.height   + gy * drawingRatio.y
+      };
     }
+
+
+    const arenaImage = new Image();
+    arenaImage.src = "./images/arena.png"; // your file path
 
     
     let yourClash = new Map();
@@ -105,14 +110,25 @@
 
     function render(ctx, canvas) {
       ctx.clearRect(0, 0, canvas.width, canvas.height);
+      const ax = (canvas.width - targetArena.x) / 2; 
+      const ay = 0.2 * canvas.height;
+      const aw = targetArena.x;
+      const ah = targetArena.y;
     
+      // Simple stretch to arena size:
+      ctx.drawImage(arenaImage, ax, ay, aw, ah);
+        
       for (const clan of yourClash.values()) {
         const { x: px, y: py } = toCanvasXY(clan.x, clan.y);
-      
+        const rx = drawingRatio.x;
+        const ry = drawingRatio.y;
         if (clan.image && clan.image.complete) {
-          const rx = drawingRatio.x;
-          const ry = drawingRatio.y;
-          ctx.drawImage(clan.image, px - rx / 2, py - ry / 2, rx, ry);
+          ctx.drawImage(clan.image,
+            px - rx/2, 
+            py - ry/2, 
+            rx, 
+            ry
+          );
         } else {
           ctx.fillStyle = "#3aa";
           ctx.beginPath();
@@ -127,7 +143,12 @@
         if (enemy.image && enemy.image.complete) {
           const rx = drawingRatio.x;
           const ry = drawingRatio.y;
-          ctx.drawImage(enemy.image, px - rx / 2, py - ry / 2, rx, ry);
+          ctx.drawImage(enemy.image,
+            px - rx/2, 
+            py - ry/2, 
+            rx, 
+            ry
+          );
         } else {
           ctx.fillStyle = "#a33";
           ctx.beginPath();
@@ -209,13 +230,11 @@
       requestAnimationFrame(loop);
     }
     
-    Promise.all(
-      [...yourClash.values(), ...enemyClash.values()]
-        .map(u => new Promise(r => {
-          u.image.onload = r;
-          u.image.onerror = r;
-        }))
-    ).then(() => loop());
+    Promise.all([
+      …[...yourClash, …enemyClash].map(…),
+      new Promise(r => { arenaImage.onload = r; arenaImage.onerror = r; })
+    ]).then(() => loop());
+
 
     function resize() {
       canvas.width  = window.innerWidth;
