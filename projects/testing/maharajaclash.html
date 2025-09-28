@@ -121,7 +121,7 @@
           ctx.drawImage(clan.image,
             px - rx/2, 
             py - ry/2, 
-            rx *3, 
+            rx * 3, 
             ry * 3
           );
         } else {
@@ -245,7 +245,7 @@
       canvas.width  = window.innerWidth;
       canvas.height = window.innerHeight;
       targetArena.y = canvas.height * 0.8;
-      targetArena.x = targetArena.y * (GRID_W / GRID_H);
+      targetArena.x = targetArena.y * 2 / 3;
       drawingRatio.x = targetArena.x / GRID_W;
       drawingRatio.y = targetArena.y / GRID_H;
       canvas.style.width  = canvas.width  + "px";
